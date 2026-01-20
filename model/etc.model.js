@@ -123,9 +123,25 @@ exports.getGroupCode = async function (groupCd) {
     let sql = "select * from new_tb_code where groupCd in (?) and itemCd <> groupCd"
     let aParameter = [groupCd];
 
-    let query = mysql.format(sql, aParameter);
+    //let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.setWageCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt) {
+    console.log(cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt);
+    let sql = "insert into new_tb_code_wage (cIdx, groupCd, itemCd, itemNm, sort, useFl, tax_free, regDt) values (?, ?, ?, ?, ?, ?, ?, ?)"
+    sql += " ON DUPLICATE KEY UPDATE itemCd=?,itemNm=?,sort=?,useFl=?,tax_free=?,modDt=?"
+    let aParameter = [cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt, itemCd, itemNm, sort, useFl, regDt];
+
+    //let query = mysql.format(sql, aParameter);
+    try {
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -134,12 +150,12 @@ exports.getGroupCode = async function (groupCd) {
 }
 
 exports.setBaseCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt) {
-    let sql = "insert into new_tb_code_wage (cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt) values (?, ?, ?, ?, ?, ?, ?)"
+    let sql = "insert into new_tb_code (cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt) values (?, ?, ?, ?, ?, ?, ?)"
     let aParameter = [cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt];
 
-    let query = mysql.format(sql, aParameter);
+    //let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -172,9 +188,9 @@ exports.getWageCode = async function (cIdx) {
     sql += " ORDER BY sort";
     let aParameter = [cIdx];
 
-    let query = mysql.format(sql, aParameter);
+    //let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -182,9 +198,23 @@ exports.getWageCode = async function (cIdx) {
     }
 }
 
-exports.deleteBaseCode = async function (groupCd) {
-    let sql = "delete from new_tb_code_wage where groupCd = ?"
-    let aParameter = [groupCd];
+exports.deleteWageCode = async function (itemCd) {console.log(itemCd,' itemCd')
+    let sql = "delete from new_tb_code_wage where itemCd = ?"
+    let aParameter = [itemCd];
+
+    //let query = mysql.format(sql, aParameter);
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.deleteBaseCode = async function (itemCd) {
+    let sql = "delete from new_tb_code where itemCd = ?"
+    let aParameter = [itemCd];
 
     let query = mysql.format(sql, aParameter);
     try {

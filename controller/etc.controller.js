@@ -18,11 +18,17 @@ module.exports = function (app) {
     //그룹 코드 조회
     app.route('/v1/code/:groupCd').get(service.getGroupCode);
 
-    //코드 삭제
-    app.route('/v1/code/:groupCd').delete(service.deleteBaseCode);
+    //급여 코드 삭제
+    app.route('/v1/code/wage/:itemCd').delete(service.deleteWageCode);
 
-    //코드 저장
+    //급여 코드 저장
+    app.route('/v1/code/wage/:cIdx').post(service.setWageCode);
+
+    //기본 코드 저장
     app.route('/v1/code/:cIdx').post(service.setBaseCode);
+
+    //기본 코드 삭제
+    app.route('/v1/code/:itemCd').delete(service.deleteBaseCode);
 
     //company 정보 조회
     app.route('/v1/config/company/:idx').get(service.getCompanyConfig);

@@ -30,6 +30,20 @@ exports.getGroupCode = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
+exports.setWageCode = async function (req, res) {
+    let cIdx = req.params.cIdx,
+        groupCd = req.body.groupCd,
+        itemCd = req.body.itemCd,
+        itemNm = req.body.itemNm,
+        sort = req.body.sort || 0,
+        useFl = req.body.useFl,
+        regDt = new Date();
+
+    let result = await etcModel.setWageCode(cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt);
+
+    res.json({'result': true, 'data': result})
+}
+
 exports.setBaseCode = async function (req, res) {
     let cIdx = req.params.cIdx,
         groupCd = req.body.groupCd,
@@ -60,11 +74,19 @@ exports.getWageCode = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
-exports.deleteBaseCode = async function (req, res) {
-    let groupCd = req.params.groupCd;
-    console.log('deleteBaseCode', groupCd);
+exports.deleteWageCode = async function (req, res) {
+    let itemCd = req.params.itemCd;
+    //console.log('deleteBaseCode', groupCd);
 
-    let result = await etcModel.deleteBaseCode(groupCd);
+    let result = await etcModel.deleteWageCode(itemCd);
+
+    res.json({'result': true, 'data': result})
+}
+
+exports.deleteBaseCode = async function (req, res) {
+    let itemCd = req.params.itemCd;
+
+    let result = await etcModel.deleteBaseCode(itemCd);
 
     res.json({'result': true, 'data': result})
 }
