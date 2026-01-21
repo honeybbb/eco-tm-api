@@ -278,10 +278,10 @@ exports.delWorkDays = async function (uIdx) {
 exports.setTaxRate = async function (appliedYear, pensionRate, healthRate, longTermCareRate, employmentRate){
     let sql = "insert into new_tb_tax_rate (applied_year, pension_rate, health_rate, long_term_care_rate, employment_rate) values (?, ?, ?, ?, ?)"
     let aParameter = [appliedYear, pensionRate, healthRate, longTermCareRate, employmentRate];
-    let query = mysql.format(sql, aParameter);
+    //let query = mysql.format(sql, aParameter);
 
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
