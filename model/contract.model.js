@@ -1,15 +1,15 @@
-const mysql = require("mysql");
+const mysql = require("mysql2/promise");
 const pool = require("../config/mysql");
 
 //직원 근로계약서 작성
-exports.setMemberContract = async function (mIdx, sIdx, type, jsonData, startDt, endDt, bigo) {
-    let sql = "insert into new_tb_member_contract (mIdx, sIdx, type, jsonData, startDt, endDt, bigo)"
-    sql += " values (?, ?, ?, ?, ?, ?, ?)"
-    let aParameter = [mIdx, sIdx, type, jsonData, startDt, endDt, bigo];
+exports.setMemberContract = async function (mIdx, sIdx, type, jsonData, filePath, startDt, endDt, bigo) {
+    let sql = "insert into new_tb_member_contract (mIdx, sIdx, type, jsonData, filePath, startDt, endDt, bigo)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?, ?)"
+    let aParameter = [mIdx, sIdx, type, jsonData, filePath, startDt, endDt, bigo];
 
-    let query = mysql.format(sql, aParameter);
+    //let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);

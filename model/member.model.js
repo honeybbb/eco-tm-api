@@ -1,5 +1,5 @@
 const pool = require("../config/mysql");
-const mysql = require("mysql")
+const mysql = require("mysql2/promise");
 
 exports.getMemberList = async function () {
     let sql = "select m.*, case when status = 0 then '재직' when status = 1 then '퇴사' else '-' end as `status`,"
@@ -79,9 +79,9 @@ exports.setMemberData = async function(type, name, id, password, birthDt, phone,
         bank, accountNo, inDate, outDate, outReason, addr, bigo
     ];
 
-    let query = mysql.format(sql, aParameter);
+    //let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);

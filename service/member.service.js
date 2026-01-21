@@ -1,4 +1,5 @@
 const memberModel = require("../model/member.model")
+const contractModel = require("../model/contract.model")
 const {hashPassword} = require("../utils/password");
 const bcrypt  = require("bcrypt");
 
@@ -23,6 +24,54 @@ exports.getMemberAvailable = async function (req, res) {
     let result = await memberModel.getMemberAvailable(sIdx);
 
     res.json({'result': true, 'data': result})
+}
+
+exports.setMemberData1 = async function (req, res) {
+    console.log(req.body, req.file);
+    try {
+        const memberData = JSON.parse(req.body.memberData);
+        const contractData = JSON.parse(req.body.contractData);
+
+        // 업로드된 파일 정보 확인
+        const uploadedFile = req.file;
+
+        //비밀번호 해시
+        const hash = await bcrypt.hash(memberData.password, 10);
+
+        // 직원 정보 DB 저장
+        let memberResult = await memberModel.setMemberData(
+            memberData.type, memberData.name, memberData.id, hash, memberData.birthDate, memberData.phone,
+            memberData.position, null, memberData.gender, memberData.email,
+            memberData.disability, memberData.disability_date, memberData.disability_grade,
+            memberData.defector, memberData.patriot, memberData.intern, memberData.beneficiary,
+            memberData.foreigner, memberData.nationality, memberData.visa_code, memberData.visa_date,
+            memberData.bankName, memberData.accountNumber, memberData.joinDate, memberData.endDate,
+            memberData.departureReason, memberData.address, memberData.bigo
+        );
+
+        const mIdx = memberResult.insertId;
+        if (mIdx && uploadedFile) {
+
+            const jsonString = JSON.stringify(contractData.jsonData);
+
+            await contractModel.setMemberContract(
+                mIdx,           // mIdx (방금 만든 직원 ID)
+                contractData.sIdx,      // sIdx
+                contractData.type,      // type
+                jsonString,             // jsonData
+                uploadedFile.filename,  // filePath (파일명 또는 전체 경로)
+                contractData.startDt,   // startDt
+                contractData.endDt,     // endDt
+                contractData.bigo       // bigo
+            );
+        }
+
+        res.json({ result: true, msg: '등록 성공' });
+
+    } catch (e) {
+        console.error('Registration Error:', e);
+        res.json({result: false, msg: '등록 중 오류가 발생했습니다.'});
+    }
 }
 
 exports.setMemberData = async function(req, res) {
