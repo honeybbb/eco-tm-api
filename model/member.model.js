@@ -144,9 +144,9 @@ exports.getPayroll = async function () {
     sql += " order by s.name, m.name"
     let aParameter = [];
 
-    let query = mysql.format(sql, aParameter);
+    //let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
