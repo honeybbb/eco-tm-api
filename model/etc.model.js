@@ -292,10 +292,10 @@ exports.setTaxRate = async function (appliedYear, pensionRate, healthRate, longT
 exports.getTaxRate = async function (year){
     let sql = "select * from new_tb_tax_rate where applied_year in (?)";
     let aParameter = [year];
-    let query = mysql.format(sql, aParameter);
+    //let query = mysql.format(sql, aParameter);
 
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
