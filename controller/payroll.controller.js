@@ -19,4 +19,7 @@ module.exports = function (app) {
 
     //연차 추계액 조회
     // app.route('/v1/annual/leave').get(service.getAnnualLeave);
+
+    //정산관리 조회
+    app.route('/v1/payroll/list').get(service.getPayrollList);
 }

@@ -109,3 +109,16 @@ exports.setPayrollDetail = async function (
         return {'data': '-9999'}
     }
 }
+
+exports.getPayrollList = async function (year, month) {
+    let sql = "select * from new_tb_settlement where year in (?) and month in (?)"
+    let aParameter = [year, month];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}

@@ -127,8 +127,10 @@ exports.setSiteHeadCount = async function (cIdx, sIdx, jsonData) {
 }
 
 exports.getSiteData = async function (sIdx) {
-    let sql = "select s.*, sa.jsonData from new_tb_site s"
+    let sql = "select s.*, sa.jsonData, sc.startDt, sc.endDt, sc.total_cost"
+    sql += " from new_tb_site s"
     sql += " left join new_tb_site_assignment sa on sa.sIdx = s.idx"
+    sql += " left join new_tb_site_contract sc on sc.sIdx = s.idx"
     sql += " where s.idx in (?)";
     let aParameter = [sIdx];
 

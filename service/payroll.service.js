@@ -152,3 +152,12 @@ exports.setPayrollDetail = async function (req, res) {
 
     res.json({'result': true, 'data': result})
 }
+
+exports.getPayrollList = async function (req, res) {
+    let {year, month} = req.query;
+    console.log(year, month, 'getPayrollList')
+
+    let result = await payrollModel.getPayrollList(year, month);
+
+    res.json({'result': true, 'data': result})
+}

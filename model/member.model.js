@@ -51,9 +51,9 @@ exports.getMemberAvailable = async function(sIdx) {
     sql += " WHERE ma.sIdx in (?))";
     let aParameter = [sIdx];
 
-    let query = mysql.format(sql, aParameter);
+    //let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
