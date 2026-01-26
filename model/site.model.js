@@ -43,8 +43,8 @@ exports.insertSiteAndContract = async function (site, contract) {
         // 현장등록 시작
         let sqlSite = `
             INSERT INTO new_tb_site 
-            (cIdx, name, address, phone, building_su, unit_su, area) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (cIdx, name, address, phone, building_su, unit_su, area, director, director_phone) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         let paramSite = [
             site.cIdx,
@@ -53,7 +53,9 @@ exports.insertSiteAndContract = async function (site, contract) {
             site.phone,
             site.building_su,
             site.unit_su,
-            site.area
+            site.area,
+            site.director,
+            site.director_phone,
         ];
 
         // pool.query 대신 connection.query 사용
@@ -66,7 +68,7 @@ exports.insertSiteAndContract = async function (site, contract) {
         // 위에서 얻은 newSiteIdx를 sIdx 값으로 사용합니다.
         let sqlContract = `
             INSERT INTO new_tb_site_contract 
-            (sIdx, cIdx, jsonData, total_amount, startDt, endDt) 
+            (sIdx, cIdx, jsonData, total_cost, startDt, endDt) 
             VALUES (?, ?, ?, ?, ?, ?)
         `;
         let paramContract = [

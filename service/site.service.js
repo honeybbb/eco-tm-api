@@ -36,7 +36,9 @@ exports.registerSiteWithContract = async function (req, res) {
         bigo: req.body.bigo,
         building_su: req.body.building_su,
         unit_su: req.body.unit_su,
-        area: req.body.area
+        area: req.body.area,
+        director: req.body.director,
+        director_phone: req.body.directorContact,
     };
 
     // 2. 계약(Contract) 데이터
@@ -44,8 +46,8 @@ exports.registerSiteWithContract = async function (req, res) {
         cIdx: req.body.cIdx, // 현장과 동일한 회사 ID라고 가정
         contract: req.body.contract || {}, // JSON 데이터 등
         totalCost: req.body.totalCost || 0, // 금액 (없으면 0 처리 등)
-        startDt: req.body.contractStart,
-        endDt: req.body.contractEnd
+        startDt: req.body.startDt,
+        endDt: req.body.endDt
     };
 
     console.log('등록 요청:', siteData, contractData);

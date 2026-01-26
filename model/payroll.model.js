@@ -95,7 +95,7 @@ exports.setPayrollDetail = async function (
     etcCostJson, manageCostJson, amount, regDt
 ){
     let sql = "insert into new_tb_payroll (sIdx, cIdx, year, month,"
-    sql += " directCostJson, indirectCostJson, etcCostJson, manageCostJson, total_amount, regDt)"
+    sql += " directCostJson, indirectCostJson, etcCostJson, manageCostJson, total_cost, regDt)"
     sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     let aParameter = [sIdx, cIdx, year, month, directCostJson, indirectCostJson,
         etcCostJson, manageCostJson, amount, regDt];

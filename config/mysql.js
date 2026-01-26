@@ -5,7 +5,8 @@ var pool = mysql.createPool({
     post: '3306',
     user: 'root',
     password: 'Renew0701!',
-    database: 'eco_erp_system'
+    database: 'eco_erp_system',
+    dateStrings: true   //시간을 문자열로 가져오기
 })
 /*
 pool.getConnection((err, connection) => {
