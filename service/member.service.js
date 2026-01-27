@@ -121,25 +121,25 @@ exports.setMemberData = async function(req, res) {
 }
 
 //직원급여등록
-exports.setPayroll = async function (req, res) {
+exports.setBaseSalary = async function (req, res) {
     let mIdx = req.params.mIdx, //회원idx
         sIdx = req.body.sIdx, //현장idx
         year = req.body.year,   //현재 년도
         paymentList = req.body.payItems, //json(지급항목)
         deductionList = req.body.deductionItems, //json(공제항목)
         grossPay = req.body.grossPay,
-        deductions = req.body.deductions,
+        deductions = req.body.deducti1ons,
         netPay = req.body.netPay,
         total = req.body.total; //합계
 
-    let result = await memberModel.setPayroll(mIdx, sIdx, year, paymentList, deductionList, grossPay, deductions, netPay, total);
+    let result = await memberModel.setBaseSalary(mIdx, sIdx, year, paymentList, deductionList, grossPay, deductions, netPay, total);
 
     res.json({'result': true, 'data': result})
 };
 
 //직원기본급여조회
-exports.getPayroll = async function (req, res) {
-    let result = await memberModel.getPayroll();
+exports.getBaseSalary = async function (req, res) {
+    let result = await memberModel.getBaseSalary();
 
     res.json({'result': true, 'data': result})
 }
@@ -147,6 +147,24 @@ exports.getPayroll = async function (req, res) {
 //직원급여내역조회
 exports.getPayrollMonth = async function (req, res) {
     let result = await memberModel.getPayrollMonth();
+
+    res.json({'result': true, 'data': result})
+}
+
+exports.setPayrollMonth = async function (req, res) {
+    let mIdx = req.params.mIdx,
+        sIdx = req.body.sIdx,
+        year = req.body.year,
+        month = req.body.month,
+        workDays = req.body.workDays,
+        grossPay = req.body.grossPay,
+        deductions = req.body.deductions,
+        netPay = req.body.netPay,
+        payItems = req.body.payItems,
+        deductionItems = req.body.deductionItems,
+        total = req.body.total;
+
+    let result = await memberModel.setPayrollMonth(mIdx, sIdx, year, month, grossPay, workDays, deductions, netPay, payItems, deductionItems, total);
 
     res.json({'result': true, 'data': result})
 }
@@ -213,4 +231,78 @@ exports.loginManager = async function (req, res) {
     const user = await memberModel.findByLoginManger(loginId);
 
      */
+}
+
+exports.registerFullMember = async function (req, res) {
+    try {
+        const body = req.body;
+        console.log('전체 등록 요청 데이터:', body);
+
+        // 1. 비밀번호 해시화
+        const hash = await bcrypt.hash(body.password, 10);
+
+        // 2. 모델에 넘길 데이터 구조화
+        // (1) Member 데이터
+        const memberData = {
+            type: body.type,
+            name: body.name,
+            id: body.id,
+            password: hash, // 해시된 비밀번호
+            birthDt: body.birthDate,
+            phone: body.phone,
+            position: body.position,
+            gender: body.gender,
+            email: body.email,
+            disability: body.disability,
+            disability_date: body.disability_date,
+            disability_grade: body.disability_grade,
+            defector: body.defector,
+            patriot: body.patriot,
+            intern: body.intern,
+            beneficiary: body.beneficiary,
+            foreigner: body.foreigner,
+            nationality: body.nationality,
+            visa_code: body.visa_code,
+            visa_date: body.visa_date,
+            bank: body.bankName,
+            accountNo: body.accountNumber,
+            inDate: body.joinDate,
+            outDate: body.endDate, // 혹은 body.outDate
+            outReason: '', // 필요시 추가
+            addr: body.address,
+            bigo: body.bigo
+        };
+
+        // (2) Contract 데이터
+        const contractData = {
+            sIdx: body.site,      // 현장 ID
+            type: body.type,      // 계약 타입 (직원 구분 등)
+            jsonData: JSON.stringify(body.wageInputs || {}), // 급여 정보 JSON화
+            startDt: body.joinDate,
+            endDt: body.endDate,
+            bigo: body.bigo
+        };
+
+        // (3) Staffing 데이터
+        const staffingData = {
+            sIdx: body.site       // 현장 ID
+        };
+
+        // 3. 통합 모델 함수 호출
+        const result = await memberModel.registerMemberWithContractAndStaffing(
+            memberData,
+            contractData,
+            staffingData
+        );
+
+        if (result.result) {
+            res.json({ result: true, data: result.mIdx, message: '직원 및 계약 등록 완료' });
+        } else {
+            res.json({ result: false, message: '등록 중 오류 발생', error: result.error });
+        }
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ result: false, message: '서버 에러' });
+    }
 }

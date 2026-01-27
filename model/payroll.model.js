@@ -1,29 +1,37 @@
-const mysql = require("mysql");
+const mysql = require("mysql2/promise");
 const pool = require("../config/mysql");
 
 exports.getWorkPayroll = async function (targetMonth) {
-    let sql = "SELECT m.idx,m.name,m.id,"
-    sql += " IFNULL(wd.workDays, 0) AS workDays,"   //-- [1] 근무 일수
-    //sql += " CAST(JSON_UNQUOTE(JSON_EXTRACT(w.jsonData, '$.\"03001001\".amount')) AS UNSIGNED) AS dailyWage,"   //-- [2] 책정된 일당 (JSON 키가 숫자이므로 따옴표 필수)
-    sql += " CAST(JSON_UNQUOTE(JSON_EXTRACT(w.jsonData, '$.\"03001001\".amount')) AS UNSIGNED) AS monthlySalary,"
-    //sql += " (IFNULL(wd.workDays, 0) * CAST(JSON_UNQUOTE(JSON_EXTRACT(w.jsonData, '$.\"03001001\".amount')) AS UNSIGNED)) AS calculatedBasePay" // -- [3] 총 기본급
-    sql += " TRUNCATE((CAST(JSON_UNQUOTE(JSON_EXTRACT(w.jsonData, '$.\"03001001\".amount')) AS UNSIGNED) / 30) * IFNULL(wd.workDays, 0), -1) AS calculatedBasePay"
-    sql += " FROM new_tb_member m"
-    sql += " LEFT JOIN new_tb_member_wage w ON m.idx = w.mIdx"
-    sql += " LEFT JOIN ("
-    sql += " SELECT mIdx, COUNT(*) as workDays"
-    sql += " FROM new_tb_work"
-    sql += " WHERE workStartDt LIKE CONCAT(?, '%')"
-    sql += " AND workFl = 'Y'"
-    sql += " GROUP BY mIdx"
-    sql += " ) wd ON m.idx = wd.mIdx"
-    sql += " WHERE m.status = '0'";
+    let sql = "SELECT m.idx, m.name, m.id,";
+    sql += " IFNULL(wd.workDays, 0) AS workDays,";//근무 일수
+    sql += " CAST(JSON_UNQUOTE(JSON_EXTRACT(mbs.payItems, '$.\"04001001\"')) AS UNSIGNED) AS monthlySalary,";//월급 (기본급)
+    sql += " IFNULL(JSON_UNQUOTE(JSON_EXTRACT(sc.jsonData, CONCAT('$.\"', m.type, '\"'))), 30) AS stdWorkDays,";//기준일수
+    sql += " TRUNCATE(";
+    sql += "   (CAST(JSON_UNQUOTE(JSON_EXTRACT(mbs.payItems, '$.\"04001001\"')) AS UNSIGNED)";
+    sql += "    / IFNULL(JSON_UNQUOTE(JSON_EXTRACT(sc.jsonData, CONCAT('$.\"', m.type, '\"'))), 30))";
+    sql += "   * IFNULL(wd.workDays, 0), -1";
+    sql += " ) AS calculatedBasePay";
+    sql += " FROM new_tb_member m";
+    sql += " LEFT JOIN new_tb_member_base_salary mbs ON mbs.idx = (";
+    sql += "    SELECT idx FROM new_tb_member_base_salary WHERE mIdx = m.idx ORDER BY regDt DESC LIMIT 1";
+    sql += " )";
+    sql += " LEFT JOIN new_tb_member_assignment ma ON ma.mIdx = m.idx";
+    sql += " LEFT JOIN new_tb_site_contract sc ON sc.sIdx = ma.sIdx";
+    sql += " LEFT JOIN (";//근무일수 서브쿼리
+    sql += "    SELECT mIdx, COUNT(*) as workDays";
+    sql += "    FROM new_tb_work";
+    sql += "    WHERE workStartDt LIKE CONCAT(?, '%')";
+    sql += "    AND workFl = 'Y'";
+    sql += "    GROUP BY mIdx";
+    sql += " ) wd ON m.idx = wd.mIdx";
+
+    //sql += " WHERE m.status = '0'";//재직중인직원만
 
     let aParameter = [targetMonth];
-    let query = mysql.format(sql, aParameter);
+    //let query = mysql.format(sql, aParameter);
 
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     } catch (e) {
         console.log('db err', e);

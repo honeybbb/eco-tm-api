@@ -3,7 +3,7 @@
 const service = require("../service/work.service");
 module.exports = function (app) {
     //출근 확인
-    app.route('/v1/work/:mIdx').get(service.getWorkFl);
+    app.route('/v1/work/flag/:mIdx').get(service.getWorkFl);
 
     //직원 출근
     app.route('/v1/work/start').post(service.workStart);

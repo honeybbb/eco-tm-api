@@ -105,18 +105,14 @@ exports.setMemberWage = async function (mIdx, sIdx, jsonData){
 }
  */
 
-exports.setPayroll = async function (mIdx, sIdx, year, paymentList, deductionList, grossPay, deductions, netPay,total) {
-    let sql = "insert into new_tb_member_payroll (mIdx, sIdx, year, payItems, deductionItems, grossPay, deductions, netPay, total)"
+exports.setBaseSalary = async function (mIdx, sIdx, year, paymentList, deductionList, grossPay, deductions, netPay,total) {
+    let sql = "insert into new_tb_member_base_salary (mIdx, sIdx, year, payItems, deductionItems, grossPay, deductions, netPay, total)"
     sql += " values (?, ?, ?, ?, ? ,?, ? ,? ,?)"
-    sql += " ON DUPLICATE KEY UPDATE year=?,payItems=?, deductionItems=?,grossPay=?, deductions=?, netPay=?,total=?"
-    let aParameter = [
-        mIdx, sIdx, year, paymentList, deductionList,grossPay, deductions, netPay,total,
-        year, paymentList, deductionList,grossPay, deductions, netPay,total
-    ];
+    let aParameter = [mIdx, sIdx, year, paymentList, deductionList,grossPay, deductions, netPay,total];
 
-    let query = mysql.format(sql, aParameter);
+    //let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -125,7 +121,37 @@ exports.setPayroll = async function (mIdx, sIdx, year, paymentList, deductionLis
 }
 
 //직원급여조회
-exports.getPayroll = async function () {
+exports.getBaseSalary = async function () {
+    let sql = "select"
+    sql += " m.idx,"    //idx
+    sql += " m.id," //사번
+    sql += " (select name from new_tb_site where ma.sIdx = idx) as siteName,"   //현장명
+    sql += " (select idx from new_tb_site where ma.sIdx = idx) as sIdx,"    //현장idx
+    sql += " (select itemNm from new_tb_code where m.position = itemCd) as role,"   //직책
+    sql += " m.name as staff,"  //성명
+    sql += " IFNULL(mbs.payItems, JSON_OBJECT()) as payItems,"
+    sql += " IFNULL(mbs.deductionItems,JSON_OBJECT()) as deductionItems,"
+    sql += " mbs.grossPay, mbs.deductions AS totalDeduction, mbs.netPay"
+    sql += " from new_tb_member m";
+    sql += " left join new_tb_member_base_salary mbs ON mbs.idx = (SELECT idx FROM new_tb_member_base_salary WHERE mIdx = m.idx";
+    sql += " ORDER BY regDt DESC LIMIT 1)"
+    sql += " left join new_tb_site s on s.idx = mbs.sIdx";
+    sql += " left join new_tb_member_assignment ma on ma.mIdx = m.idx";
+    sql += " where m.status = 0"  //재직상태
+    sql += " order by s.name, m.name"
+    let aParameter = [];
+
+    //let query = mysql.format(sql, aParameter);
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+/*
+exports.getPayroll1 = async function () {
     let sql = "select"
     sql += " m.idx,"    //idx
     sql += " m.id," //사번
@@ -142,6 +168,7 @@ exports.getPayroll = async function () {
     sql += " left join new_tb_member_assignment ma on ma.mIdx = m.idx";
     sql += " where m.status = 0"  //재직상태
     sql += " order by s.name, m.name"
+    sql += " group by m.idx limit 1"
     let aParameter = [];
 
     //let query = mysql.format(sql, aParameter);
@@ -153,6 +180,8 @@ exports.getPayroll = async function () {
         return {'data': '-9999'}
     }
 }
+
+ */
 /*
 exports.getPayroll = async function (mIdx, year) {
     let sql = "SELECT\n" +
@@ -200,8 +229,40 @@ exports.getPayroll = async function (mIdx, year) {
 
 //직원 급여 내역 조회
 exports.getPayrollMonth = async function () {
-    let sql = "select * from new_tb_member_payroll_month";
+    let sql = "select"
+    sql += " m.idx,"    //idx
+    sql += " m.id," //사번
+    sql += " (select name from new_tb_site where ma.sIdx = idx) as siteName,"   //현장명
+    sql += " (select idx from new_tb_site where ma.sIdx = idx) as sIdx,"    //현장idx
+    sql += " (select itemNm from new_tb_code where m.position = itemCd) as role,"   //직책
+    sql += " m.name as staff,"  //성명
+    sql += " IFNULL(mbs.payItems, JSON_OBJECT()) as payItems,"
+    sql += " IFNULL(mbs.deductionItems,JSON_OBJECT()) as deductionItems,"
+    sql += " mbs.grossPay, mbs.deductions AS totalDeduction, mbs.netPay"
+    sql += " from new_tb_member m";
+    sql += " left join new_tb_member_payroll_month mbs ON mbs.idx = (SELECT idx FROM new_tb_member_base_salary WHERE mIdx = m.idx";
+    sql += " ORDER BY regDt DESC LIMIT 1)"
+    sql += " left join new_tb_site s on s.idx = mbs.sIdx";
+    sql += " left join new_tb_member_assignment ma on ma.mIdx = m.idx";
+    //sql += " where m.status = 0"  //재직상태 (임시로 주석 왜냐면 퇴사직원도 있을테니까)
+    sql += " order by s.name, m.name"
     let aParameter = [];
+
+    //let query = mysql.format(sql, aParameter);
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.setPayrollMonth = async function (mIdx, sIdx, year, month, grossPay, workDays, deductions, netPay, payItems, deductionItems, total){
+    let sql = "insert into new_tb_member_payroll_month ("
+    sql += "mIdx, sIdx, year, month, grossPay, workDays, deductions, netPay, payItems, deductionItems, total)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    let aParameter = [mIdx, sIdx, year, month, grossPay, workDays, deductions, netPay, payItems, deductionItems, total];
 
     let query = mysql.format(sql, aParameter);
     try {
@@ -288,5 +349,80 @@ exports.loginUser = async function (loginId, password) {
     }catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
+    }
+}
+
+exports.registerMemberWithContractAndStaffing = async function (member, contract, staffing) {
+    const connection = await pool.getConnection(); // 커넥션 가져오기
+
+    try {
+        await connection.beginTransaction(); // 트랜잭션 시작
+
+        // -----------------------------------------------------
+        // 1. 직원(Member) 등록
+        // -----------------------------------------------------
+        let sqlMember = `
+            INSERT INTO new_tb_member 
+            (type, name, id, password, birthDt, phone, position, gender, email,
+             disability, disability_date, disability_grade, defector, patriot, intern, beneficiary, foreigner, nationality, visa_code, visa_date,
+             bank, accountNo, inDate, outDate, outReason, addr, bigo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        let paramMember = [
+            member.type, member.name, member.id, member.password, member.birthDt, member.phone, member.position, member.gender, member.email,
+            member.disability, member.disability_date, member.disability_grade, member.defector, member.patriot, member.intern, member.beneficiary, member.foreigner, member.nationality, member.visa_code, member.visa_date,
+            member.bank, member.accountNo, member.inDate, member.outDate, member.outReason, member.addr, member.bigo
+        ];
+
+        let resMember = await connection.query(sqlMember, paramMember);
+        let new_mIdx = resMember[0].insertId; // 생성된 직원 PK (mIdx) 가져오기
+
+        // -----------------------------------------------------
+        // 2. 계약서(Contract) 등록
+        // -----------------------------------------------------
+        // contract 데이터에 위에서 만든 new_mIdx를 사용합니다.
+        let sqlContract = `
+            INSERT INTO new_tb_member_contract 
+            (mIdx, sIdx, type, jsonData, startDt, endDt, bigo)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `;
+        let paramContract = [
+            new_mIdx,
+            contract.sIdx,
+            contract.type,
+            contract.jsonData, // JSON 문자열 상태
+            contract.startDt,
+            contract.endDt,
+            contract.bigo
+        ];
+
+        await connection.query(sqlContract, paramContract);
+
+        // -----------------------------------------------------
+        // 3. 직원 배치(Staffing/Assignment) 등록
+        // -----------------------------------------------------
+        let sqlStaffing = `
+            INSERT INTO new_tb_member_assignment (mIdx, sIdx) 
+            VALUES (?, ?)
+            ON DUPLICATE KEY UPDATE sIdx = VALUES(sIdx)
+        `;
+        let paramStaffing = [new_mIdx, staffing.sIdx];
+
+        await connection.query(sqlStaffing, paramStaffing);
+
+        // 모든 쿼리가 성공하면 커밋
+        await connection.commit();
+
+        return { result: true, mIdx: new_mIdx };
+
+    } catch (e) {
+        // 에러 발생 시 롤백 (등록된 직원 정보도 취소됨)
+        await connection.rollback();
+        console.log('Transaction Error:', e);
+        return { result: false, error: e };
+
+    } finally {
+        connection.release(); // 커넥션 반납
     }
 }

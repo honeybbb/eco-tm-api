@@ -5,8 +5,6 @@ const service = require("../service/payroll.service");
 module.exports = function (app) {
     //직원 출근일수에 따른 급여
     app.route('/v1/payroll/member/workday').get(service.getWorkPayroll);
-    //직원 급여 조회
-    // app.route('/v1/payroll/member/:mIdx').get(service.getPayroll);
 
     //직원 급여 도급 저장
     app.route('/v1/payroll/member').post(service.setPayrollDetail);

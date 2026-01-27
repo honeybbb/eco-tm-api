@@ -1,5 +1,5 @@
 const pool = require("../config/mysql");
-const mysql = require("mysql")
+const mysql = require("mysql2/promise")
 
 exports.getWorkFl = async function (mIdx, sIdx, today) {
     let sql = "select * from new_tb_work where mIdx = ? and sIdx = ? and Date(regDt) = ?"
@@ -154,16 +154,21 @@ exports.getWorkDayCount = async function (date)  {
 }
 
 exports.getWorkList = async function (month) {
+    let sql = "select * from new_tb_work WHERE workStartDt LIKE CONCAT(?, '%') AND workFl = 'Y'";
+
+    /*
     let sql = "SELECT mIdx,COUNT(*) as workDays"
     sql += " FROM new_tb_work"
-    sql += " WHERE workStartDt LIKE (?)" // 선택된 연월"
+    sql += " WHERE workStartDt LIKE CONCAT(?, '%')" // 선택된 연월"
     sql += " AND workFl = 'Y'"  // 유효 근무만
     sql += " GROUP BY mIdx";
+
+     */
     let aParameter = [month];
 
-    let query = mysql.format(sql, aParameter);
+    //let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
