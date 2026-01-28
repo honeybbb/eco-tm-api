@@ -23,7 +23,7 @@ module.exports = function (app) {
     app.route('/v1/member/base/salary/:mIdx').post(service.setBaseSalary);
 
     //직원 급여 정보 조회 (월급)
-    app.route('/v1/member/salary').get(service.getPayrollMonth);
+    app.route('/v1/member/payroll/month').get(service.getPayrollMonth);
 
     //직원 급여 정보 등록 (월급)
     app.route('/v1/member/payroll/month/:mIdx').post(service.setPayrollMonth);

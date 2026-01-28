@@ -23,7 +23,7 @@ exports.getMemberList = async function () {
 }
 
 exports.getMemberData = async function (id) {
-    let sql = "select m.*, IFNULL(ms.sIdx, '0') as `sIdx`, cd.itemNm as `position`, cd2.itemNm as `type`,"
+    let sql = "select m.*, IFNULL(ms.sIdx, '0') as `sIdx`, cd.itemCd as `positionCd`, cd.itemNm as `position`, cd2.itemNm as `type`,"
     sql += " CONCAT('[',GROUP_CONCAT(JSON_OBJECT('name',s.name, 'address',s.address)),']') as `sites`"
     sql += " from new_tb_member m"
     sql += " inner join new_tb_code cd on cd.itemCd = m.position"
@@ -105,10 +105,10 @@ exports.setMemberWage = async function (mIdx, sIdx, jsonData){
 }
  */
 
-exports.setBaseSalary = async function (mIdx, sIdx, year, paymentList, deductionList, grossPay, deductions, netPay,total) {
-    let sql = "insert into new_tb_member_base_salary (mIdx, sIdx, year, payItems, deductionItems, grossPay, deductions, netPay, total)"
-    sql += " values (?, ?, ?, ?, ? ,?, ? ,? ,?)"
-    let aParameter = [mIdx, sIdx, year, paymentList, deductionList,grossPay, deductions, netPay,total];
+exports.setBaseSalary = async function (mIdx, sIdx, year, paymentList, deductionList, checkedList, grossPay, deductions, netPay,total) {
+    let sql = "insert into new_tb_member_base_salary (mIdx, sIdx, year, payItems, deductionItems, checkedItems, grossPay, deductions, netPay, total)"
+    sql += " values (?, ?, ?, ?, ? ,? ,? ,?, ?,?)"
+    let aParameter = [mIdx, sIdx, year, paymentList, deductionList, checkedList, grossPay, deductions, netPay,total];
 
     //let query = mysql.format(sql, aParameter);
     try {
@@ -125,12 +125,14 @@ exports.getBaseSalary = async function () {
     let sql = "select"
     sql += " m.idx,"    //idx
     sql += " m.id," //사번
+    sql += " m.type,"   //직원구분
     sql += " (select name from new_tb_site where ma.sIdx = idx) as siteName,"   //현장명
     sql += " (select idx from new_tb_site where ma.sIdx = idx) as sIdx,"    //현장idx
     sql += " (select itemNm from new_tb_code where m.position = itemCd) as role,"   //직책
     sql += " m.name as staff,"  //성명
     sql += " IFNULL(mbs.payItems, JSON_OBJECT()) as payItems,"
     sql += " IFNULL(mbs.deductionItems,JSON_OBJECT()) as deductionItems,"
+    sql += " IFNULL(mbs.checkedItems,JSON_OBJECT()) as checkedItems,"
     sql += " mbs.grossPay, mbs.deductions AS totalDeduction, mbs.netPay"
     sql += " from new_tb_member m";
     sql += " left join new_tb_member_base_salary mbs ON mbs.idx = (SELECT idx FROM new_tb_member_base_salary WHERE mIdx = m.idx";
@@ -232,16 +234,17 @@ exports.getPayrollMonth = async function () {
     let sql = "select"
     sql += " m.idx,"    //idx
     sql += " m.id," //사번
+    sql += " m.type,"   //구분
     sql += " (select name from new_tb_site where ma.sIdx = idx) as siteName,"   //현장명
     sql += " (select idx from new_tb_site where ma.sIdx = idx) as sIdx,"    //현장idx
     sql += " (select itemNm from new_tb_code where m.position = itemCd) as role,"   //직책
     sql += " m.name as staff,"  //성명
     sql += " IFNULL(mbs.payItems, JSON_OBJECT()) as payItems,"
     sql += " IFNULL(mbs.deductionItems,JSON_OBJECT()) as deductionItems,"
+    sql += " IFNULL(mbs.checkedItems,JSON_OBJECT()) as checkedItems,"
     sql += " mbs.grossPay, mbs.deductions AS totalDeduction, mbs.netPay"
     sql += " from new_tb_member m";
-    sql += " left join new_tb_member_payroll_month mbs ON mbs.idx = (SELECT idx FROM new_tb_member_base_salary WHERE mIdx = m.idx";
-    sql += " ORDER BY regDt DESC LIMIT 1)"
+    sql += " left join new_tb_member_payroll_month mbs ON mbs.mIdx = m.idx"
     sql += " left join new_tb_site s on s.idx = mbs.sIdx";
     sql += " left join new_tb_member_assignment ma on ma.mIdx = m.idx";
     //sql += " where m.status = 0"  //재직상태 (임시로 주석 왜냐면 퇴사직원도 있을테니까)

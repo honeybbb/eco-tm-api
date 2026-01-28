@@ -68,8 +68,8 @@ exports.insertSiteAndContract = async function (site, contract) {
         // 위에서 얻은 newSiteIdx를 sIdx 값으로 사용합니다.
         let sqlContract = `
             INSERT INTO new_tb_site_contract 
-            (sIdx, cIdx, jsonData, total_cost, startDt, endDt) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            (sIdx, cIdx, jsonData, total_cost, startDt, endDt, staffCount, staffDetail, workSchedule, breaktime) 
+            VALUES (?, ?, ?, ?, ?, ?, ? , ?, ?, ?)
         `;
         let paramContract = [
             new_sIdx,        // ★ 여기서 현장 ID 연결
@@ -77,7 +77,11 @@ exports.insertSiteAndContract = async function (site, contract) {
             JSON.stringify(contract.contract),
             contract.totalCost,
             contract.startDt,
-            contract.endDt
+            contract.endDt,
+            contract.staffCount,
+            contract.staffDetail,
+            contract.workSchedule,
+            contract.breaktime,
         ];
 
         await connection.query(sqlContract, paramContract);

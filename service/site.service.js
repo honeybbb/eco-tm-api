@@ -43,11 +43,15 @@ exports.registerSiteWithContract = async function (req, res) {
 
     // 2. 계약(Contract) 데이터
     let contractData = {
-        cIdx: req.body.cIdx, // 현장과 동일한 회사 ID라고 가정
+        cIdx: req.body.cIdx, // companyIdx
         contract: req.body.contract || {}, // JSON 데이터 등
         totalCost: req.body.totalCost || 0, // 금액 (없으면 0 처리 등)
-        startDt: req.body.startDt,
-        endDt: req.body.endDt
+        startDt: req.body.contractStart,
+        endDt: req.body.contractEnd,
+        staffCount: req.body.staffCount || 0,
+        staffDetail: req.body.staffDetail,
+        workSchedule: req.body.workSchedule,
+        breaktime: req.body.breaktime,
     };
 
     console.log('등록 요청:', siteData, contractData);

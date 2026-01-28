@@ -127,12 +127,13 @@ exports.setBaseSalary = async function (req, res) {
         year = req.body.year,   //현재 년도
         paymentList = req.body.payItems, //json(지급항목)
         deductionList = req.body.deductionItems, //json(공제항목)
+        checkedList = req.body.checkedItems,    //json(공제항목 체크여부)
         grossPay = req.body.grossPay,
         deductions = req.body.deducti1ons,
         netPay = req.body.netPay,
         total = req.body.total; //합계
 
-    let result = await memberModel.setBaseSalary(mIdx, sIdx, year, paymentList, deductionList, grossPay, deductions, netPay, total);
+    let result = await memberModel.setBaseSalary(mIdx, sIdx, year, paymentList, deductionList, checkedList, grossPay, deductions, netPay, total);
 
     res.json({'result': true, 'data': result})
 };
