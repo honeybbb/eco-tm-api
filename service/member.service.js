@@ -147,7 +147,9 @@ exports.getBaseSalary = async function (req, res) {
 
 //직원급여내역조회
 exports.getPayrollMonth = async function (req, res) {
-    let result = await memberModel.getPayrollMonth();
+    let year = req.query.year,
+        month = req.query.month;
+    let result = await memberModel.getPayrollMonth(year, month);
 
     res.json({'result': true, 'data': result})
 }

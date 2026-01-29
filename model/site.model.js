@@ -7,6 +7,7 @@ exports.getSiteList = async function (cIdx) {
     sql += " from new_tb_site s"
     sql += " left join new_tb_site_contract sc on sc.sIdx = s.idx"
     sql += " where s.cIdx = ?";
+    sql += " group by s.idx"
     let aParameter = [cIdx];
 
     //let query = mysql.format(sql, aParameter);
@@ -33,73 +34,214 @@ exports.setSiteData = async function (cIdx, name, address, phone, bigo, building
     }
 }
 
+exports.saveSite = async function (site) {
+    const connection = await pool.getConnection();
+    try {
+        let new_sIdx = site.sIdx;
+
+        if (new_sIdx) {
+            // [UPDATE]
+            let sql = `
+                UPDATE new_tb_site 
+                SET name=?, address=?, phone=?, building_su=?, unit_su=?, area=?, director=?, director_phone=?
+                WHERE sIdx = ?
+            `;
+            let params = [
+                site.name, site.address, site.phone, site.building_su,
+                site.unit_su, site.area, site.director, site.director_phone,
+                new_sIdx
+            ];
+            await connection.query(sql, params);
+        } else {
+            // [INSERT]
+            let sql = `
+                INSERT INTO new_tb_site 
+                (cIdx, name, address, phone, building_su, unit_su, area, director, director_phone) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            let params = [
+                site.cIdx, site.name, site.address, site.phone, site.building_su,
+                site.unit_su, site.area, site.director, site.director_phone
+            ];
+            let result = await connection.query(sql, params);
+            new_sIdx = result[0].insertId;
+        }
+
+        return { success: true, sIdx: new_sIdx };
+
+    } catch (e) {
+        console.error(e);
+        return { success: false, error: e };
+    } finally {
+        connection.release();
+    }
+}
+
+exports.saveContract = async function (contract) {
+    const connection = await pool.getConnection();
+    try {
+        // scIdx(계약 PK)가 있으면 UPDATE, 없으면 INSERT
+        if (contract.scIdx) {
+            // [UPDATE]
+            let sql = `
+                UPDATE new_tb_site_contract 
+                SET jsonData=?, total_cost=?, startDt=?, endDt=?, staffCount=?, staffDetail=?, 
+                    workSchedule=?, breaktime=?
+                WHERE scIdx = ? 
+            `;
+            let params = [
+                contract.jsonData,
+                contract.totalCost,
+                contract.startDt,
+                contract.endDt,
+                contract.staffCount,
+                contract.staffDetail,
+                contract.workSchedule,
+                contract.breaktime,
+                contract.scIdx // WHERE 조건
+            ];
+            await connection.query(sql, params);
+
+        } else {
+            // [INSERT]
+            let sql = `
+                INSERT INTO new_tb_site_contract 
+                (sIdx, cIdx, workdays, total_cost, startDt, endDt, staffCount, staffDetail, workSchedule, breaktime) 
+                VALUES (?, ?, ?, ?, ?, ?, ? , ?, ?, ?)
+            `;
+            let params = [
+                contract.sIdx, // 현장 FK
+                contract.cIdx,
+                contract.workDays,
+                contract.totalCost,
+                contract.startDt,
+                contract.endDt,
+                contract.staffCount,
+                contract.staffDetail,
+                contract.workSchedule,
+                contract.breaktime
+            ];
+            await connection.query(sql, params);
+        }
+
+        return { success: true };
+
+    } catch (e) {
+        console.error("Contract Save Error:", e);
+        return { success: false, error: e };
+    } finally {
+        connection.release();
+    }
+}
+
 exports.insertSiteAndContract = async function (site, contract) {
     const connection = await pool.getConnection();
 
     try {
-        // 트랜잭션 시작
         await connection.beginTransaction();
 
-        // 현장등록 시작
-        let sqlSite = `
-            INSERT INTO new_tb_site 
-            (cIdx, name, address, phone, building_su, unit_su, area, director, director_phone) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-        let paramSite = [
-            site.cIdx,
-            site.name,
-            site.address,
-            site.phone,
-            site.building_su,
-            site.unit_su,
-            site.area,
-            site.director,
-            site.director_phone,
-        ];
+        let new_sIdx = site.sIdx; // sIdx가 있는지 확인 (수정 모드인지 확인)
 
-        // pool.query 대신 connection.query 사용
-        let result = await connection.query(sqlSite, paramSite);
+        // ----------------------------------------------------
+        // CASE 1: 수정 (sIdx가 있을 때 -> UPDATE)
+        // ----------------------------------------------------
+        if (new_sIdx) {
+            // 1. 현장 정보 수정
+            let sqlSite = `
+                UPDATE new_tb_site 
+                SET name=?, address=?, phone=?, building_su=?, unit_su=?, 
+                    area=?, director=?, director_phone=?
+                WHERE sIdx = ?
+            `;
+            let paramSite = [
+                site.name,
+                site.address,
+                site.phone,
+                site.building_su,
+                site.unit_su,
+                site.area,
+                site.director,
+                site.director_phone,
+                new_sIdx // WHERE 조건
+            ];
+            await connection.query(sqlSite, paramSite);
 
-        // ★ 중요: 방금 INSERT한 현장의 Primary Key (Auto Increment ID)를 가져옵니다.
-        let new_sIdx = result[0].insertId;
+            // 2. 계약 정보 수정
+            let sqlContract = `
+                UPDATE new_tb_site_contract 
+                SET jsonData=?, total_cost=?, startDt=?, endDt=?, staffCount=?, staffDetail=?, 
+                    workSchedule=?, breaktime=?
+                WHERE sIdx = ?
+            `;
+            let paramContract = [
+                JSON.stringify(contract.contract),
+                contract.totalCost,
+                contract.startDt,
+                contract.endDt,
+                contract.staffCount,
+                contract.staffDetail,
+                contract.workSchedule,
+                contract.breaktime,
+                new_sIdx // WHERE 조건
+            ];
+            await connection.query(sqlContract, paramContract);
+        }
+            // ----------------------------------------------------
+            // CASE 2: 신규 등록 (sIdx가 없을 때 -> INSERT) : 기존 코드 그대로
+        // ----------------------------------------------------
+        else {
+            // 1. 현장 등록
+            let sqlSite = `
+                INSERT INTO new_tb_site 
+                (cIdx, name, address, phone, building_su, unit_su, area, director, director_phone) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            let paramSite = [
+                site.cIdx,
+                site.name,
+                site.address,
+                site.phone,
+                site.building_su,
+                site.unit_su,
+                site.area,
+                site.director,
+                site.director_phone,
+            ];
+            let result = await connection.query(sqlSite, paramSite);
 
-        // 계약 등록
-        // 위에서 얻은 newSiteIdx를 sIdx 값으로 사용합니다.
-        let sqlContract = `
-            INSERT INTO new_tb_site_contract 
-            (sIdx, cIdx, jsonData, total_cost, startDt, endDt, staffCount, staffDetail, workSchedule, breaktime) 
-            VALUES (?, ?, ?, ?, ?, ?, ? , ?, ?, ?)
-        `;
-        let paramContract = [
-            new_sIdx,        // ★ 여기서 현장 ID 연결
-            contract.cIdx,
-            JSON.stringify(contract.contract),
-            contract.totalCost,
-            contract.startDt,
-            contract.endDt,
-            contract.staffCount,
-            contract.staffDetail,
-            contract.workSchedule,
-            contract.breaktime,
-        ];
+            new_sIdx = result[0].insertId; // 새로 생성된 ID 받기
 
-        await connection.query(sqlContract, paramContract);
+            // 2. 계약 등록
+            let sqlContract = `
+                INSERT INTO new_tb_site_contract 
+                (sIdx, cIdx, jsonData, total_cost, startDt, endDt, staffCount, staffDetail, workSchedule, breaktime) 
+                VALUES (?, ?, ?, ?, ?, ?, ? , ?, ?, ?)
+            `;
+            let paramContract = [
+                new_sIdx,
+                contract.cIdx,
+                JSON.stringify(contract.contract),
+                contract.totalCost,
+                contract.startDt,
+                contract.endDt,
+                contract.staffCount,
+                contract.staffDetail,
+                contract.workSchedule,
+                contract.breaktime,
+            ];
+            await connection.query(sqlContract, paramContract);
+        }
+
         await connection.commit();
 
-        // 성공 시 생성된 현장 ID 반환
         return { success: true, sIdx: new_sIdx };
 
     } catch (e) {
-        // ---------------------------------------------------------
-        // Step D. 에러 발생 시 롤백 (모두 취소)
-        // ---------------------------------------------------------
         await connection.rollback();
         console.log('Transaction Error:', e);
         return { success: false, error: e };
 
     } finally {
-        // 3. 커넥션 반납 (필수)
         connection.release();
     }
 }
@@ -133,10 +275,15 @@ exports.setSiteHeadCount = async function (cIdx, sIdx, jsonData) {
 }
 
 exports.getSiteData = async function (sIdx) {
-    let sql = "select s.*, sa.jsonData, sc.startDt, sc.endDt, sc.total_cost"
+    let sql = "select s.*, sa.jsonData, sc.startDt, sc.endDt, sc.total_cost,"
+    sql += " CONCAT('[',GROUP_CONCAT(DISTINCT JSON_OBJECT('bigo', sb.bigo, 'regDt', sb.regDt)),']') as bigoList,"
+    sql += " CONCAT('[',GROUP_CONCAT(DISTINCT JSON_OBJECT('workDays', sc.workdays, 'startDt', sc.startDt,"
+    sql += " 'endDt', sc.endDt, 'workSchedule', sc.workSchedule, 'breaktime', sc.breaktime, 'category', (select itemNm from new_tb_code where itemCd = sc.type),"
+    sql += " 'staffList', sc.staffDetail, 'staffCount', sc.staffCount)),']') as `contractList`"
     sql += " from new_tb_site s"
     sql += " left join new_tb_site_assignment sa on sa.sIdx = s.idx"
     sql += " left join new_tb_site_contract sc on sc.sIdx = s.idx"
+    sql += " left join new_tb_site_bigo sb on sb.sIdx = s.idx"
     sql += " where s.idx in (?)";
     let aParameter = [sIdx];
 
@@ -147,6 +294,44 @@ exports.getSiteData = async function (sIdx) {
     }catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
+    }
+}
+
+exports.getSiteData1 = async function (sIdx) {
+    // 현장 정보 가져오기
+    let sqlSite = `SELECT * FROM new_tb_site WHERE idx = ?`;
+
+    // 계약 정보 가져오기 (컬럼 일일이 안 적고 * 사용 가능!)
+    let sqlContract = `SELECT * FROM new_tb_site_contract WHERE sIdx = ? ORDER BY startDt DESC`;
+
+    // 3. 비고 정보 가져오기
+    let sqlBigo = `SELECT * FROM new_tb_site_bigo WHERE sIdx = ? ORDER BY regDt DESC`;
+
+    try {
+        // Promise.all로 3개의 쿼리를 병렬(동시) 실행 -> 속도 빠름
+        const [siteRows, contractRows, bigoRows] = await Promise.all([
+            pool.query(sqlSite, [sIdx]),
+            pool.query(sqlContract, [sIdx]),
+            pool.query(sqlBigo, [sIdx])
+        ]);
+
+        // 현장 정보가 없으면 null 리턴
+        if (siteRows.length === 0) {
+            return null;
+        }
+
+        // 4. 데이터 합치기 (Javascript 객체 구조 만들기)
+        const siteData = siteRows[0]; // 현장 기본 정보 (1개)
+
+        // 현장 객체 안에 리스트를 집어넣음
+        siteData.contractList = contractRows; // 계약 리스트 (배열)
+        siteData.bigoList = bigoRows;         // 비고 리스트 (배열)
+
+        return siteData;
+
+    } catch (e) {
+        console.error("DB Error:", e);
+        throw e;
     }
 }
 
