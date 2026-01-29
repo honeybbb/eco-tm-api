@@ -274,6 +274,24 @@ exports.setSiteHeadCount = async function (cIdx, sIdx, jsonData) {
     }
 }
 
+exports.getSiteHeadCount = async function (sIdx) {
+    let sql = "select m.name, (select itemNm from new_tb_code where itemCd = m.position) as role,"
+    sql += " m.inDate as joinDate,"
+    sql += " CASE WHEN m.status = 0 THEN '재직' WHEN m.status = 1 THEN '퇴사' ELSE '알 수 없음' END AS status,"
+    sql += " m.phone"
+    sql += " from new_tb_member_assignment ma"
+    sql += " left join new_tb_member m on m.idx = ma.mIdx WHERE ma.sIdx = ?";
+    let aParameter = [sIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.getSiteData = async function (sIdx) {
     let sql = "select s.*, sa.jsonData, sc.startDt, sc.endDt, sc.total_cost,"
     sql += " CONCAT('[',GROUP_CONCAT(DISTINCT JSON_OBJECT('bigo', sb.bigo, 'regDt', sb.regDt)),']') as bigoList,"

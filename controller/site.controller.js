@@ -17,6 +17,8 @@ module.exports = function (app) {
     //현장 배치 정보 저장
     app.route('/v1/site/headcount').post(service.setSiteHeadCount);
 
+    app.route('/v1/site/headcount/:sIdx').get(service.getSiteHeadCount)
+
     //청구서 보기
     // app.route('/v1/site/account/bill').get(service)
 

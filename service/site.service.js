@@ -143,6 +143,14 @@ exports.setSiteHeadCount = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
+exports.getSiteHeadCount = async function (req, res) {
+    let sIdx = req.params.sIdx;
+
+    let result = await siteModel.getSiteHeadCount(sIdx);
+
+    res.json({'result': true, 'data': result})
+}
+
 exports.getSiteData = async function (req, res) {
     const sIdx = req.params.sIdx;
 
