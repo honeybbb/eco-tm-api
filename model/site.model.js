@@ -2,7 +2,7 @@ const pool = require("../config/mysql");
 const mysql = require("mysql2/promise")
 
 exports.getSiteList = async function (cIdx) {
-    let sql = "select s.*,"
+    let sql = "select s.*, case when s.status = 'Y' then '운영 중' else '계약 종료' end as `status`,"
     sql += " CONCAT(DATE_FORMAT(sc.startDt, '%Y-%m-%d'), ' ~ ', DATE_FORMAT(sc.endDt, '%Y-%m-%d')) AS contract"
     sql += " from new_tb_site s"
     sql += " left join new_tb_site_contract sc on sc.sIdx = s.idx"
