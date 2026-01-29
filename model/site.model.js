@@ -20,6 +20,19 @@ exports.getSiteList = async function (cIdx) {
     }
 }
 
+exports.setSiteBigo = async function (sIdx, bigo, admin) {
+    let sql = "insert into new_tb_site_bigo (sIdx, bigo, admin_id) values (?, ?, ?)"
+    let aParameter = [sIdx, bigo, admin];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.setSiteData = async function (cIdx, name, address, phone, bigo, building_su, unit_su, area) {
     let sql = "insert into new_tb_site (cIdx, name, address, phone, building_su, unit_su, area) values (?, ?, ?, ?, ?, ?, ?)"
     let aParameter = [cIdx, name, address, phone, building_su, unit_su, area];

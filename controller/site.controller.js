@@ -6,6 +6,9 @@ module.exports = function (app) {
     // 현장 리스트 조회
     app.route('/v1/site/list/:cIdx').get(service.getSiteList);
 
+    //현장 비고 저장
+    app.route('/v1/site/bigo/register').post(service.setSiteBigo);
+
     // 현장 데이터 조회
     app.route('/v1/site/data/:sIdx').get(service.getSiteData);
 
