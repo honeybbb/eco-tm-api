@@ -42,6 +42,7 @@ exports.registerSiteWithContract = async function (req, res) {
         // ====================================================
         let siteData = {
             sIdx: req.body.sIdx || req.query.idx, // 수정일 경우 존재
+            sType: req.body.sType, //건물타입
             cIdx: req.body.cIdx,
             name: req.body.name,
             site_id: req.body.site_id,
@@ -57,6 +58,7 @@ exports.registerSiteWithContract = async function (req, res) {
             area: req.body.area,
             director: req.body.director,
             director_phone: req.body.directorContact,
+            payment_day: req.body.payment_day,
         };
 
         // [Model 호출 1] 현장 정보 저장 (INSERT or UPDATE)

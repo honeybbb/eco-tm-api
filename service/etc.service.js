@@ -37,9 +37,12 @@ exports.setWageCode = async function (req, res) {
         itemNm = req.body.itemNm,
         sort = req.body.sort || 0,
         useFl = req.body.useFl,
+        taxFree = req.body.tax_free || 0,
         regDt = new Date();
 
-    let result = await etcModel.setWageCode(cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt);
+    console.log(cIdx, groupCd, itemCd, itemNm, sort, useFl, taxFree, regDt)
+
+    let result = await etcModel.setWageCode(cIdx, groupCd, itemCd, itemNm, sort, useFl, taxFree, regDt);
 
     res.json({'result': true, 'data': result})
 }
@@ -91,6 +94,36 @@ exports.deleteBaseCode = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
+exports.getItemCode = async function (req, res) {
+    let cIdx = req.params.cIdx;
+    let result = await etcModel.getItemCode(cIdx);
+
+    res.json({'result': true, 'data': result})
+}
+
+exports.setItemCode = async function (req, res) {
+    let cIdx = req.params.cIdx,
+        groupCd = req.body.groupCd,
+        itemCd = req.body.itemCd,
+        itemNm = req.body.itemNm,
+        sort = req.body.sort || 0,
+        useFl = req.body.useFl,
+        price = req.body.price,
+        regDt = new Date();
+
+    let result = await etcModel.setItemCode(cIdx, groupCd, itemCd, itemNm, sort, useFl, price, regDt);
+
+    res.json({'result': true, 'data': result})
+}
+
+exports.deleteItemCode = async function (req, res) {
+    let itemCd = req.params.itemCd;
+
+    let result = await etcModel.deleteItemCode(itemCd);
+
+    res.json({'result': true, 'data': result})
+}
+
 exports.setWorkDays = async function (req, res) {
     let cIdx = req.body.cIdx,
         sIdx = req.body.sIdx,
@@ -133,11 +166,12 @@ exports.setTaxRate = async function (req, res) {
         pensionRate = req.body.pension_rate, //국민연금
         healthRate = req.body.health_rate,   //건강보험
         longTermCareRate = req.body.long_term_care_rate,   //장기요양보험
-        employmentRate = req.body.employment_rate;   //고용보험
+        employmentRate = req.body.employment_rate,   //고용보험
+        industrialRate = req.body.industrial_rate;   //산재보험
 
-    console.log(appliedYear, pensionRate, healthRate, longTermCareRate, employmentRate)
+    //console.log(appliedYear, pensionRate, healthRate, longTermCareRate, employmentRate)
 
-    let result = await etcModel.setTaxRate(appliedYear, pensionRate, healthRate, longTermCareRate, employmentRate);
+    let result = await etcModel.setTaxRate(appliedYear, pensionRate, healthRate, longTermCareRate, employmentRate, industrialRate);
 
     res.json({'result': true, 'data': result})
 }

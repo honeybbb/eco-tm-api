@@ -39,6 +39,16 @@ exports.workEnd = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
+//오늘 연차 여부 확인
+exports.getDayOff = async function (req, res) {
+    let mIdx = req.params.mIdx,
+        today = new Date().toISOString().slice(0, 10);
+
+    let result = await workModel.getDayOff(mIdx, today);
+
+    res.json({'result': true, 'data':result});
+}
+
 //직원 근무현황 조회
 exports.getWorkSheet = async function (req, res) {
     let mIdx = req.params.mIdx, //직원idx

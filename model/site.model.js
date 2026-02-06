@@ -56,12 +56,12 @@ exports.saveSite = async function (site) {
             // [UPDATE]
             let sql = `
                 UPDATE new_tb_site 
-                SET name=?, address=?, phone=?, building_su=?, unit_su=?, area=?, director=?, director_phone=?
-                WHERE sIdx = ?
+                SET sType=?, name=?, address=?, phone=?, building_su=?, unit_su=?, area=?, director=?, director_phone=?, payment_day=?
+                WHERE idx = ?
             `;
             let params = [
-                site.name, site.address, site.phone, site.building_su,
-                site.unit_su, site.area, site.director, site.director_phone,
+                site.sType, site.name, site.address, site.phone, site.building_su,
+                site.unit_su, site.area, site.director, site.director_phone, site.payment_day,
                 new_sIdx
             ];
             await connection.query(sql, params);
@@ -69,12 +69,12 @@ exports.saveSite = async function (site) {
             // [INSERT]
             let sql = `
                 INSERT INTO new_tb_site 
-                (cIdx, name, address, phone, building_su, unit_su, area, director, director_phone) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (cIdx, name, address, phone, building_su, unit_su, area, director, director_phone, payment_day) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             let params = [
                 site.cIdx, site.name, site.address, site.phone, site.building_su,
-                site.unit_su, site.area, site.director, site.director_phone
+                site.unit_su, site.area, site.director, site.director_phone, site.payment_day
             ];
             let result = await connection.query(sql, params);
             new_sIdx = result[0].insertId;
@@ -316,6 +316,7 @@ exports.getSiteData = async function (sIdx) {
     sql += " left join new_tb_site_contract sc on sc.sIdx = s.idx"
     sql += " left join new_tb_site_bigo sb on sb.sIdx = s.idx"
     sql += " where s.idx in (?)";
+    // sql += " order by regDt desc limit 1"
     let aParameter = [sIdx];
 
     //let query = mysql.format(sql, aParameter);

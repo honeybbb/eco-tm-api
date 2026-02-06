@@ -105,53 +105,7 @@ exports.setMemberWage = async function (mIdx, sIdx, jsonData){
 }
  */
 
-exports.setBaseSalary = async function (mIdx, sIdx, year, paymentList, deductionList, checkedList, grossPay, deductions, netPay,total) {
-    let sql = "insert into new_tb_member_base_salary (mIdx, sIdx, year, payItems, deductionItems, checkedItems, grossPay, deductions, netPay, total)"
-    sql += " values (?, ?, ?, ?, ? ,? ,? ,?, ?,?)"
-    let aParameter = [mIdx, sIdx, year, paymentList, deductionList, checkedList, grossPay, deductions, netPay,total];
 
-    //let query = mysql.format(sql, aParameter);
-    try {
-        let [res] = await pool.query(sql, aParameter);
-        return res;
-    }catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
-    }
-}
-
-//직원급여조회
-exports.getBaseSalary = async function () {
-    let sql = "select"
-    sql += " m.idx,"    //idx
-    sql += " m.id," //사번
-    sql += " m.type,"   //직원구분
-    sql += " (select name from new_tb_site where ma.sIdx = idx) as siteName,"   //현장명
-    sql += " (select idx from new_tb_site where ma.sIdx = idx) as sIdx,"    //현장idx
-    sql += " (select itemNm from new_tb_code where m.position = itemCd) as role,"   //직책
-    sql += " m.name as staff,"  //성명
-    sql += " IFNULL(mbs.payItems, JSON_OBJECT()) as payItems,"
-    sql += " IFNULL(mbs.deductionItems,JSON_OBJECT()) as deductionItems,"
-    sql += " IFNULL(mbs.checkedItems,JSON_OBJECT()) as checkedItems,"
-    sql += " mbs.grossPay, mbs.deductions AS totalDeduction, mbs.netPay"
-    sql += " from new_tb_member m";
-    sql += " left join new_tb_member_base_salary mbs ON mbs.idx = (SELECT idx FROM new_tb_member_base_salary WHERE mIdx = m.idx";
-    sql += " ORDER BY regDt DESC LIMIT 1)"
-    sql += " left join new_tb_site s on s.idx = mbs.sIdx";
-    sql += " left join new_tb_member_assignment ma on ma.mIdx = m.idx";
-    sql += " where m.status = 0"  //재직상태
-    sql += " order by s.name, m.name"
-    let aParameter = [];
-
-    //let query = mysql.format(sql, aParameter);
-    try {
-        let [res] = await pool.query(sql, aParameter);
-        return res;
-    }catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
-    }
-}
 /*
 exports.getPayroll1 = async function () {
     let sql = "select"
@@ -229,87 +183,12 @@ exports.getPayroll = async function (mIdx, year) {
 
  */
 
-//직원 급여 내역 조회
-exports.getPayrollMonth = async function (year, month) {
-    let sql = "select"
-    sql += " m.idx,"
-    sql += " m.id,"
-    sql += " m.type,"
-    sql += " (select name from new_tb_site where ma.sIdx = idx) as siteName,"
-    sql += " (select idx from new_tb_site where ma.sIdx = idx) as sIdx,"
-    sql += " (select itemNm from new_tb_code where m.position = itemCd) as role,"
-    sql += " m.name as staff,"
-
-    // 1. [급여 내역] (payroll_month 테이블에서 가져옴)
-    sql += " IFNULL(mbs.payItems, JSON_OBJECT()) as payItems,"
-    sql += " IFNULL(mbs.deductionItems, JSON_OBJECT()) as deductionItems,"
-    sql += " IFNULL(mbs.grossPay, 0) as grossPay,"
-    sql += " IFNULL(mbs.deductions, 0) as totalDeduction,"
-    sql += " IFNULL(mbs.netPay, 0) as netPay,"
-
-    // 2. [체크박스 설정] (base_salary 테이블에서 가져옴 - ★수정됨)
-    // mbs가 아니라 bs(base_salary) 별칭을 사용합니다.
-    sql += " IFNULL(bs.checkedItems, JSON_OBJECT()) as checkedItems"
-
-    sql += " from new_tb_member m";
-
-    // =================================================================================
-    // JOIN 1. 해당 연/월 급여 내역 (mbs) - 저장된 급여 정보
-    // =================================================================================
-    sql += " left join new_tb_member_payroll_month mbs ON mbs.idx = (";
-    sql += "     SELECT idx FROM new_tb_member_payroll_month";
-    sql += "     WHERE mIdx = m.idx";
-    sql += "     AND year = ?";
-    sql += "     AND month = ?";
-    sql += "     ORDER BY regDt DESC LIMIT 1";
-    sql += " )";
-
-    // =================================================================================
-    // JOIN 2. 최신 기본급 설정 (bs) - checkedItems 가져오기용 ★추가됨
-    // =================================================================================
-    sql += " left join new_tb_member_base_salary bs ON bs.idx = (";
-    sql += "     SELECT idx FROM new_tb_member_base_salary";
-    sql += "     WHERE mIdx = m.idx";
-    sql += "     ORDER BY regDt DESC LIMIT 1"; // 가장 최근 설정 가져오기
-    sql += " )";
-
-    sql += " left join new_tb_site s on s.idx = mbs.sIdx";
-    sql += " left join new_tb_member_assignment ma on ma.mIdx = m.idx";
-
-    sql += " order by s.name, m.name";
-
-    let aParameter = [year, month];
-
-    try {
-        let [res] = await pool.query(sql, aParameter);
-        return res;
-    } catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
-    }
-}
-
-exports.setPayrollMonth = async function (mIdx, sIdx, year, month, grossPay, workDays, deductions, netPay, payItems, deductionItems, total){
-    let sql = "insert into new_tb_member_payroll_month ("
-    sql += "mIdx, sIdx, year, month, grossPay, workDays, deductions, netPay, payItems, deductionItems, total)"
-    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    let aParameter = [mIdx, sIdx, year, month, grossPay, workDays, deductions, netPay, payItems, deductionItems, total];
-
-    let query = mysql.format(sql, aParameter);
-    try {
-        let res = await pool.query(query);
-        return res;
-    }catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
-    }
-}
-
 //직원 연차 조회 (리스트)
 exports.getMemberLeave = async function (sIdx, year) {
-    let sql = "select ml.*, m.inDate, m.name, (select itemNm from new_tb_code c where c.itemCd = m.position) as `position`"
-    sql += " from new_tb_member_annual_leave ml"
-    sql += " left join new_tb_member m on m.idx = ml.mIdx"
+    let sql = "select ml.*, m.inDate, m.name,"
+    sql += " (select itemNm from new_tb_code c where c.itemCd = m.position) as `position`"
+    sql += " from new_tb_member m"
+    sql += " left join new_tb_member_annual_leave m; on m.idx = ml.mIdx"
     sql += " where ml.sIdx in (?) and ml.year in (?)"
     let aParameter = [sIdx, year];
 
@@ -332,6 +211,55 @@ exports.setMemberLeave = async function (mIdx, year, personalNo, middle_date, ba
     let query = mysql.format(sql, aParameter);
     try {
         let res = await pool.query(query);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+//직원 연차 신청
+exports.setMemberOff = async function (mIdx, sIdx, startDt, endDt, reason) {
+    let sql = "insert into new_tb_member_off (mIdx, sIdx, startDt, endDt, reason)"
+    sql += " values (?, ?, ?, ?, ?)"
+    let aParameter = [mIdx, sIdx, startDt, endDt, reason];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.getMemberOff = async function (cIdx, startDt, endDt) {
+    let sql = "select mo.idx, m.name as `staff`,"
+    sql += " DATE_FORMAT(mo.regDt, '%Y-%m-%d') AS reqDate,"
+    sql += " mo.startDt, mo.endDt, DATEDIFF(endDt, startDt) + 1 as `days`,"
+    sql += " (select name from new_tb_site where idx = mo.sIdx) as  `site`,"
+    sql += " mo.reason, mo.status"
+    sql += " from new_tb_member_off mo"
+    sql += " inner join new_tb_member m on m.idx = mo.mIdx"
+    sql += " where mo.cIdx in (?)"
+    sql += " and DATE(mo.regDt) between (?) and (?)"
+    let aParameter = [cIdx, startDt, endDt];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.updateOffStatus = async function (idx, status) {
+    let sql = "update new_tb_member_off set status = (?) where idx = ?"
+    let aParameter = [status, idx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);

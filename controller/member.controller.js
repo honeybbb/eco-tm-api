@@ -16,23 +16,20 @@ module.exports = function (app) {
     //배치 가능 직원 조회
     app.route('/v1/member/list/available').get(service.getMemberAvailable);
 
-    //직원 기본 급여 정보 조회
-    app.route('/v1/member/payroll').get(service.getBaseSalary);
-
-    //직원 기본 급여 등록
-    app.route('/v1/member/base/salary/:mIdx').post(service.setBaseSalary);
-
-    //직원 급여 정보 조회 (월급)
-    app.route('/v1/member/payroll/month').get(service.getPayrollMonth);
-
-    //직원 급여 정보 등록 (월급)
-    app.route('/v1/member/payroll/month/:mIdx').post(service.setPayrollMonth);
-
     //직원 연차 조회
     app.route('/v1/member/leave').get(service.getMemberLeave);
 
     //직원 연차 저장
     app.route('/v1/member/leave/register').post(service.setMemberLeave);
+
+    //직원 연차 신청
+    app.route('/v1/member/off/request/:mIdx').post(service.setMemberOff);
+
+    //직원 연차 신청 현황
+    app.route('/v1/member/off/:cIdx').get(service.getMemberOff);
+
+    //직원 연차 승인 or 반려
+    app.route('/v1/member/off/status').post(service.updateOffStatus);
 
     //직원 배치
     app.route('/v1/member/staffing/:mIdx').post(service.setMemberStaffing);

@@ -120,58 +120,6 @@ exports.setMemberData = async function(req, res) {
     res.json({'result': true, 'data': result})
 }
 
-//직원급여등록
-exports.setBaseSalary = async function (req, res) {
-    let mIdx = req.params.mIdx, //회원idx
-        sIdx = req.body.sIdx, //현장idx
-        year = req.body.year,   //현재 년도
-        paymentList = req.body.payItems, //json(지급항목)
-        deductionList = req.body.deductionItems, //json(공제항목)
-        checkedList = req.body.checkedItems,    //json(공제항목 체크여부)
-        grossPay = req.body.grossPay,
-        deductions = req.body.deducti1ons,
-        netPay = req.body.netPay,
-        total = req.body.total; //합계
-
-    let result = await memberModel.setBaseSalary(mIdx, sIdx, year, paymentList, deductionList, checkedList, grossPay, deductions, netPay, total);
-
-    res.json({'result': true, 'data': result})
-};
-
-//직원기본급여조회
-exports.getBaseSalary = async function (req, res) {
-    let result = await memberModel.getBaseSalary();
-
-    res.json({'result': true, 'data': result})
-}
-
-//직원급여내역조회
-exports.getPayrollMonth = async function (req, res) {
-    let year = req.query.year,
-        month = req.query.month;
-    let result = await memberModel.getPayrollMonth(year, month);
-
-    res.json({'result': true, 'data': result})
-}
-
-exports.setPayrollMonth = async function (req, res) {
-    let mIdx = req.params.mIdx,
-        sIdx = req.body.sIdx,
-        year = req.body.year,
-        month = req.body.month,
-        workDays = req.body.workDays,
-        grossPay = req.body.grossPay,
-        deductions = req.body.deductions,
-        netPay = req.body.netPay,
-        payItems = req.body.payItems,
-        deductionItems = req.body.deductionItems,
-        total = req.body.total;
-
-    let result = await memberModel.setPayrollMonth(mIdx, sIdx, year, month, grossPay, workDays, deductions, netPay, payItems, deductionItems, total);
-
-    res.json({'result': true, 'data': result})
-}
-
 exports.getMemberLeave = async function (req, res) {
     let sIdx = req.query.sIdx,
         year = req.query.year;
@@ -196,6 +144,38 @@ exports.setMemberLeave = async function (req, res) {
         bigo = req.body.bigo;
 
     let result = await memberModel.setMemberLeave(mIdx, position, year, personalNo, middle_date, basis_cost, count, over_count, used_count, amount, bigo);
+
+    res.json({'result': true, 'data': result})
+}
+
+exports.setMemberOff = async function (req, res) {
+    let mIdx = req.params.mIdx,
+        sIdx = req.body.sIdx,
+        startDt = req.body.startDt,
+        endDt = req.body.endDt,
+        reason = req.body.reason;
+
+    console.log(mIdx, sIdx, startDt, endDt, reason);
+    let result = await memberModel.setMemberOff(mIdx, sIdx, startDt, endDt, reason);
+
+    res.json({'result': true, 'data': result})
+}
+
+exports.getMemberOff = async function (req, res) {
+    let cIdx = req.params.cIdx,
+        startDt = req.query.startDt,
+        endDt = req.query.endDt;
+
+    let result = await memberModel.getMemberOff(cIdx, startDt, endDt);
+
+    res.json({'result': true, 'data': result})
+}
+
+exports.updateOffStatus = async function (req, res) {
+    let idx = req.body.idx,
+        status = req.body.status;
+    console.log(idx, status)
+    let result = await memberModel.updateOffStatus(idx, status);
 
     res.json({'result': true, 'data': result})
 }

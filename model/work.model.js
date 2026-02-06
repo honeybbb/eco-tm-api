@@ -43,6 +43,26 @@ exports.workEnd = async function (mIdx, sIdx, workEndDt, today) {
     }
 }
 
+exports.getDayOff = async function (mIdx, today) {
+    let sql = "select * from new_tb_member_off"
+    sql += " where mIdx in (?)" //직원idx
+    sql += " and AND (?) BETWEEN startDt AND endDt" //날짜
+    sql += " and status = 1"; //연차 승인 상태
+    let aParameter = [mIdx, today];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.getDayOffList = async function (mIdx, startDt, endDt) {
+    let sql = "select * from new_tb_member_off"
+}
+
 /*
 exports.getWorkDaysAdmin = async function (sIdx, ym) {
     let sql = "SELECT mIdx,COUNT(*) AS workdays"

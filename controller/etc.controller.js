@@ -3,6 +3,7 @@
 const service = require("../service/etc.service");
 
 module.exports = function (app) {
+    /* ======= 공지 관련 ======= */
     //공지 리스트
     app.route('/v1/notice/list').get(service.getNoticeList)
 
@@ -11,6 +12,8 @@ module.exports = function (app) {
 
     //공지 등록
     //app.route('/v1/notice/write').post(service.setNotice);
+
+    /* ======= 코드 관련 ======= */
 
     //기본 코드 조회
     app.route('/v1/code').get(service.getBaseCode);
@@ -29,6 +32,14 @@ module.exports = function (app) {
 
     //기본 코드 삭제
     app.route('/v1/code/:itemCd').delete(service.deleteBaseCode);
+
+    //물품 코드 조회
+    app.route('/v1/code/item/:cIdx').get(service.getItemCode);
+
+    //물품 코드 저장
+    app.route('/v1/code/item/:cIdx').post(service.setItemCode);
+
+    app.route('/v1/code/item/:itemCd').delete(service.deleteItemCode)
 
     //company 정보 조회
     app.route('/v1/config/company/:idx').get(service.getCompanyConfig);

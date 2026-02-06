@@ -133,11 +133,14 @@ exports.getGroupCode = async function (groupCd) {
     }
 }
 
-exports.setWageCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt) {
-    console.log(cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt);
-    let sql = "insert into new_tb_code_wage (cIdx, groupCd, itemCd, itemNm, sort, useFl, tax_free, regDt) values (?, ?, ?, ?, ?, ?, ?, ?)"
-    sql += " ON DUPLICATE KEY UPDATE itemCd=?,itemNm=?,sort=?,useFl=?,tax_free=?,modDt=?"
-    let aParameter = [cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt, itemCd, itemNm, sort, useFl, regDt];
+exports.setWageCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl, taxFree, regDt) {
+    //console.log(cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt);
+    let sql = "insert into new_tb_code_wage (cIdx, groupCd, itemCd, itemNm, sort, useFl, tax_free, regDt)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?, ?)"
+    sql += " ON DUPLICATE KEY UPDATE itemNm=?,sort=?,useFl=?,tax_free=?,modDt=?"
+    let aParameter = [
+        cIdx, groupCd, itemCd, itemNm, sort, useFl, taxFree, regDt,
+        itemNm, sort, useFl, taxFree, regDt];
 
     //let query = mysql.format(sql, aParameter);
     try {
@@ -178,7 +181,7 @@ exports.getCompanyConfig = async function (cIdx) {
 }
 
 exports.getWageCode = async function (cIdx) {
-    let sql = "SELECT itemNm, itemCd,groupCd,"
+    let sql = "SELECT itemNm, itemCd,groupCd,tax_free,"
     sql += " CASE groupCd"
     sql += "    WHEN '04001' THEN '지급항목'"
     sql += "    WHEN '04002' THEN '공제항목'"
@@ -219,6 +222,69 @@ exports.deleteBaseCode = async function (itemCd) {
     let query = mysql.format(sql, aParameter);
     try {
         let res = await pool.query(query);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.getItemCode = async function (cIdx) {
+    let sql ="SELECT"
+    sql += " L1.itemCd   AS groupCode,"
+    sql += " L1.itemNm   AS groupName," // Level 1 (대분류: 그룹)
+    sql += " L2.itemCd   AS subCode,"
+    sql += " L2.itemNm   AS subName,"   // Level 2 (중분류: 서브그룹 혹은 직접 코드)
+    sql += " L3.itemCd   AS detailCode,"
+    sql += " L3.itemNm   AS detailName," // Level 3 (소분류: 실제 상세 코드)
+    sql += " L3.price   AS price"
+    sql += " FROM (SELECT * FROM new_tb_code_item WHERE LENGTH(itemCd) = 2 AND useFl = 'Y') L1"
+    sql += " LEFT JOIN new_tb_code_item L2"
+    sql += " ON L2.groupCd = L1.itemCd"
+    sql += " AND LENGTH(L2.itemCd) = 5"
+    sql += " AND L2.useFl = 'Y'"
+    sql += " LEFT JOIN new_tb_code_item L3"
+    sql += " ON L3.groupCd = L2.itemCd"
+    sql += " AND LENGTH(L3.itemCd) = 8"
+    sql += " AND L3.useFl = 'Y'"
+    sql += " WHERE L1.cIdx in (?)"  // 특정 회사/현장 ID
+    sql += " ORDER BY L1.itemCd, L2.itemCd, L3.itemCd";
+    let aParameter = [cIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.setItemCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl, price, regDt) {
+    //console.log(cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt);
+    let sql = "insert into new_tb_code_item (cIdx, groupCd, itemCd, itemNm, sort, useFl, price, regDt) values (?, ?, ?, ?, ?, ?, ?, ?)"
+    sql += " ON DUPLICATE KEY UPDATE itemNm=?,sort=?,useFl=?,price=?,modDt=?"
+    let aParameter = [
+        cIdx, groupCd, itemCd, itemNm, sort, useFl, price, regDt,
+        itemNm, sort, useFl, price, regDt];
+
+    //let query = mysql.format(sql, aParameter);
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.deleteItemCode = async function (itemCd) {
+    let sql = "delete from new_tb_code_item where itemCd = ?"
+    let aParameter = [itemCd];
+
+    //let query = mysql.format(sql, aParameter);
+    try {
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -275,9 +341,10 @@ exports.delWorkDays = async function (uIdx) {
     }
 }
 
-exports.setTaxRate = async function (appliedYear, pensionRate, healthRate, longTermCareRate, employmentRate){
-    let sql = "insert into new_tb_tax_rate (applied_year, pension_rate, health_rate, long_term_care_rate, employment_rate) values (?, ?, ?, ?, ?)"
-    let aParameter = [appliedYear, pensionRate, healthRate, longTermCareRate, employmentRate];
+exports.setTaxRate = async function (appliedYear, pensionRate, healthRate, longTermCareRate, employmentRate, industrialRate){
+    let sql = "insert into new_tb_tax_rate (applied_year, pension_rate, health_rate, long_term_care_rate, employment_rate, industrial_rate)"
+    sql += " values (?, ?, ?, ?, ?, ?)"
+    let aParameter = [appliedYear, pensionRate, healthRate, longTermCareRate, employmentRate, industrialRate];
     //let query = mysql.format(sql, aParameter);
 
     try {
@@ -290,7 +357,7 @@ exports.setTaxRate = async function (appliedYear, pensionRate, healthRate, longT
 }
 
 exports.getTaxRate = async function (year){
-    let sql = "select * from new_tb_tax_rate where applied_year in (?)";
+    let sql = "select * from new_tb_tax_rate where applied_year in (?) order by regDt desc limit 1";
     let aParameter = [year];
     //let query = mysql.format(sql, aParameter);
 
