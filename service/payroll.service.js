@@ -1,6 +1,9 @@
 const payrollModel = require("../model/payroll.model")
 const etcModel = require("../model/etc.model")
 const workModel = require("../model/work.model")
+const contractModel = require("../model/contract.model")
+const memberModel = require("../model/member.model")
+const wageModel = require("../model/etc.model");
 
 //직원기본급여조회
 exports.getBaseSalary = async function (req, res) {
@@ -22,19 +25,128 @@ exports.setBaseSalary = async function (req, res) {
         netPay = req.body.netPay,
         total = req.body.total; //합계
 
-    let result = await memberModel.setBaseSalary(mIdx, sIdx, year, paymentList, deductionList, checkedList, grossPay, deductions, netPay, total);
+    let result = await payrollModel.setBaseSalary(mIdx, sIdx, year, paymentList, deductionList, checkedList, grossPay, deductions, netPay, total);
 
     res.json({'result': true, 'data': result})
 };
 
 //직원급여내역조회
 exports.getPayrollMonth = async function (req, res) {
-    let year = req.query.year,
-        month = req.query.month;
-    let result = await payrollModel.getPayrollMonth(year, month);
+    let { year, month } = req.query;
 
-    res.json({'result': true, 'data': result})
-}
+    if (!year || !month) {
+        return res.json({ 'result': false, 'msg': '날짜 설정을 확인해주세요.' });
+    }
+
+    const targetMonthStr = `${year}-${String(month).padStart(2, '0')}`;
+    const startOfMonth = new Date(year, month - 1, 1);
+    const endOfMonth = new Date(year, month, 0);
+    const daysInMonth = endOfMonth.getDate();
+
+    try {
+        // 1. 데이터 병렬 수집
+        const [contracts, works, wageCodes] = await Promise.all([
+            contractModel.getMemberContract(targetMonthStr),
+            workModel.getWorkDays(targetMonthStr),
+            wageModel.getWageCode()
+        ]);
+
+        // 2. 직원별 급여 계산 루프
+        const payrollResults = contracts.map(mc => {
+            // JSON 데이터 파싱
+            const jsonData = typeof mc.jsonData === 'string' ? JSON.parse(mc.jsonData) : mc.jsonData;
+            // 해당 직원의 출근일 필터링
+            const memberWorkDates = works
+                .filter(w => w.mIdx === mc.mIdx)
+                .map(w => w.workDate);
+
+            // 2-1. 결근 계산 (격일제 vs 평일제)
+            const isAlternateDay = mc.month_work_time >= 210;
+            let absentDays = 0;
+            let scheduledDays = 0;
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const currentDate = new Date(year, month - 1, d);
+                const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+
+                let isScheduled = false;
+                if (isAlternateDay) {
+                    // 격일제: 입사일(startDt) 기준 2일 간격 패턴
+                    const startDt = new Date(mc.startDt);
+                    startDt.setHours(0,0,0,0);
+                    currentDate.setHours(0,0,0,0);
+                    const diffDays = Math.round(Math.abs(currentDate - startDt) / (1000 * 60 * 60 * 24));
+                    if (diffDays % 2 === 0) isScheduled = true;
+                } else {
+                    // 평일제: 월~금
+                    if (currentDate.getDay() >= 1 && currentDate.getDay() <= 5) isScheduled = true;
+                }
+
+                if (isScheduled) {
+                    scheduledDays++;
+
+                    // 근무 예정일인데 출근 기록이 없으면 결근
+                    if (!memberWorkDates.includes(dateStr)) {
+                        absentDays++;
+                    }
+                }
+                /*
+                // 근무예정일인데 출근기록(연차포함)이 없으면 결근
+                if (isScheduled && !memberWorkDates.includes(dateStr)) {
+                    absentDays++;
+                }
+
+                 */
+            }
+
+            // 2-2. 급여액 산출
+            const hourlyRate = mc.grossPay / mc.month_work_time;
+            const absentDeduction = Math.round(hourlyRate * mc.day_work_time * absentDays);
+            const finalBaseSalary = mc.grossPay - absentDeduction;
+
+            // 2-3. 비과세 합계 (경비직 특수조건 적용)
+            let totalTaxFree = 0;
+            let extraPaySum = 0;
+
+            wageCodes.forEach(cw => {
+                const amount = parseInt(jsonData[cw.itemCd] || 0);
+                if (cw.itemCd !== '04001001') extraPaySum += amount;
+
+                if (cw.itemCd === '04001003' && mc.type === '01001001' && mc.month_work_time >= 210) {
+                    // 경비원 야간수당 비과세 (20만원)
+                    totalTaxFree += Math.min(amount, 200000);
+                } else if (cw.tax_free > 0) {
+                    totalTaxFree += Math.min(amount, cw.tax_free);
+                }
+            });
+
+            console.log(mc, 'c')
+
+            return {
+                mIdx: mc.mIdx,
+                staff: mc.name,
+                role: mc.role,
+                id: mc.id,
+                siteName: mc.siteName,
+                sIdx: mc.sIdx,
+                payment_day: mc.payment_day,
+                scheduledDays,
+                absentDays,
+                absentDeduction,
+                finalBaseSalary,
+                totalTaxFree,
+                taxableIncome: (finalBaseSalary + extraPaySum) - totalTaxFree
+            };
+        });
+
+        // 3. 최종 결과 반환
+        res.json({ 'result': true, 'data': payrollResults });
+
+    } catch (e) {
+        console.error('Payroll Calculation Error:', e);
+        res.json({ 'result': false, 'msg': '급여 계산 중 오류가 발생했습니다.' });
+    }
+};
 
 exports.setPayrollMonth = async function (req, res) {
     let mIdx = req.params.mIdx,

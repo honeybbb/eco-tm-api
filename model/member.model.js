@@ -10,6 +10,7 @@ exports.getMemberList = async function () {
     sql += " left join new_tb_member_contract mc on mc.mIdx = m.idx"
     sql += " left join (select b.*, s.name from new_tb_member_assignment b left join new_tb_site s on s.idx = b.sIdx) as `ms` on ms.mIdx = m.idx"
     sql += " left join new_tb_code c on c.itemCd = m.type left join new_tb_code c2 on c2.itemCd = m.position";
+    sql += " order by m.idx asc"
     let aParameter = [];
 
     //let query = mysql.format(sql, aParameter);
@@ -23,15 +24,41 @@ exports.getMemberList = async function () {
 }
 
 exports.getMemberData = async function (id) {
-    let sql = "select m.*, IFNULL(ms.sIdx, '0') as `sIdx`, cd.itemCd as `positionCd`, cd.itemNm as `position`, cd2.itemNm as `type`,"
-    sql += " CONCAT('[',GROUP_CONCAT(JSON_OBJECT('name',s.name, 'address',s.address)),']') as `sites`"
-    sql += " from new_tb_member m"
-    sql += " inner join new_tb_code cd on cd.itemCd = m.position"
-    sql += " inner join new_tb_code cd2 on cd2.itemCd = m.type"
-    sql += " left join new_tb_member_assignment ms on m.idx = ms.mIdx"
-    sql += " left join new_tb_site s on s.idx = ms.sIdx"
-    // sql += " where m.idx = ?"
-    sql += " where m.id = ?"
+    let sql = "SELECT m.*, IFNULL(ms.sIdx, '0') AS `sIdx`,s.payment_day,"
+    sql += " cd.itemCd AS `positionCd`, cd.itemNm AS `position`,"
+    sql += " cd2.itemNm AS `type`,"
+    sql += " CONCAT('[',"
+    sql += " GROUP_CONCAT(DISTINCT"
+    sql += "   CASE WHEN ms.mIdx IS NOT NULL THEN"
+    sql += "     JSON_OBJECT('name', s.name, 'address', s.address)"
+    sql += "   END"
+    sql += " ),']') AS `sites`,"
+    sql += " CONCAT('[',"
+    sql += " GROUP_CONCAT(DISTINCT"
+    sql += "   CASE WHEN mc.idx IS NOT NULL THEN"
+    sql += "     JSON_OBJECT("
+    sql += "       'contractData', mc.jsonData,"
+    sql += "       'startDt', mc.startDt,"
+    sql += "       'endDt', mc.endDt,"
+    sql += "       'monthWorkTime', mc.month_work_time,"
+    sql += "       'dayWorkTime', mc.day_work_time"
+    sql += "     )"
+    sql += "   END"
+    sql += " ),']') AS `contract`"
+    sql += " FROM new_tb_member m"
+    sql += " INNER JOIN new_tb_code cd ON cd.itemCd = m.position"
+    sql += " INNER JOIN new_tb_code cd2 ON cd2.itemCd = m.type"
+    sql += " LEFT JOIN new_tb_member_assignment ms ON m.idx = ms.mIdx"
+    sql += " LEFT JOIN new_tb_site s ON s.idx = ms.sIdx"
+    sql += " LEFT JOIN ("
+    sql += "   SELECT mIdx, MAX(idx) AS max_idx"
+    sql += "   FROM new_tb_member_contract"
+    sql += "   GROUP BY mIdx"
+    sql += " ) LatestC ON m.idx = LatestC.mIdx"
+    sql += " LEFT JOIN new_tb_member_contract mc"
+    sql += "   ON mc.idx = LatestC.max_idx"
+    sql += " WHERE m.id = ?"
+    sql += " GROUP BY m.idx";
     let aParameter = [id];
 
     //let query = mysql.format(sql, aParameter);
@@ -257,6 +284,21 @@ exports.getMemberOff = async function (cIdx, startDt, endDt) {
 exports.updateOffStatus = async function (idx, status) {
     let sql = "update new_tb_member_off set status = (?) where idx = ?"
     let aParameter = [status, idx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+//직원 연차 등록(관리자)
+exports.setMemberOffForce = async function (mIdx, sIdx, startDt, endDt, reason) {
+    let sql = "insert into new_tb_member_off (mIdx, sIdx, startDt, endDt, reason, status)"
+    sql += " values (?, ?, ?, ?, ?, '1')" //자동등록
+    let aParameter = [mIdx, sIdx, startDt, endDt, reason];
 
     try {
         let [res] = await pool.query(sql, aParameter);

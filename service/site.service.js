@@ -41,27 +41,29 @@ exports.registerSiteWithContract = async function (req, res) {
         // Step 1. 현장(Site) 데이터 준비
         // ====================================================
         let siteData = {
-            sIdx: req.body.sIdx || req.query.idx, // 수정일 경우 존재
+            sIdx: req.body.sIdx,
             sType: req.body.sType, //건물타입
             cIdx: req.body.cIdx,
             name: req.body.name,
-            site_id: req.body.site_id,
-            type: req.body.type,
+            // site_id: req.body.site_id,
+            // type: req.body.type,
             status: req.body.status,
-            address: req.body.address,
-            address_detail: req.body.addressDetail,
-            phone: req.body.phone,
-            manager: req.body.manager,
-            bigo: req.body.bigo,
+            area: req.body.area,
+            is_vat: req.body.is_vat,
             building_su: req.body.building_su,
             unit_su: req.body.unit_su,
-            area: req.body.area,
+            address: req.body.address,
+            address_detail: req.body.addressDetail,
+            payment_day: req.body.payment_day,
+
+            phone: req.body.phone || '',
+            manager: req.body.manager || '',
             director: req.body.director,
             director_phone: req.body.directorContact,
-            payment_day: req.body.payment_day,
+            bigo: req.body.bigo || '',
         };
 
-        // [Model 호출 1] 현장 정보 저장 (INSERT or UPDATE)
+        // 현장 정보 저장 (INSERT or UPDATE)
         // 결과로 sIdx(현장 키값)를 받아옵니다.
         let siteResult = await siteModel.saveSite(siteData);
 
@@ -87,7 +89,6 @@ exports.registerSiteWithContract = async function (req, res) {
             console.error("JSON Parse Error", e);
         }
 
-        // ★ [Loop] Service단에서 반복문 실행
         if (Array.isArray(contractList) && contractList.length > 0) {
             for (const contractItem of contractList) {
 
@@ -96,12 +97,13 @@ exports.registerSiteWithContract = async function (req, res) {
                 if(contractItem.staffList && Array.isArray(contractItem.staffList)){
                     currentStaffCount = contractItem.staffList.reduce((acc, cur) => acc + (Number(cur.count)||0), 0);
                 }
-
+                console.log(contractItem)
                 // 개별 계약 데이터 객체 생성
                 let contractData = {
                     scIdx: contractItem.scIdx, // ★ 계약 고유키 (수정 시 필요)
-                    sIdx: targetSIdx,          // ★ 위에서 구한 현장 ID 연결
+                    sIdx: targetSIdx,          //현장idx
                     cIdx: req.body.cIdx,
+                    type: contractItem.type,
 
                     // 상세 데이터
                     workDays: contractItem.workDays,
@@ -114,7 +116,7 @@ exports.registerSiteWithContract = async function (req, res) {
                     breaktime: contractItem.breakTime
                 };
 
-                // [Model 호출 2] 개별 계약 저장 (Loop 안에서 호출)
+                // 개별 계약 저장
                 await siteModel.saveContract(contractData);
             }
         }
@@ -127,6 +129,23 @@ exports.registerSiteWithContract = async function (req, res) {
         res.status(500).json({ 'result': false, 'message': '서버 에러 발생' });
     }
 };
+
+exports.registerBudget = async function (req, res) {
+    let sIdx = req.body.sIdx,
+        jsonData = req.body.jsonData;
+
+    let result = await siteModel.registerBudget(sIdx, jsonData);
+
+    res.json({ 'result': true, 'data': result });
+}
+
+exports.getSiteBudget = async function (req, res) {
+    let sIdx = req.body.sIdx;
+
+    let result = await siteModel.getSiteBudget(sIdx);
+
+    res.json({ 'result': true, 'data': result });
+}
 
 exports.updateSiteData = async function (req, res) {
     let sIdx = req.body.sIdx,

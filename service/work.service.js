@@ -1,7 +1,7 @@
 const workModel = require("../model/work.model")
 //출근 여부 확인
 exports.getWorkFl = async function (req, res) {
-    let mIdx = req.params.mIdx,
+    let mIdx = req.query.mIdx,
         sIdx = req.query.sIdx,
         today = new Date().toISOString().slice(0, 10); // '2025-11-07'
 
@@ -17,12 +17,20 @@ exports.workStart = async function (req, res) {
     let mIdx = req.body.mIdx,
         sIdx = req.body.sIdx,
         workStartDt = new Date(),
+        workType = req.body.workType,
+        bigo = req.body.bigo,
         regDt = new Date();
 
-    console.log(mIdx, sIdx, workStartDt, regDt)
-    let result = await workModel.workStart(mIdx, sIdx, workStartDt, regDt);
+    // console.log(mIdx, sIdx, workStartDt, regDt)
+    try {
+        let result = await workModel.workStart(mIdx, sIdx, workStartDt, workType, bigo, regDt);
 
-    res.json({'result': true, 'data': result})
+        res.json({'result': true, 'data': result})
+    }catch (e) {
+        console.error(e);
+        res.status(500).json({ result: false, message: '서버 에러' });
+
+    }
 }
 
 //직원 퇴근
@@ -82,8 +90,17 @@ exports.getWorkDayCount = async function (req, res) {
 }
 
 exports.getWorkList = async function (req, res) {
-    let month = req.query.month;
-    let result = await workModel.getWorkList(month);
+    let month = req.query.month,
+        sIdx = req.query.sIdx;
+    let result = await workModel.getWorkList(month, sIdx);
+
+    res.json({'result': true, 'data':result});
+}
+
+exports.getWorkOffList = async function (req, res) {
+    let month = req.query.month,
+        sIdx = req.query.sIdx;
+    let result = await workModel.getWorkOffList(month, sIdx);
 
     res.json({'result': true, 'data':result});
 }

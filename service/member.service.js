@@ -14,6 +14,8 @@ exports.getMemberList = async function (req, res) {
 exports.getMemberData = async function (req, res) {
     let id = req.params.id;
 
+    console.log(id, 'ddd')
+
     let result = await memberModel.getMemberData(id);
 
     res.json({'result': true, 'data': result})

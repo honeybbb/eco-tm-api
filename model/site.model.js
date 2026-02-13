@@ -56,12 +56,12 @@ exports.saveSite = async function (site) {
             // [UPDATE]
             let sql = `
                 UPDATE new_tb_site 
-                SET sType=?, name=?, address=?, phone=?, building_su=?, unit_su=?, area=?, director=?, director_phone=?, payment_day=?
+                SET sType=?, name=?, address=?, phone=?, building_su=?, unit_su=?, area=?,is_vat=?, director=?, director_phone=?, payment_day=?
                 WHERE idx = ?
             `;
             let params = [
                 site.sType, site.name, site.address, site.phone, site.building_su,
-                site.unit_su, site.area, site.director, site.director_phone, site.payment_day,
+                site.unit_su, site.area, site.is_vat, site.director, site.director_phone, site.payment_day,
                 new_sIdx
             ];
             await connection.query(sql, params);
@@ -69,12 +69,12 @@ exports.saveSite = async function (site) {
             // [INSERT]
             let sql = `
                 INSERT INTO new_tb_site 
-                (cIdx, name, address, phone, building_su, unit_su, area, director, director_phone, payment_day) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (cIdx, sType, name, address, phone, building_su, unit_su, area, is_vat, director, director_phone, payment_day) 
+                VALUES (?, ?,  ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             let params = [
-                site.cIdx, site.name, site.address, site.phone, site.building_su,
-                site.unit_su, site.area, site.director, site.director_phone, site.payment_day
+                site.cIdx, site.sType, site.name, site.address, site.phone, site.building_su,
+                site.unit_su, site.area, site.is_vat, site.director, site.director_phone, site.payment_day
             ];
             let result = await connection.query(sql, params);
             new_sIdx = result[0].insertId;
@@ -98,11 +98,12 @@ exports.saveContract = async function (contract) {
             // [UPDATE]
             let sql = `
                 UPDATE new_tb_site_contract 
-                SET jsonData=?, total_cost=?, startDt=?, endDt=?, staffCount=?, staffDetail=?, 
+                SET type=?, jsonData=?, total_cost=?, startDt=?, endDt=?, staffCount=?, staffDetail=?, 
                     workSchedule=?, breaktime=?
                 WHERE scIdx = ? 
             `;
             let params = [
+                contract.type,
                 contract.jsonData,
                 contract.totalCost,
                 contract.startDt,
@@ -119,12 +120,13 @@ exports.saveContract = async function (contract) {
             // [INSERT]
             let sql = `
                 INSERT INTO new_tb_site_contract 
-                (sIdx, cIdx, workdays, total_cost, startDt, endDt, staffCount, staffDetail, workSchedule, breaktime) 
-                VALUES (?, ?, ?, ?, ?, ?, ? , ?, ?, ?)
+                (sIdx, cIdx, type, workdays, total_cost, startDt, endDt, staffCount, staffDetail, workSchedule, breaktime) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ? , ?, ?, ?)
             `;
             let params = [
                 contract.sIdx, // 현장 FK
                 contract.cIdx,
+                contract.type,
                 contract.workDays,
                 contract.totalCost,
                 contract.startDt,
@@ -259,6 +261,19 @@ exports.insertSiteAndContract = async function (site, contract) {
     }
 }
 
+exports.registerBudget = async function (sIdx, jsonData) {
+    let sql = "update new_tb_site_contract set jsonData=? where sIdx = ?"
+    let aParameter = [jsonData,sIdx];
+
+    try {
+        let res = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.updateSiteData = async function (sIdx, name, address, phone, bigo, building_su, unit_su, area) {
     let sql = "update new_tb_site set name=?,address=?,phone=?,bigo=?,building_su=?,unit_su=?,area=? where sIdx = ?";
     let aParameter = [name, address, phone, building_su, unit_su, area, sIdx];
@@ -306,11 +321,13 @@ exports.getSiteHeadCount = async function (sIdx) {
 }
 
 exports.getSiteData = async function (sIdx) {
-    let sql = "select s.*, sa.jsonData, sc.startDt, sc.endDt, sc.total_cost,"
-    sql += " CONCAT('[',GROUP_CONCAT(DISTINCT JSON_OBJECT('bigo', sb.bigo, 'regDt', sb.regDt)),']') as bigoList,"
-    sql += " CONCAT('[',GROUP_CONCAT(DISTINCT JSON_OBJECT('workDays', sc.workdays, 'startDt', sc.startDt,"
-    sql += " 'endDt', sc.endDt, 'workSchedule', sc.workSchedule, 'breaktime', sc.breaktime, 'category', (select itemNm from new_tb_code where itemCd = sc.type),"
-    sql += " 'staffList', sc.staffDetail, 'staffCount', sc.staffCount)),']') as `contractList`"
+    let sql = "select s.*, sa.jsonData, sc.startDt, sc.endDt, sc.total_cost, sc.jsonData as `budget`,"
+    sql += " CONCAT('[',GROUP_CONCAT(DISTINCT CASE WHEN sb.sIdx is not null THEN JSON_OBJECT('bigo', sb.bigo, 'regDt', sb.regDt) END),']') as bigoList,"
+    sql += " CONCAT('[',GROUP_CONCAT(DISTINCT CASE WHEN sc.sIdx is not null THEN JSON_OBJECT('workDays', sc.workdays, 'startDt', sc.startDt,"
+    sql += " 'endDt', sc.endDt, 'workSchedule', sc.workSchedule, 'breaktime', sc.breaktime,"
+    sql += " 'category', (select itemNm from new_tb_code where itemCd = sc.type),"
+    sql += " 'type', (select itemCd from new_tb_code where itemCd = sc.type),"
+    sql += " 'staffList', sc.staffDetail, 'staffCount', sc.staffCount) END),']') as `contractList`"
     sql += " from new_tb_site s"
     sql += " left join new_tb_site_assignment sa on sa.sIdx = s.idx"
     sql += " left join new_tb_site_contract sc on sc.sIdx = s.idx"

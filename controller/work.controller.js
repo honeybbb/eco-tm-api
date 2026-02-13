@@ -3,7 +3,7 @@
 const service = require("../service/work.service");
 module.exports = function (app) {
     //출근 확인
-    app.route('/v1/work/flag/:mIdx').get(service.getWorkFl);
+    app.route('/v1/work/status').get(service.getWorkFl);
 
     //직원 출근
     app.route('/v1/work/start').post(service.workStart);
@@ -19,6 +19,9 @@ module.exports = function (app) {
 
     //직원 근무현황
     app.route('/v1/work/list').get(service.getWorkList);
+
+    //직원 연차 사용 현황
+    app.route('/v1/work/off').get(service.getWorkOffList);
 
     //직원 출근 일수에 따른 급여
     //app.route('/v1/work/day/count').get(service.getWorkDayCount);

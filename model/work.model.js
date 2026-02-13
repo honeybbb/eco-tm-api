@@ -2,12 +2,12 @@ const pool = require("../config/mysql");
 const mysql = require("mysql2/promise")
 
 exports.getWorkFl = async function (mIdx, sIdx, today) {
-    let sql = "select * from new_tb_work where mIdx = ? and sIdx = ? and Date(regDt) = ?"
+    let sql = "select * from new_tb_work"
+    sql += " where mIdx = ? and sIdx = ? and Date(regDt) = ? and workEndDt is null"
     let aParameter = [mIdx, sIdx, today];
 
-    let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -15,13 +15,13 @@ exports.getWorkFl = async function (mIdx, sIdx, today) {
     }
 }
 
-exports.workStart = async function (mIdx, sIdx, workStartDt, regDt) {
-    let sql = "insert into new_tb_work (mIdx, sIdx, workStartDt, regDt) values (?, ?, ? ,?)"
-    let aParameter = [mIdx, sIdx, workStartDt, regDt];
+exports.workStart = async function (mIdx, sIdx, workStartDt, workType, bigo, regDt) {
+    let sql = "insert into new_tb_work (mIdx, sIdx, workStartDt, workType, bigo, regDt)"
+    sql += " values (?, ?, ? , ?, ?, ?)"
+    let aParameter = [mIdx, sIdx, workStartDt, workType, bigo, regDt];
 
-    let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -33,9 +33,8 @@ exports.workEnd = async function (mIdx, sIdx, workEndDt, today) {
     let sql = "update new_tb_work set workEndDt=?, workFl='N' where mIdx = ? and sIdx = ? and Date(workStartDt) = ?"
     let aParameter = [workEndDt, mIdx, sIdx, today];
 
-    let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -109,14 +108,15 @@ exports.getWorkDaysAdmin = async function (sIdx, ym) {
     }
 }
 
-exports.getWorkDays = async function (mIdx, startDt, endDt) {
-    let sql = "select COUNT(*) as workdays from new_tb_work where mIdx = ? and LEFT(?, 7) = ?";
-    let aParameter = [mIdx, startDt, endDt];
+exports.getWorkDays = async function (targetMonthStr) {
+    // let sql = "select COUNT(*) as workdays from new_tb_work where mIdx = ? and LEFT(?, 7) = ?";
+    let sql = "SELECT mIdx, DATE_FORMAT(workStartDt, '%Y-%m-%d') as workDate"
+    sql += " FROM new_tb_work WHERE DATE_FORMAT(workStartDt, '%Y-%m') = ?"
+    let aParameter = [targetMonthStr];
 
-    let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
-        return res[0];
+        let [res] = await pool.query(sql, aParameter);
+        return res;
     }catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
@@ -133,7 +133,7 @@ exports.getWorkSheet = async function (mIdx, startDt, endDt) {
 
     let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(query);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -173,8 +173,9 @@ exports.getWorkDayCount = async function (date)  {
     }
 }
 
-exports.getWorkList = async function (month) {
-    let sql = "select * from new_tb_work WHERE workStartDt LIKE CONCAT(?, '%') AND workFl = 'Y'";
+exports.getWorkList = async function (month, sIdx) {
+    let sql = "select * from new_tb_work"
+    sql += " WHERE workStartDt LIKE CONCAT(?, '%') AND workFl = 'Y' AND sIdx in (?)";
 
     /*
     let sql = "SELECT mIdx,COUNT(*) as workDays"
@@ -184,7 +185,24 @@ exports.getWorkList = async function (month) {
     sql += " GROUP BY mIdx";
 
      */
-    let aParameter = [month];
+    let aParameter = [month, sIdx];
+
+    //let query = mysql.format(sql, aParameter);
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.getWorkOffList = async function (month, sIdx) {
+    let sql = "select * from new_tb_member_off"
+    sql += " WHERE startDt LIKE CONCAT(?, '%') AND endDt LIKE CONCAT(?, '%')"
+    sql += " AND status = 1 AND sIdx in (?)";
+
+    let aParameter = [month, month, sIdx];
 
     //let query = mysql.format(sql, aParameter);
     try {
