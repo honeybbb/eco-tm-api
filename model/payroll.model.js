@@ -48,14 +48,14 @@ exports.getBaseSalary = async function () {
         return {'data': '-9999'}
     }
 }
-
+/*
 exports.getPayrollMonth = async function (year, month) {
 
 }
-
+*/
 
 //직원 급여 내역 조회
-exports.getPayrollMonth2 = async function (year, month) {
+exports.getPayrollMonth = async function (year, month) {
     let sql = "select"
     sql += " m.idx,"
     sql += " m.id,"

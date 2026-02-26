@@ -11,7 +11,7 @@ module.exports = function (app) {
     //직원 퇴근
     app.route('/v1/work/end').post(service.workEnd);
 
-    //직원 근무현황 조회
+    //직원 근무현황 조회 (직원화면)
     app.route('/v1/work/sheet/:mIdx').get(service.getWorkSheet);
 
     //직원 근태 수정
@@ -20,7 +20,7 @@ module.exports = function (app) {
     //직원 근무현황
     app.route('/v1/work/list').get(service.getWorkList);
 
-    //직원 연차 사용 현황
+    //직원 연차신청현황
     app.route('/v1/work/off').get(service.getWorkOffList);
 
     //직원 출근 일수에 따른 급여

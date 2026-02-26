@@ -63,6 +63,8 @@ exports.registerSiteWithContract = async function (req, res) {
             bigo: req.body.bigo || '',
         };
 
+        console.log(siteData, 'siteData');
+
         // 현장 정보 저장 (INSERT or UPDATE)
         // 결과로 sIdx(현장 키값)를 받아옵니다.
         let siteResult = await siteModel.saveSite(siteData);
@@ -140,7 +142,9 @@ exports.registerBudget = async function (req, res) {
 }
 
 exports.getSiteBudget = async function (req, res) {
-    let sIdx = req.body.sIdx;
+    let sIdx = req.query.sIdx;
+
+    if(!sIdx) return res.json({ 'result': false, 'msg': '현장 인덱스 정보가 없습니다.' });
 
     let result = await siteModel.getSiteBudget(sIdx);
 

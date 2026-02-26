@@ -34,8 +34,8 @@ exports.setSiteBigo = async function (sIdx, bigo, admin) {
 }
 
 exports.setSiteData = async function (cIdx, name, address, phone, bigo, building_su, unit_su, area) {
-    let sql = "insert into new_tb_site (cIdx, name, address, phone, building_su, unit_su, area) values (?, ?, ?, ?, ?, ?, ?)"
-    let aParameter = [cIdx, name, address, phone, building_su, unit_su, area];
+    let sql = "insert into new_tb_site (cIdx, name, address, phone, bigo, building_su, unit_su, area) values (?, ?, ?, ?, ?, ?, ?, ?)"
+    let aParameter = [cIdx, name, address, phone, bigo, building_su, unit_su, area];
 
     let query = mysql.format(sql, aParameter);
     try {
@@ -70,7 +70,7 @@ exports.saveSite = async function (site) {
             let sql = `
                 INSERT INTO new_tb_site 
                 (cIdx, sType, name, address, phone, building_su, unit_su, area, is_vat, director, director_phone, payment_day) 
-                VALUES (?, ?,  ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?,  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             let params = [
                 site.cIdx, site.sType, site.name, site.address, site.phone, site.building_su,
@@ -274,6 +274,19 @@ exports.registerBudget = async function (sIdx, jsonData) {
     }
 }
 
+exports.getSiteBudget = async function (sIdx) {
+    let sql = "select * from new_tb_site_contract where sIdx = ? order by regDt desc limit 1"
+    let aParameter = [sIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.updateSiteData = async function (sIdx, name, address, phone, bigo, building_su, unit_su, area) {
     let sql = "update new_tb_site set name=?,address=?,phone=?,bigo=?,building_su=?,unit_su=?,area=? where sIdx = ?";
     let aParameter = [name, address, phone, building_su, unit_su, area, sIdx];
@@ -321,10 +334,10 @@ exports.getSiteHeadCount = async function (sIdx) {
 }
 
 exports.getSiteData = async function (sIdx) {
-    let sql = "select s.*, sa.jsonData, sc.startDt, sc.endDt, sc.total_cost, sc.jsonData as `budget`,"
+    let sql = "select s.*, sa.jsonData, sc.startDt, sc.endDt, sc.total_cost,"
     sql += " CONCAT('[',GROUP_CONCAT(DISTINCT CASE WHEN sb.sIdx is not null THEN JSON_OBJECT('bigo', sb.bigo, 'regDt', sb.regDt) END),']') as bigoList,"
     sql += " CONCAT('[',GROUP_CONCAT(DISTINCT CASE WHEN sc.sIdx is not null THEN JSON_OBJECT('workDays', sc.workdays, 'startDt', sc.startDt,"
-    sql += " 'endDt', sc.endDt, 'workSchedule', sc.workSchedule, 'breaktime', sc.breaktime,"
+    sql += " 'endDt', sc.endDt, 'workSchedule', sc.workSchedule, 'breaktime', sc.breaktime,'budget', sc.jsonData, 'scIdx', sc.idx,"
     sql += " 'category', (select itemNm from new_tb_code where itemCd = sc.type),"
     sql += " 'type', (select itemCd from new_tb_code where itemCd = sc.type),"
     sql += " 'staffList', sc.staffDetail, 'staffCount', sc.staffCount) END),']') as `contractList`"

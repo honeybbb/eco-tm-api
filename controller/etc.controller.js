@@ -11,7 +11,10 @@ module.exports = function (app) {
     app.route('/v1/notice/data').get(service.getNoticeData)
 
     //공지 등록
-    //app.route('/v1/notice/write').post(service.setNotice);
+    app.route('/v1/notice/register').post(service.setNotice);
+
+    //공지 삭제
+    app.route('/v1/notice/remove').delete(service.removeNotice);
 
     /* ======= 코드 관련 ======= */
 

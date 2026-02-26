@@ -5,9 +5,21 @@ exports.getNoticeList = async function () {
     let sql = "select * from new_tb_notice";
     let aParameter = [];
 
-    let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.getNoticeTarget = async function (target) {
+    let sql = "select * from new_tb_notice where target in (?)"
+    let aParameter = [target];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -19,9 +31,8 @@ exports.getNoticeData = async function (idx) {
     let sql = "select * from new_tb_notice where idx = ?"
     let aParameter = [idx];
 
-    let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -29,13 +40,30 @@ exports.getNoticeData = async function (idx) {
     }
 }
 
-exports.setNotice = async function (title, content, createdBy, target){
-    let sql = "insert into new_tb_notice (title, content, createBy, target) values (?, ?, ?, ?)"
-    let aParameter = [title, content, createdBy, target];
+exports.setNotice = async function (must, type, target, title, content, regDt){
+    let sql = "insert into new_tb_notice (must, type, target, title, content, regDt)"
+    sql += " values (?, ?, ?, ?, ?, ?)"
+    sql += " ON DUPLICATE KEY UPDATE must=?, type=?, target=?, title=?, content=?, modDt=?"
+    let aParameter = [
+        must, type, target, title, content, regDt,
+        must, type, target, title, content, regDt
+    ];
 
-    let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.removeNotice = async function (idx, author){
+    let sql = "delete from new_tb_notice where idx = ? and author = ?"
+    let aParameter = [idx, author];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);

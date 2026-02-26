@@ -5,8 +5,6 @@ exports.getWorkFl = async function (req, res) {
         sIdx = req.query.sIdx,
         today = new Date().toISOString().slice(0, 10); // '2025-11-07'
 
-    console.log(mIdx, sIdx, today)
-
     let result = await workModel.getWorkFl(mIdx, sIdx, today);
 
     res.json({'result': true, 'data': result})
@@ -16,12 +14,12 @@ exports.getWorkFl = async function (req, res) {
 exports.workStart = async function (req, res) {
     let mIdx = req.body.mIdx,
         sIdx = req.body.sIdx,
-        workStartDt = new Date(),
+        workStartDt = req.body.workStartDt || new Date(),
         workType = req.body.workType,
         bigo = req.body.bigo,
         regDt = new Date();
 
-    // console.log(mIdx, sIdx, workStartDt, regDt)
+    console.log(mIdx, sIdx, workStartDt, regDt, bigo)
     try {
         let result = await workModel.workStart(mIdx, sIdx, workStartDt, workType, bigo, regDt);
 
@@ -93,6 +91,8 @@ exports.getWorkList = async function (req, res) {
     let month = req.query.month,
         sIdx = req.query.sIdx;
     let result = await workModel.getWorkList(month, sIdx);
+
+    console.log(month, sIdx, result)
 
     res.json({'result': true, 'data':result});
 }

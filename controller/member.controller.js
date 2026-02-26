@@ -13,9 +13,6 @@ module.exports = function (app) {
     // app.route('/v1/member/register').post(service.setMemberData);
     app.route('/v1/member/register').post(service.registerFullMember);
 
-    //배치 가능 직원 조회
-    app.route('/v1/member/list/available').get(service.getMemberAvailable);
-
     //직원 연차 조회
     app.route('/v1/member/leave').get(service.getMemberLeave);
 
@@ -31,12 +28,13 @@ module.exports = function (app) {
     //직원 연차 승인 or 반려
     app.route('/v1/member/off/status').post(service.updateOffStatus);
 
+    //배치 가능 직원 조회
+    app.route('/v1/member/staffing/:sIdx').get(service.getMemberAvailable);
+
     //직원 배치
     app.route('/v1/member/staffing/:mIdx').post(service.setMemberStaffing);
 
-    //로그인
-    app.route('/v1/member/auth').post(service.loginUser);
+    //직원 배치 해제
+    app.route('/v1/member/staffing/:idx').delete(service.removeMemberStaffing);
 
-    //운영자 로그인
-    app.route('/v1/manager/auth').post(service.loginManager);
 }

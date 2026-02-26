@@ -10,7 +10,7 @@ exports.getMemberList = async function () {
     sql += " left join new_tb_member_contract mc on mc.mIdx = m.idx"
     sql += " left join (select b.*, s.name from new_tb_member_assignment b left join new_tb_site s on s.idx = b.sIdx) as `ms` on ms.mIdx = m.idx"
     sql += " left join new_tb_code c on c.itemCd = m.type left join new_tb_code c2 on c2.itemCd = m.position";
-    sql += " order by m.idx asc"
+    sql += " order by ms.sIdx desc, m.idx"
     let aParameter = [];
 
     //let query = mysql.format(sql, aParameter);
@@ -72,10 +72,10 @@ exports.getMemberData = async function (id) {
 }
 
 exports.getMemberAvailable = async function(sIdx) {
-    let sql = "SELECT * FROM new_tb_member m WHERE m.idx NOT IN"
+    let sql = "SELECT *, (select itemNm from new_tb_code where m.position = itemCd) as `role` FROM new_tb_member m WHERE m.idx NOT IN"
     sql += " (SELECT ma.mIdx"
     sql += " FROM new_tb_member_assignment ma"
-    sql += " WHERE ma.sIdx in (?))";
+    sql += " WHERE ma.sIdx in (?)) and m.status = 0"; //m.stauts 0 : 재직 / 1: 퇴사
     let aParameter = [sIdx];
 
     //let query = mysql.format(sql, aParameter);
@@ -325,27 +325,13 @@ exports.setMemberStaffing = async function (mIdx, sIdx) {
     }
 }
 
-exports.findByLoginId = async function (loginId) {
-    let sql = "select * from new_tb_member where id = ?";
-    let aParameter = [loginId];
+//직원 배치 해제
+exports.removeMemberStaffing = async function (idx) {
+    let sql = "delete from new_tb_member_assignment WHERE idx = ?";
+    let aParameter = [idx];
 
-    let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
-        return res[0];
-    }catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
-    }
-}
-
-exports.loginUser = async function (loginId, password) {
-    let sql = "select * from new_tb_member where id = ? and password = ?";
-    let aParameter = [loginId, password];
-
-    let query = mysql.format(sql, aParameter);
-    try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);

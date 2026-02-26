@@ -3,7 +3,8 @@ const mysql = require("mysql2/promise")
 
 exports.getWorkFl = async function (mIdx, sIdx, today) {
     let sql = "select * from new_tb_work"
-    sql += " where mIdx = ? and sIdx = ? and Date(regDt) = ? and workEndDt is null"
+    sql += " where mIdx = ? and sIdx = ? and Date(regDt) = ?"
+    sql += " and workEndDt is null"
     let aParameter = [mIdx, sIdx, today];
 
     try {
@@ -124,20 +125,26 @@ exports.getWorkDays = async function (targetMonthStr) {
 }
 
 exports.getWorkSheet = async function (mIdx, startDt, endDt) {
-    let sql = "select DATE_FORMAT(workStartDt, '%Y-%m-%d') AS `date`,"
-    sql += " IFNULL(TIMESTAMPDIFF(HOUR, workStartDt, workEndDt),0) AS `duration`,"
-    sql += " DATE_FORMAT(workStartDt, '%H:%i') as `workin`,"
-    sql += " DATE_FORMAT(workEndDt, '%H:%i') as `workout`"
-    sql += " from new_tb_work where mIdx = ? and regDt >= CONCAT(?, '-01') AND regDt <  DATE_ADD(CONCAT(?, '-01'), INTERVAL 1 MONTH)"
+    let sql = "SELECT DATE_FORMAT(workStartDt, '%Y-%m-%d') AS `date`,"
+    sql += " IFNULL(TIMESTAMPDIFF(HOUR, workStartDt, workEndDt), 0) AS `duration`,"
+    sql += " DATE_FORMAT(workStartDt, '%H:%i') AS `workin`,"
+    sql += " DATE_FORMAT(workEndDt, '%H:%i') AS `workout`,"
+    sql += " workType"
+    sql += " FROM new_tb_work"
+    sql += " WHERE mIdx = ?"
+    sql += " AND workStartDt >= ?"                          // regDt → workStartDt
+    sql += " AND workStartDt <= CONCAT(?, ' 23:59:59')"    // regDt → workStartDt
+    sql += " ORDER BY workStartDt ASC"                     // 날짜 정렬 추가
+
     let aParameter = [mIdx, startDt, endDt];
 
     let query = mysql.format(sql, aParameter);
     try {
         let [res] = await pool.query(query);
         return res;
-    }catch (e) {
+    } catch (e) {
         console.log('db err', e);
-        return {'data': '-9999'}
+        return { 'data': '-9999' }
     }
 }
 
@@ -159,7 +166,7 @@ exports.getWorkDayCount = async function (date)  {
     let sql = "SELECT mIdx,COUNT(*) as workDays"
     sql += " FROM new_tb_work"
     sql += " WHERE workStartDt LIKE (?)" // 선택된 연월"
-    sql += " AND workFl = 'Y'"  // 유효 근무만
+    // sql += " AND workFl = 'Y'"  // 유효 근무만
     sql += " GROUP BY mIdx";
     let aParameter = [date];
 
@@ -175,8 +182,7 @@ exports.getWorkDayCount = async function (date)  {
 
 exports.getWorkList = async function (month, sIdx) {
     let sql = "select * from new_tb_work"
-    sql += " WHERE workStartDt LIKE CONCAT(?, '%') AND workFl = 'Y' AND sIdx in (?)";
-
+    sql += " WHERE workStartDt LIKE CONCAT(?, '%') AND sIdx in (?)";
     /*
     let sql = "SELECT mIdx,COUNT(*) as workDays"
     sql += " FROM new_tb_work"
@@ -200,7 +206,7 @@ exports.getWorkList = async function (month, sIdx) {
 exports.getWorkOffList = async function (month, sIdx) {
     let sql = "select * from new_tb_member_off"
     sql += " WHERE startDt LIKE CONCAT(?, '%') AND endDt LIKE CONCAT(?, '%')"
-    sql += " AND status = 1 AND sIdx in (?)";
+    sql += " AND sIdx in (?)";
 
     let aParameter = [month, month, sIdx];
 

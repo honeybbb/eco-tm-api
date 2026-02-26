@@ -5,16 +5,22 @@ const bcrypt  = require("bcrypt");
 
 //직원 리스트 조회
 exports.getMemberList = async function (req, res) {
-    let result = await memberModel.getMemberList();
+    try {
+        let result = await memberModel.getMemberList();
+        const safeResult = result.map(member => {
+            const { password, ...safeMember } = member;  // password만 분리하고 나머지
+            return safeMember;
+        });
 
-    res.json({'result': true, 'data': result})
+        res.json({'result': true, 'data': safeResult})
+    } catch(err) {
+        res.json({'result': false, 'msg': '회원정보를 찾을 수 없습니다.'})
+    }
 }
 
 //직원 데이터 조회
 exports.getMemberData = async function (req, res) {
     let id = req.params.id;
-
-    console.log(id, 'ddd')
 
     let result = await memberModel.getMemberData(id);
 
@@ -24,6 +30,7 @@ exports.getMemberData = async function (req, res) {
 exports.getMemberAvailable = async function (req, res) {
     let sIdx = req.query.sIdx;
     let result = await memberModel.getMemberAvailable(sIdx);
+    result.forEach(member => { delete member.password;});
 
     res.json({'result': true, 'data': result})
 }
@@ -191,31 +198,12 @@ exports.setMemberStaffing = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
-exports.loginUser = async function (req, res) {
-    let loginId = req.body.id,
-        password = req.body.password;
-    console.log(loginId, password)
+exports.removeMemberStaffing = async function (req, res) {
+    let idx = req.params.idx;
 
-    const user = await memberModel.findByLoginId(loginId);
-    const match = await bcrypt.compare(password, user.password);
-    delete user.password;
+    let result = await memberModel.removeMemberStaffing(idx)
 
-    //let result = await memberModel.loginUser(loginId, password);
-    if(match) {
-        res.json({'result': true, 'data': user})
-    }else {
-        res.json({'result': false, 'msg': '아이디 혹은 비밀번호를 확인해주세요.'})
-    }
-}
-
-exports.loginManager = async function (req, res) {
-    /*
-    let loginId = req.body.id,
-        password = req.body.password;
-
-    const user = await memberModel.findByLoginManger(loginId);
-
-     */
+    res.json({'result': true, 'data': result})
 }
 
 exports.registerFullMember = async function (req, res) {
@@ -253,7 +241,7 @@ exports.registerFullMember = async function (req, res) {
             accountNo: body.accountNumber,
             inDate: body.joinDate,
             outDate: body.endDate, // 혹은 body.outDate
-            outReason: '', // 필요시 추가
+            outReason: body.endReason, // 필요시 추가
             addr: body.address,
             bigo: body.bigo
         };

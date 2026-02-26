@@ -14,6 +14,39 @@ exports.getNoticeData = async function(req, res) {
     res.json({'result': true, 'data': result})
 }
 
+exports.setNotice = async function (req, res) {
+    let must = req.body.must,
+        type = req.body.type,
+        target = req.body.target,
+        title = req.body.title,
+        content = req.body.content,
+        regDt = new Date();
+
+    try {
+        let result = await etcModel.setNotice(must, type, target, title, content, regDt);
+
+        res.json({'result': true, 'data': result})
+
+    }catch(err) {
+        res.json({'result': false, 'msg': '공지 등록에 실패했습니다.'})
+    }
+
+}
+
+exports.removeNotice = async function (req, res) {
+    let idx = req.query.idx,
+        author = req.query.author;
+
+    try {
+        let result = await etcModel.removeNotice(idx, author);
+
+        res.json({'result': true, 'data': result})
+
+    }catch(err) {
+        res.json({'result': false, 'msg': '공지 삭제에 실패했습니다.'})
+    }
+}
+
 exports.getBaseCode = async function (req, res) {
     let result = await etcModel.getBaseCode();
 
