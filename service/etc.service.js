@@ -1,5 +1,19 @@
 const etcModel = require("../model/etc.model");
 
+exports.getMenus = async function (req, res) {
+    let companyNo = req.params.companyNo,
+        isMaster = req.query.isMaster == 'Y'? true:false;
+
+    try {
+        let result = await etcModel.getMenus(companyNo, isMaster);
+
+        res.json({'result': true, 'data': result})
+
+    } catch(err) {
+        res.json({'result': false, 'msg': '관리자 메뉴를 찾을 수 없습니다.'})
+    }
+}
+
 exports.getNoticeList = async function (req, res) {
     let result = await etcModel.getNoticeList();
 
@@ -48,7 +62,9 @@ exports.removeNotice = async function (req, res) {
 }
 
 exports.getBaseCode = async function (req, res) {
-    let result = await etcModel.getBaseCode();
+    let cIdx = req.params.cIdx;
+    if(cIdx == ':cIdx') return res.json({'result': false, 'msg':'회사 정보가 없습니다.'});
+    let result = await etcModel.getBaseCode(cIdx);
 
     res.json({'result': true, 'data': result})
 
@@ -56,7 +72,7 @@ exports.getBaseCode = async function (req, res) {
 
 exports.getGroupCode = async function (req, res) {
     let groupCd = req.params.groupCd;
-    if(groupCd == ':groupCd') return res.json({'result': false, 'msg':'Invalid Code'});
+    if(groupCd == ':groupCd') return res.json({'result': false, 'msg':'그룹코드가 없습니다.'});
 
     let result = await etcModel.getGroupCode(groupCd);
 
@@ -70,12 +86,10 @@ exports.setWageCode = async function (req, res) {
         itemNm = req.body.itemNm,
         sort = req.body.sort || 0,
         useFl = req.body.useFl,
-        taxFree = req.body.tax_free || 0,
+        option = req.body.option || 0,//비과세한도
         regDt = new Date();
 
-    console.log(cIdx, groupCd, itemCd, itemNm, sort, useFl, taxFree, regDt)
-
-    let result = await etcModel.setWageCode(cIdx, groupCd, itemCd, itemNm, sort, useFl, taxFree, regDt);
+    let result = await etcModel.setWageCode(cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt);
 
     res.json({'result': true, 'data': result})
 }
@@ -87,9 +101,12 @@ exports.setBaseCode = async function (req, res) {
         itemNm = req.body.itemNm,
         sort = req.body.sort,
         useFl = req.body.useFl,
+        option = req.body.option,
         regDt = new Date();
 
-    let result = await etcModel.setBaseCode(cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt);
+    console.log(cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt);
+
+    let result = await etcModel.setBaseCode(cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt);
 
     res.json({'result': true, 'data': result})
 }
@@ -123,36 +140,6 @@ exports.deleteBaseCode = async function (req, res) {
     let itemCd = req.params.itemCd;
 
     let result = await etcModel.deleteBaseCode(itemCd);
-
-    res.json({'result': true, 'data': result})
-}
-
-exports.getItemCode = async function (req, res) {
-    let cIdx = req.params.cIdx;
-    let result = await etcModel.getItemCode(cIdx);
-
-    res.json({'result': true, 'data': result})
-}
-
-exports.setItemCode = async function (req, res) {
-    let cIdx = req.params.cIdx,
-        groupCd = req.body.groupCd,
-        itemCd = req.body.itemCd,
-        itemNm = req.body.itemNm,
-        sort = req.body.sort || 0,
-        useFl = req.body.useFl,
-        price = req.body.price,
-        regDt = new Date();
-
-    let result = await etcModel.setItemCode(cIdx, groupCd, itemCd, itemNm, sort, useFl, price, regDt);
-
-    res.json({'result': true, 'data': result})
-}
-
-exports.deleteItemCode = async function (req, res) {
-    let itemCd = req.params.itemCd;
-
-    let result = await etcModel.deleteItemCode(itemCd);
 
     res.json({'result': true, 'data': result})
 }

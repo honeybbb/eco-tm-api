@@ -42,8 +42,10 @@ siteRoutes(app);
 var memberRoutes = require("./controller/member.controller");
 memberRoutes(app);
 
+/*
 var contractRoutes = require("./controller/contract.controller");
 contractRoutes(app);
+ */
 
 var payrollRoutes = require("./controller/payroll.controller");
 payrollRoutes(app);

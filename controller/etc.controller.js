@@ -3,6 +3,9 @@
 const service = require("../service/etc.service");
 
 module.exports = function (app) {
+    //관리자 메뉴 조회
+    app.route('/v1/menu/:companyNo').get(service.getMenus);
+
     /* ======= 공지 관련 ======= */
     //공지 리스트
     app.route('/v1/notice/list').get(service.getNoticeList)
@@ -19,16 +22,10 @@ module.exports = function (app) {
     /* ======= 코드 관련 ======= */
 
     //기본 코드 조회
-    app.route('/v1/code').get(service.getBaseCode);
+    app.route('/v1/code/:cIdx').get(service.getBaseCode);
 
     //그룹 코드 조회
     app.route('/v1/code/:groupCd').get(service.getGroupCode);
-
-    //급여 코드 삭제
-    app.route('/v1/code/wage/:itemCd').delete(service.deleteWageCode);
-
-    //급여 코드 저장
-    app.route('/v1/code/wage/:cIdx').post(service.setWageCode);
 
     //기본 코드 저장
     app.route('/v1/code/:cIdx').post(service.setBaseCode);
@@ -36,29 +33,11 @@ module.exports = function (app) {
     //기본 코드 삭제
     app.route('/v1/code/:itemCd').delete(service.deleteBaseCode);
 
-    //물품 코드 조회
-    app.route('/v1/code/item/:cIdx').get(service.getItemCode);
-
-    //물품 코드 저장
-    app.route('/v1/code/item/:cIdx').post(service.setItemCode);
-
-    app.route('/v1/code/item/:itemCd').delete(service.deleteItemCode)
-
     //company 정보 조회
     app.route('/v1/config/company/:idx').get(service.getCompanyConfig);
 
     //급여항목 조회
     app.route('/v1/config/code/wage/:cIdx').get(service.getWageCode);
-    /*
-    //기준 근무일수 저장
-    app.route('/v1/config/workday').post(service.setWorkDays);
-
-    //기준 근무일수 조회
-    app.route('/v1/config/workday').get(service.getWorkDays);
-
-    //기준 근무일수 삭제
-    app.route('/v1/config/workday/:uIdx').delete(service.delWorkDays);
-    */
 
     //당해년도 세율 저장
     app.route('/v1/config/tax/rate').post(service.setTaxRate);
