@@ -6,12 +6,27 @@ exports.getMenus = async function (req, res) {
 
     try {
         let result = await etcModel.getMenus(companyNo, isMaster);
+        // console.log(result, 'ss')
 
         res.json({'result': true, 'data': result})
 
     } catch(err) {
         res.json({'result': false, 'msg': '관리자 메뉴를 찾을 수 없습니다.'})
     }
+}
+
+exports.updateMenus = async function (req, res) {
+    let companyNo = req.body.companyNo,
+        menuNo = req.body.menuNo,
+        masterOnly = req.body.masterOnly,
+        useFl = req.body.useFl;
+
+    console.log(companyNo, menuNo, masterOnly, useFl);
+    return;
+
+    let result = await etcModel.updateMenus(companyNo, menuNo, masterOnly, useFl);
+
+    res.json({'result': true, 'data': result})
 }
 
 exports.getNoticeList = async function (req, res) {
@@ -104,9 +119,20 @@ exports.setBaseCode = async function (req, res) {
         option = req.body.option,
         regDt = new Date();
 
-    console.log(cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt);
-
     let result = await etcModel.setBaseCode(cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt);
+
+    res.json({'result': true, 'data': result})
+}
+
+exports.updateBaseCode = async function (req, res) {
+    let itemCd = req.params.itemCd,
+        itemNm = req.body.itemNm,
+        useFl = req.body.useFl,
+        option = req.body.option,
+        sort = req.body.sort,
+        modDt = new Date();
+
+    let result = await etcModel.updateBaseCode(itemCd, itemNm, useFl, option, sort, modDt);
 
     res.json({'result': true, 'data': result})
 }

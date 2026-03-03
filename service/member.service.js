@@ -2,6 +2,7 @@ const memberModel = require("../model/member.model")
 const contractModel = require("../model/contract.model")
 const {hashPassword} = require("../utils/password");
 const bcrypt  = require("bcrypt");
+const xlsx = require("xlsx");
 
 //직원 리스트 조회
 exports.getMemberList = async function (req, res) {
@@ -279,3 +280,101 @@ exports.registerFullMember = async function (req, res) {
         res.status(500).json({ result: false, message: '서버 에러' });
     }
 }
+
+exports.uploadExcel = async function (req, res) {
+    try {
+        const { sIdx } = req.body; // 프론트에서 선택한 현장 idx
+        const file = req.file;
+
+        if (!sIdx) return res.status(400).json({ result: false, message: "배치할 현장을 선택해주세요." });
+        if (!file) return res.status(400).json({ result: false, message: "파일이 업로드되지 않았습니다." });
+
+        // 엑셀 파싱 (날짜 형식 유지)
+        const workbook = xlsx.read(file.buffer, { type: 'buffer', cellDates: true });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
+
+        let successCount = 0;
+        let failList = [];
+
+        for (const row of rows) {
+            try {
+                const memberId = String(row['사번'] || '').trim();
+                // if (!memberId) continue; // 사번 없으면 스킵
+
+                // 1. 비밀번호 해시화 (초기 비밀번호는 사번으로 설정)
+                const hash = await bcrypt.hash(memberId, 10);
+
+                // 2. 데이터 구조화 (엑셀 한글 헤더 매핑)
+                const memberData = {
+                    type: row['구분(경비/미화)'] === '경비' ? 'S' : 'C',
+                    name: row['이름'],
+                    id: memberId,
+                    password: hash,
+                    birthDt: row['생년월일'],
+                    phone: row['연락처'],
+                    position: row['직위'],
+                    gender: row['성별'] === '남' ? 'M' : 'F',
+                    email: row['이메일'] || '',
+                    disability: row['장애여부(Y/N)'] || 'N',
+                    disability_date: row['장애등록일'],
+                    disability_grade: row['장애등급'],
+                    defector: row['새터민여부(Y/N)'] || 'N',
+                    patriot: row['국가유공자여부(Y/N)'] || 'N',
+                    intern: row['청년인턴(Y/N)'] || 'N',
+                    beneficiary: row['기초생활수급자(Y/N)'] || 'N',
+                    foreigner: row['외국인여부(Y/N)'] || 'N',
+                    nationality: row['국적'],
+                    visa_code: row['비자코드'],
+                    visa_date: row['비자만료일'],
+                    bank: row['은행'],
+                    accountNo: row['계좌번호'],
+                    inDate: row['입사일'],
+                    outDate: row['퇴사일'],
+                    outReason: row['사직사유'],
+                    addr: row['주소'],
+                    bigo: row['비고']
+                };
+
+                // 계약 데이터 최소화 (엑셀에 없는 정보는 기본값 처리)
+                const contractData = {
+                    sIdx: sIdx, // 프론트에서 받은 현장 ID
+                    type: memberData.type,
+                    jsonData: JSON.stringify({}), // 급여 정보는 빈 객체로 생략
+                    startDt: '',
+                    endDt: '',
+                    bigo: ''
+                };
+
+                const staffingData = {
+                    sIdx: sIdx // 프론트에서 받은 현장 ID
+                };
+
+                // 3. 통합 모델 함수 호출
+                const result = await memberModel.registerMemberWithContractAndStaffing(
+                    memberData,
+                    contractData,
+                    staffingData
+                );
+
+                if (result.result) successCount++;
+                else failList.push({ id: memberId, name: row['이름'], error: result.error });
+
+            } catch (innerErr) {
+                failList.push({ id: row['사번'], reason: innerErr.message });
+            }
+        }
+
+        res.json({
+            result: true,
+            message: `${successCount}건 등록 완료`,
+            total: rows.length,
+            success: successCount,
+            fails: failList
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ result: false, message: '서버 에러' });
+    }
+};

@@ -5,11 +5,12 @@ exports.getMemberList = async function () {
     let sql = "select m.*, case when status = 0 then '재직' when status = 1 then '퇴사' else '-' end as `status`,"
     // sql += " mc.jsonData as wage,"
     sql += " ms.sIdx, ms.name as `siteName`,"
-    sql += " c.itemNm as `type`, c2.itemNm as `position`"
+    sql += " c.itemNm as `type`, c2.itemNm as `position`, c3.option `badgeColor`, c3.itemNm as `disability_grade`"
     sql += " from new_tb_member m"
     sql += " left join new_tb_member_contract mc on mc.mIdx = m.idx"
     sql += " left join (select b.*, s.name from new_tb_member_assignment b left join new_tb_site s on s.idx = b.sIdx) as `ms` on ms.mIdx = m.idx"
     sql += " left join new_tb_code c on c.itemCd = m.type left join new_tb_code c2 on c2.itemCd = m.position";
+    sql += " left join new_tb_code c3 on c3.itemCd = m.disability_grade"
     sql += " order by ms.sIdx desc, m.idx"
     let aParameter = [];
 
@@ -20,6 +21,21 @@ exports.getMemberList = async function () {
     }catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
+    }
+}
+
+exports.getMemberIdxMap = async function (ids) {
+    let sql = "SELECT id, idx FROM new_tb_member WHERE id IN (?)";
+    try {
+        let [res] = await pool.query(sql, [ids]);
+
+        return res.reduce((acc, cur) => {
+            acc[cur.id] = cur.idx;
+            return acc;
+        }, {});
+    } catch (e) {
+        console.log('mapping err', e);
+        return {};
     }
 }
 
@@ -338,6 +354,61 @@ exports.removeMemberStaffing = async function (idx) {
         return {'data': '-9999'}
     }
 }
+
+exports.insertMember = async function (member) {
+    let sql = `
+        INSERT INTO new_tb_member 
+        (type, name, id, password, birthDt, phone, position, gender, email,
+         disability, disability_date, disability_grade, disability_bigo, defector, patriot, intern, beneficiary, foreigner, nationality, visa_code, visa_date,
+         bank, accountNo, inDate, outDate, outReason, addr, bigo, guarantee, retire_pension, four_ins)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    let aParameter = [
+        member.type, member.name, member.id, member.password, member.birthDt, member.phone, member.position, member.gender, member.email,
+        member.disability, member.disability_date, member.disability_grade, member.disability_bigo, member.defector, member.patriot, member.intern, member.beneficiary, member.foreigner, member.nationality, member.visa_code, member.visa_date,
+        member.bank, member.accountNo, member.inDate, member.outDate, member.outReason, member.addr, member.bigo, member.guarantee, member.retire_pension, member.four_ins
+    ];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res.insertId;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
+
+exports.insertContract = async function (contract) {
+    let sql = `
+        INSERT INTO new_tb_member_contract 
+        (mIdx, sIdx, type, jsonData, startDt, endDt, bigo)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
+    let aParameter = [contract.mIdx, contract.sIdx, contract.type, contract.jsonData, contract.startDt, contract.endDt, contract.bigo];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
+
+exports.insertAssignment = async function (staffing) {
+    let sql = `
+        INSERT INTO new_tb_member_assignment (mIdx, sIdx) 
+        VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE sIdx = VALUES(sIdx)
+    `;
+    let aParameter = [staffing.mIdx, staffing.sIdx];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
 
 exports.registerMemberWithContractAndStaffing = async function (member, contract, staffing) {
     const connection = await pool.getConnection(); // 커넥션 가져오기

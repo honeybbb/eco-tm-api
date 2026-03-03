@@ -6,6 +6,8 @@ module.exports = function (app) {
     //관리자 메뉴 조회
     app.route('/v1/menu/:companyNo').get(service.getMenus);
 
+    app.route('/v1/menu/update').post(service.updateMenus);
+
     /* ======= 공지 관련 ======= */
     //공지 리스트
     app.route('/v1/notice/list').get(service.getNoticeList)
@@ -25,10 +27,12 @@ module.exports = function (app) {
     app.route('/v1/code/:cIdx').get(service.getBaseCode);
 
     //그룹 코드 조회
-    app.route('/v1/code/:groupCd').get(service.getGroupCode);
+    app.route('/v1/code/group/:groupCd').get(service.getGroupCode);
 
     //기본 코드 저장
     app.route('/v1/code/:cIdx').post(service.setBaseCode);
+
+    app.route('/v1/code/:itemCd').put(service.updateBaseCode);
 
     //기본 코드 삭제
     app.route('/v1/code/:itemCd').delete(service.deleteBaseCode);

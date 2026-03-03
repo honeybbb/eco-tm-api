@@ -47,6 +47,9 @@ var contractRoutes = require("./controller/contract.controller");
 contractRoutes(app);
  */
 
+var uploadRoutes = require("./controller/upload.controller");
+uploadRoutes(app);
+
 var payrollRoutes = require("./controller/payroll.controller");
 payrollRoutes(app);
 

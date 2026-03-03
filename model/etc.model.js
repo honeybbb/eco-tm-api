@@ -19,6 +19,20 @@ exports.getMenus = async function (companyNo, isMaster) {
     }
 }
 
+exports.updateMenus = async function (companyNo, menuNo, masterOnly, useFl) {
+    let sql = "update new_tb_menu set masterOnly = ?, useFl = ? where menuNo in (?) and companyNo in (?)";
+
+    let aParameter = [masterOnly, useFl, menuNo, companyNo];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.getNoticeList = async function () {
     let sql = "select * from new_tb_notice";
     let aParameter = [];
@@ -107,13 +121,13 @@ exports.getBaseCode = async function (cIdx) {
     let sql ="SELECT"
     sql += " L1.itemCd   AS groupCode,"
     sql += " L1.itemNm   AS groupName," // Level 1 (대분류: 그룹)
-    sql += " L1.useFl, L1.deleteFl, L1.editFl,L1.option,"
+    sql += " L1.useFl, L1.deleteFl, L1.editFl,L1.option,L1.sort,"
     sql += " L2.itemCd   AS subCode,"
     sql += " L2.itemNm   AS subName,"   // Level 2 (중분류: 서브그룹 혹은 직접 코드)
-    sql += " L2.useFl, L2.deleteFl, L2.editFl,L2.option,"
+    sql += " L2.useFl, L2.deleteFl, L2.editFl,L2.option,L2.sort,"
     sql += " L3.itemCd   AS detailCode,"
     sql += " L3.itemNm   AS detailName," // Level 3 (소분류: 실제 상세 코드)
-    sql += " L3.useFl, L3.deleteFl, L3.editFl,L3.option"
+    sql += " L3.useFl, L3.deleteFl, L3.editFl,L3.option, L3.sort"
     sql += " FROM (SELECT * FROM new_tb_code WHERE LENGTH(itemCd) = 2"
     // sql += " AND useFl = 'Y'"
     sql += ") L1"
@@ -175,10 +189,23 @@ exports.setWageCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl
 }
 
 exports.setBaseCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt) {
-    let sql = "insert into new_tb_code (cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt) values (?, ?, ?, ?, ?, ?, ?, ?)"
+    let sql = "insert into new_tb_code (cIdx, groupCd, itemCd, itemNm, sort, useFl, `option`, regDt) values (?, ?, ?, ?, ?, ?, ?, ?)"
     let aParameter = [cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt];
 
-    //let query = mysql.format(sql, aParameter);
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.updateBaseCode = async function (itemCd, itemNm, useFl, option, sort, modDt) {
+    let sql = "update new_tb_code set itemNm = ?, useFl=?, `option`=?, `sort`=?, modDt=?"
+    sql += " where itemCd in (?)"
+    let aParameter = [itemNm, useFl, option, sort, modDt, itemCd];
+
     try {
         let [res] = await pool.query(sql, aParameter);
         return res;
@@ -204,7 +231,7 @@ exports.getCompanyConfig = async function (cIdx) {
 
 exports.getWageCode = async function (cIdx) {
     let sql = "SELECT itemNm, itemCd, groupCd,"
-    sql += " `option` as `tax_free`,useFl, deleteFl, editFl,"
+    sql += " `option` as `tax_free`,useFl, deleteFl, editFl, sort,"
     sql += " CASE groupCd"
     sql += "    WHEN '04001' THEN '지급항목'"
     sql += "    WHEN '04002' THEN '공제항목'"

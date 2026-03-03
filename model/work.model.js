@@ -124,6 +124,19 @@ exports.getWorkDays = async function (targetMonthStr) {
     }
 }
 
+exports.excelUpload = async function (insertData) {
+    let sql = "INSERT INTO new_tb_work (sIdx, mIdx, workStartDt, workEndDt, workType, regDt) VALUES ?";
+    let query = mysql.format(sql, [insertData]);
+
+    try {
+        let [res] = await pool.query(query);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return { 'data': '-9999' }
+    }
+};
+
 exports.getWorkSheet = async function (mIdx, startDt, endDt) {
     let sql = "SELECT DATE_FORMAT(workStartDt, '%Y-%m-%d') AS `date`,"
     sql += " IFNULL(TIMESTAMPDIFF(HOUR, workStartDt, workEndDt), 0) AS `duration`,"
