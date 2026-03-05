@@ -13,6 +13,8 @@ module.exports = function (app) {
     // app.route('/v1/member/register').post(service.setMemberData);
     app.route('/v1/member/register').post(service.registerFullMember);
 
+    app.route('/v1/member/data/:id').put(service.updateMemberData);
+
     //직원 연차 조회
     app.route('/v1/member/leave').get(service.getMemberLeave);
 

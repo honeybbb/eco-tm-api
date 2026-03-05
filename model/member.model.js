@@ -40,52 +40,58 @@ exports.getMemberIdxMap = async function (ids) {
 }
 
 exports.getMemberData = async function (id) {
-    let sql = "SELECT m.*, IFNULL(ms.sIdx, '0') AS `sIdx`,s.payment_day,"
-    sql += " cd.itemCd AS `positionCd`, cd.itemNm AS `position`,"
-    sql += " cd2.itemNm AS `type`,"
-    sql += " CONCAT('[',"
-    sql += " GROUP_CONCAT(DISTINCT"
-    sql += "   CASE WHEN ms.mIdx IS NOT NULL THEN"
-    sql += "     JSON_OBJECT('name', s.name, 'address', s.address)"
-    sql += "   END"
-    sql += " ),']') AS `sites`,"
-    sql += " CONCAT('[',"
-    sql += " GROUP_CONCAT(DISTINCT"
-    sql += "   CASE WHEN mc.idx IS NOT NULL THEN"
-    sql += "     JSON_OBJECT("
-    sql += "       'contractData', mc.jsonData,"
-    sql += "       'startDt', mc.startDt,"
-    sql += "       'endDt', mc.endDt,"
-    sql += "       'monthWorkTime', mc.month_work_time,"
-    sql += "       'dayWorkTime', mc.day_work_time"
-    sql += "     )"
-    sql += "   END"
-    sql += " ),']') AS `contract`"
-    sql += " FROM new_tb_member m"
-    sql += " INNER JOIN new_tb_code cd ON cd.itemCd = m.position"
-    sql += " INNER JOIN new_tb_code cd2 ON cd2.itemCd = m.type"
-    sql += " LEFT JOIN new_tb_member_assignment ms ON m.idx = ms.mIdx"
-    sql += " LEFT JOIN new_tb_site s ON s.idx = ms.sIdx"
-    sql += " LEFT JOIN ("
-    sql += "   SELECT mIdx, MAX(idx) AS max_idx"
-    sql += "   FROM new_tb_member_contract"
-    sql += "   GROUP BY mIdx"
-    sql += " ) LatestC ON m.idx = LatestC.mIdx"
-    sql += " LEFT JOIN new_tb_member_contract mc"
-    sql += "   ON mc.idx = LatestC.max_idx"
-    sql += " WHERE m.id = ?"
-    sql += " GROUP BY m.idx";
+    let sql = `
+        SELECT 
+            m.*,
+            IFNULL(ms.sIdx, '0') AS \`sIdx\`,
+            s.payment_day,
+            cd.itemCd AS \`positionCd\`,
+            cd.itemNm AS \`positionName\`,
+            cd2.itemNm AS \`type\`,
+            cd2.itemCd AS \`typeCd\`,
+            CONCAT('[',
+                GROUP_CONCAT(DISTINCT
+                    CASE WHEN ms.mIdx IS NOT NULL THEN
+                        JSON_OBJECT('name', s.name, 'address', s.address)
+                    END
+                ), ']') AS \`sites\`,
+            CONCAT('[',
+                GROUP_CONCAT(DISTINCT
+                    CASE WHEN mc.idx IS NOT NULL THEN
+                        JSON_OBJECT(
+                            'contractData', mc.jsonData,
+                            'startDt', mc.startDt,
+                            'endDt', mc.endDt,
+                            'monthWorkTime', mc.month_work_time,
+                            'dayWorkTime', mc.day_work_time
+                        )
+                    END
+                ), ']') AS \`contract\`
+        FROM new_tb_member m
+        LEFT JOIN new_tb_code cd ON cd.itemCd = m.position
+        LEFT JOIN new_tb_code cd2 ON cd2.itemCd = m.type
+        LEFT JOIN new_tb_member_assignment ms ON m.idx = ms.mIdx
+        LEFT JOIN new_tb_site s ON s.idx = ms.sIdx
+        LEFT JOIN (
+            SELECT mIdx, MAX(idx) AS max_idx
+            FROM new_tb_member_contract
+            GROUP BY mIdx
+        ) LatestC ON m.idx = LatestC.mIdx
+        LEFT JOIN new_tb_member_contract mc ON mc.idx = LatestC.max_idx
+        WHERE m.id = ?
+        GROUP BY m.idx
+    `;
+
     let aParameter = [id];
 
-    //let query = mysql.format(sql, aParameter);
     try {
         let [res] = await pool.query(sql, aParameter);
         return res;
-    }catch (e) {
+    } catch (e) {
         console.log('db err', e);
-        return {'data': '-9999'}
+        return {'data': '-9999'};
     }
-}
+};
 
 exports.getMemberAvailable = async function(sIdx) {
     let sql = "SELECT *, (select itemNm from new_tb_code where m.position = itemCd) as `role` FROM new_tb_member m WHERE m.idx NOT IN"
@@ -106,20 +112,20 @@ exports.getMemberAvailable = async function(sIdx) {
 
 exports.setMemberData = async function(type, name, id, password, birthDt, phone, position, contract, gender, email,
                                        disability, disability_date, disability_grade, defector, patriot, intern, beneficiary, foreigner, nationality, visa_code, visa_date,
-                                       bank, accountNo, inDate, outDate, outReason, addr, bigo){
+                                       bank, accountNumber, inDate, outDate, outReason, address, bigo){
     let sql = "insert into new_tb_member (type, name, id, password, birthDt, phone, position, contract, gender, email,"
     sql += " disability, disability_date, disability_grade, defector, patriot, intern, beneficiary, foreigner, nationality, visa_code, visa_date,"
-    sql += " bank, accountNo, inDate, outDate, outReason, addr, bigo)"
+    sql += " bank, accountNumber, inDate, outDate, outReason, address, bigo)"
     sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     sql += " ON DUPLICATE KEY UPDATE name=?, birthDt=?, phone=?, position=?, gender=?,email=?,"
     sql += " disability=?, disability_date=?, disability_grade=?, defector=?, patriot=?, intern=?, beneficiary=?, foreigner=?, nationality=?, visa_code=?, visa_date=?,"
-    sql += " bank=?,accountNo=?,inDate=?,outDate=?,outReason=?,addr=?,bigo=?"
+    sql += " bank=?,accountNumber=?,inDate=?,outDate=?,outReason=?,addr=?,bigo=?"
     let aParameter = [type, name, id, password, birthDt, phone, position, contract, gender, email,
         disability, disability_date, disability_grade, defector, patriot, intern, beneficiary, foreigner, nationality, visa_code, visa_date,
-        bank, accountNo, inDate, outDate, outReason, addr, bigo,
+        bank, accountNumber, inDate, outDate, outReason, address, bigo,
         name, birthDt, phone, position, gender, email,
         disability, disability_date, disability_grade, defector, patriot, intern, beneficiary, foreigner, nationality, visa_code, visa_date,
-        bank, accountNo, inDate, outDate, outReason, addr, bigo
+        bank, accountNumber, inDate, outDate, outReason, address, bigo
     ];
 
     //let query = mysql.format(sql, aParameter);
@@ -360,13 +366,13 @@ exports.insertMember = async function (member) {
         INSERT INTO new_tb_member 
         (type, name, id, password, birthDt, phone, position, gender, email,
          disability, disability_date, disability_grade, disability_bigo, defector, patriot, intern, beneficiary, foreigner, nationality, visa_code, visa_date,
-         bank, accountNo, inDate, outDate, outReason, addr, bigo, guarantee, retire_pension, four_ins)
+         bank, accountNumber, inDate, outDate, outReason, address, bigo, guarantee, retire_pension, four_ins)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     let aParameter = [
         member.type, member.name, member.id, member.password, member.birthDt, member.phone, member.position, member.gender, member.email,
         member.disability, member.disability_date, member.disability_grade, member.disability_bigo, member.defector, member.patriot, member.intern, member.beneficiary, member.foreigner, member.nationality, member.visa_code, member.visa_date,
-        member.bank, member.accountNo, member.inDate, member.outDate, member.outReason, member.addr, member.bigo, member.guarantee, member.retire_pension, member.four_ins
+        member.bank, member.accountNumber, member.inDate, member.outDate, member.outReason, member.address, member.bigo, member.guarantee, member.retire_pension, member.four_ins
     ];
 
     try {
@@ -423,14 +429,14 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
             INSERT INTO new_tb_member 
             (type, name, id, password, birthDt, phone, position, gender, email,
              disability, disability_date, disability_grade, defector, patriot, intern, beneficiary, foreigner, nationality, visa_code, visa_date,
-             bank, accountNo, inDate, outDate, outReason, addr, bigo)
+             bank, accountNumber, inDate, outDate, outReason, address, bigo)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         let paramMember = [
             member.type, member.name, member.id, member.password, member.birthDt, member.phone, member.position, member.gender, member.email,
             member.disability, member.disability_date, member.disability_grade, member.defector, member.patriot, member.intern, member.beneficiary, member.foreigner, member.nationality, member.visa_code, member.visa_date,
-            member.bank, member.accountNo, member.inDate, member.outDate, member.outReason, member.addr, member.bigo
+            member.bank, member.accountNumber, member.inDate, member.outDate, member.outReason, member.address, member.bigo
         ];
 
         let resMember = await connection.query(sqlMember, paramMember);

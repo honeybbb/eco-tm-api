@@ -6,7 +6,7 @@ module.exports = function (app) {
     //관리자 메뉴 조회
     app.route('/v1/menu/:companyNo').get(service.getMenus);
 
-    app.route('/v1/menu/update').post(service.updateMenus);
+    app.route('/v1/menu/update/:companyNo').put(service.updateMenus);
 
     /* ======= 공지 관련 ======= */
     //공지 리스트
@@ -48,4 +48,10 @@ module.exports = function (app) {
 
     //당해년도 세율 조회
     app.route('/v1/config/tax/rate/:year').get(service.getTaxRate);
+
+    //청소용품 신청
+    app.route('/v1/code/item/order/:sIdx').post(service.setOrders);
+
+    //청소용품 신청 리스트
+    app.route('/v1/code/item/order').get(service.getOrders);
 }

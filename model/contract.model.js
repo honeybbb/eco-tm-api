@@ -19,22 +19,49 @@ exports.setMemberContract = async function (mIdx, sIdx, type, jsonData, filePath
 
 //계약 내용 보기 (급여까지)
 exports.getMemberContract = async function (targetMonthStr) {
-    let sql = "SELECT mc.*, m.name, m.id, s.idx as `sIdx`, s.name as  `siteName`, s.payment_day,"
-    sql += " (select itemNm from new_tb_code where itemCd = m.position) as `role`"
-    sql += " FROM new_tb_member_contract mc"
-    sql += " left join new_tb_member m on m.idx = mc.mIdx"
-    sql += " left join new_tb_site s on s.idx = mc.sIdx"
-    sql += " WHERE mc.startDt BETWEEN mc.startDt AND IFNULL(mc.endDt, '9999-12-31')";
-    let aParameter = [targetMonthStr];
+    // targetMonthStr 예: '2026-03' → 첫날과 마지막날로 변환
+    const startOfMonth = `${targetMonthStr}-01`;
+    const endOfMonth = new Date(targetMonthStr + '-01');
+    endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+    endOfMonth.setDate(0); // 말일
+    const endOfMonthStr = endOfMonth.toISOString().split('T')[0];
+
+    let sql = `
+        SELECT 
+            mc.*,
+            m.name,
+            m.id,
+            s.idx AS \`sIdx\`,
+            s.name AS \`siteName\`,
+            s.payment_day,
+            (SELECT itemNm FROM new_tb_code WHERE itemCd = m.position) AS \`role\`
+        FROM new_tb_member m
+        INNER JOIN (
+            SELECT sub.*
+            FROM new_tb_member_contract sub
+            INNER JOIN (
+                SELECT mIdx, MAX(idx) AS max_idx
+                FROM new_tb_member_contract
+                GROUP BY mIdx
+            ) latest ON sub.mIdx = latest.mIdx AND sub.idx = latest.max_idx
+            WHERE sub.startDt <= ?
+              AND (sub.endDt >= ? OR sub.endDt IS NULL)
+        ) mc ON m.idx = mc.mIdx
+        LEFT JOIN new_tb_site s ON s.idx = mc.sIdx
+        ORDER BY m.idx
+    `;
+
+    let aParameter = [endOfMonthStr, startOfMonth];  // endDt >= startOfMonth, startDt <= endOfMonth
 
     try {
         let [res] = await pool.query(sql, aParameter);
+        console.log(`[getMemberContract] 성공 - 조회된 계약 수: ${res.length}`);
         return res;
-    }catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
+    } catch (e) {
+        console.log('[getMemberContract] db err', e);
+        return { 'data': '-9999' };
     }
-}
+};
 
 exports.getMemberContract1 = async function (mIdx) {
     let sql = "select mc.type, mc.startDt, mc.endDt, mc.bigo,"

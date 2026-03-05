@@ -2,11 +2,11 @@ const etcModel = require("../model/etc.model");
 
 exports.getMenus = async function (req, res) {
     let companyNo = req.params.companyNo,
-        isMaster = req.query.isMaster == 'Y'? true:false;
+        isMaster = req.query.isMaster == 'Y'? true:false,
+        path = req.query.path;
 
     try {
-        let result = await etcModel.getMenus(companyNo, isMaster);
-        // console.log(result, 'ss')
+        let result = await etcModel.getMenus(companyNo, isMaster, path);
 
         res.json({'result': true, 'data': result})
 
@@ -16,15 +16,16 @@ exports.getMenus = async function (req, res) {
 }
 
 exports.updateMenus = async function (req, res) {
-    let companyNo = req.body.companyNo,
+    let companyNo = req.params.companyNo,
         menuNo = req.body.menuNo,
+        menuNm = req.body.menuNm,
         masterOnly = req.body.masterOnly,
+        sort = req.body.sort,
         useFl = req.body.useFl;
 
-    console.log(companyNo, menuNo, masterOnly, useFl);
-    return;
+    console.log(companyNo, menuNo, menuNm, masterOnly, sort, useFl);
 
-    let result = await etcModel.updateMenus(companyNo, menuNo, masterOnly, useFl);
+    let result = await etcModel.updateMenus(companyNo, menuNo, menuNm, masterOnly, sort, useFl);
 
     res.json({'result': true, 'data': result})
 }
@@ -49,10 +50,11 @@ exports.setNotice = async function (req, res) {
         target = req.body.target,
         title = req.body.title,
         content = req.body.content,
+        author = req.body.author,
         regDt = new Date();
 
     try {
-        let result = await etcModel.setNotice(must, type, target, title, content, regDt);
+        let result = await etcModel.setNotice(must, type, target, title, content, author, regDt);
 
         res.json({'result': true, 'data': result})
 
@@ -227,5 +229,44 @@ exports.getTaxRate = async function (req, res) {
 
     let result = await etcModel.getTaxRate(year);
 
+    res.json({'result': true, 'data': result})
+}
+
+//품목 신청
+exports.setOrders = async function (req, res) {
+    try {
+        let sIdx = req.params.sIdx,
+            mIdx = req.body.mIdx,
+            orderList = req.body.orders;
+
+        console.log(orderList, 'orderList')
+
+        if (orderList.length === 0) {
+            return res.status(400).json({ result: false, message: "신청할 물품이 없습니다." });
+        }
+
+        let result = await etcModel.setOrders(sIdx, orderList, mIdx);
+
+        res.json({ result: true, data: result });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ result: false, message: "서버 오류" });
+    }
+}
+
+//품목신청 리스트
+exports.getOrders = async function (req, res) {
+    let result = await etcModel.getOrders();
+
+    res.json({'result': true, 'data': result})
+}
+
+exports.updateOrderStatus = async function (req, res) {
+    let sIdx = req.body.sIdx,
+        oIdx = req.body.oIdx,
+        mIdx = req.body.mIdx,
+        status = req.body.status;
+
+    let result = await etcModel.updateOrderStatus(sIdx, oIdx, mIdx, status);
     res.json({'result': true, 'data': result})
 }

@@ -1,28 +1,36 @@
 const mysql = require("mysql2/promise");
 const pool = require("../config/mysql");
 
-exports.getMenus = async function (companyNo, isMaster) {
-    let sql = "select * from new_tb_menu where companyNo in (?) and useFl = 'Y'";
-    if(!isMaster){
-        //관리자가 아니라면?
+exports.getMenus = async function (companyNo, isMaster, path) {
+    // 1. 기본 쿼리: 회사번호 일치 + 사용 여부 'Y'
+    // sort(순서)를 1순위, menuNo를 2순위로 정렬하여 일관성을 유지합니다.
+    let sql = "SELECT * FROM new_tb_menu WHERE companyNo = ?"
+
+    if(path !== '/settings') {
+        sql += " AND useFl = 'Y'";
+    }
+
+    // 2. 마스터 권한 체크
+    if (!isMaster) {
         sql += " AND masterOnly = 'N'";
     }
-    sql += " order by menuNo"
-    let aParameter = [companyNo, isMaster];
+
+    // 3. 정렬 순서 적용 (중요!)
+    sql += " ORDER BY depth ASC, sort ASC, menuNo ASC";
 
     try {
-        let [res] = await pool.query(sql, aParameter);
+        let [res] = await pool.query(sql, [companyNo]);
         return res;
-    }catch (e) {
+    } catch (e) {
         console.log('db err', e);
-        return {'data': '-9999'}
+        return { 'data': '-9999' };
     }
-}
+};
 
-exports.updateMenus = async function (companyNo, menuNo, masterOnly, useFl) {
-    let sql = "update new_tb_menu set masterOnly = ?, useFl = ? where menuNo in (?) and companyNo in (?)";
+exports.updateMenus = async function (companyNo, menuNo, menuNm, masterOnly, sort, useFl) {
+    let sql = "update new_tb_menu set menuNm=?, masterOnly = ?, sort = ?, useFl = ? where menuNo in (?) and companyNo in (?)";
 
-    let aParameter = [masterOnly, useFl, menuNo, companyNo];
+    let aParameter = [menuNm, masterOnly, sort, useFl, menuNo, companyNo];
 
     try {
         let [res] = await pool.query(sql, aParameter);
@@ -34,7 +42,7 @@ exports.updateMenus = async function (companyNo, menuNo, masterOnly, useFl) {
 }
 
 exports.getNoticeList = async function () {
-    let sql = "select * from new_tb_notice";
+    let sql = "select n.*, c.itemNm as `targetName` from new_tb_notice n left join new_tb_code c on c.itemCd = n.target";
     let aParameter = [];
 
     try {
@@ -72,12 +80,12 @@ exports.getNoticeData = async function (idx) {
     }
 }
 
-exports.setNotice = async function (must, type, target, title, content, regDt){
-    let sql = "insert into new_tb_notice (must, type, target, title, content, regDt)"
-    sql += " values (?, ?, ?, ?, ?, ?)"
+exports.setNotice = async function (must, type, target, title, content, author, regDt){
+    let sql = "insert into new_tb_notice (must, type, target, title, content, author, regDt)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?)"
     sql += " ON DUPLICATE KEY UPDATE must=?, type=?, target=?, title=?, content=?, modDt=?"
     let aParameter = [
-        must, type, target, title, content, regDt,
+        must, type, target, title, content, author, regDt,
         must, type, target, title, content, regDt
     ];
 
@@ -417,5 +425,89 @@ exports.getTaxRate = async function (year){
     }catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
+    }
+}
+
+exports.setOrders = async function (sIdx, orderList, mIdx) {
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+
+        const aParameter = orderList.map(item => [
+            sIdx,
+            item.detailCode,
+            item.qty,
+            new Date(),
+            mIdx
+        ]);
+
+
+        let sql = "INSERT INTO new_tb_orders (sIdx, itemCd, qty, regDt, mIdx) VALUES ?";
+        let [res] = await conn.query(sql, [aParameter]);
+
+        await conn.commit();
+        return res;
+    } catch (e) {
+        await conn.rollback();
+        console.log('db err', e);
+        return {'data': '-9999'}
+    } finally {
+        conn.release();
+    }
+};
+
+exports.getOrders = async function () {
+    let sql = `
+        SELECT
+            o.regDt,
+            o.sIdx,
+            o.mIdx,
+            o.status,
+            s.name AS siteName,
+            m.name AS applicant,
+            -- 상세 품목들을 JSON 배열로 묶기
+            JSON_ARRAYAGG(
+                    JSON_OBJECT(
+                            'idx', o.idx,
+                            'itemName', c.itemNm,
+                            'qty', o.qty,
+                            'price', IFNULL(NULLIF(c.option, ''), 0),
+                            'itemCd', o.itemCd
+                    )
+            ) AS items,
+            -- 총 금액 합계
+            SUM(o.qty * IFNULL(NULLIF(c.option, ''), 0)) AS totalAmount,
+            CONCAT(
+                    MAX(c.itemNm),
+                    IF(COUNT(o.idx) > 1, CONCAT(' 외 ', COUNT(o.idx) - 1, '건'), '')
+            ) AS summary
+        FROM new_tb_orders o
+                 LEFT JOIN new_tb_site s ON o.sIdx = s.idx
+                 LEFT JOIN new_tb_member m ON o.mIdx = m.idx
+                 LEFT JOIN new_tb_code c ON o.itemCd = c.itemCd
+        GROUP BY o.regDt, o.mIdx, o.sIdx, o.status
+        ORDER BY o.regDt DESC
+    `;
+    let aParameter = [];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return { 'data': '-9999' };
+    }
+};
+
+exports.updateOrderStatus = async function (sIdx, oIdx, mIdx, status) {
+    let sql = "update new_tb_orders set status = ? WHERE sIdx = ? and idx = ? and mIdx = ?";
+    let aParameter = [status, sIdx, oIdx, mIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return { 'data': '-9999' };
     }
 }

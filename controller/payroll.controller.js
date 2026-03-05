@@ -15,6 +15,8 @@ module.exports = function (app) {
     //직원 급여 정보 등록 (월급)
     app.route('/v1/member/payroll/month/:mIdx').post(service.setPayrollMonth);
 
+    app.route('/v1/member/payroll/calculate').get(service.getPayrollCalculate)
+
     //직원 퇴직금 추계액 조회
     app.route('/v1/payroll/retirement').get(service.getRetirementEstimation);
 

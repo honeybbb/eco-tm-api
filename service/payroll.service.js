@@ -37,6 +37,29 @@ exports.getPayrollMonth = async function (req, res) {
         return res.json({ 'result': false, 'msg': '날짜 설정을 확인해주세요.' });
     }
 
+    let result = await payrollModel.getPayrollMonth(year, month);
+
+    res.json({'result': true, 'data': result})
+}
+exports.getPayrollCalculate = async function (req, res) {
+    let { year, month } = req.query;
+
+    if (!year || !month) {
+        return res.json({ 'result': false, 'msg': '날짜 설정을 확인해주세요.' });
+    }
+
+    let result = await payrollModel.getPayrollCalculate(year, month);
+
+    res.json({'result': true, 'data': result})
+}
+
+exports.getPayrollMonth3 = async function (req, res) {
+    let { year, month } = req.query;
+
+    if (!year || !month) {
+        return res.json({ 'result': false, 'msg': '날짜 설정을 확인해주세요.' });
+    }
+
     const targetMonthStr = `${year}-${String(month).padStart(2, '0')}`;
     const endOfMonth = new Date(year, month, 0);
     const daysInMonth = endOfMonth.getDate();
@@ -47,6 +70,8 @@ exports.getPayrollMonth = async function (req, res) {
             workModel.getWorkDays(targetMonthStr),
             wageModel.getWageCode()
         ]);
+
+        console.log('contracts 전체 개수:', contracts.length);
 
         const payrollResults = contracts.map(mc => {
             const jsonData = typeof mc.jsonData === 'string' ? JSON.parse(mc.jsonData) : mc.jsonData;

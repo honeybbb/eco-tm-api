@@ -24,6 +24,8 @@ exports.getMemberData = async function (req, res) {
     let id = req.params.id;
 
     let result = await memberModel.getMemberData(id);
+    console.log(result, 'getMemberData');
+    if(result.length > 0) delete result?.[0].password;
 
     res.json({'result': true, 'data': result})
 }
@@ -109,7 +111,7 @@ exports.setMemberData = async function(req, res) {
         visa_code = req.body.visa_code,
         visa_date = req.body.visa_date,
         bank = req.body.bank,
-        accountNo = req.body.accountNo,
+        accountNumber = req.body.accountNumber,
         inDate = req.body.joinDate,
         outDate = req.body.outDate,
         outReason = req.body.outReason,
@@ -124,7 +126,7 @@ exports.setMemberData = async function(req, res) {
     let result = await memberModel.setMemberData(
         type, name, id, hash, birthDt, phone, position, contract, gender, email,
         disability, disability_date, disability_grade, defector, patriot, intern, beneficiary, foreigner, nationality, visa_code, visa_date,
-        bank, accountNo, inDate, outDate, outReason, addr, bigo
+        bank, accountNumber, inDate, outDate, outReason, address, bigo
     )
 
     res.json({'result': true, 'data': result})
@@ -239,7 +241,7 @@ exports.registerFullMember = async function (req, res) {
             visa_code: body.visa_code,
             visa_date: body.visa_date,
             bank: body.bankName,
-            accountNo: body.accountNumber,
+            accountNumber: body.accountNumber,
             inDate: body.joinDate,
             outDate: body.endDate, // 혹은 body.outDate
             outReason: body.endReason, // 필요시 추가
@@ -281,6 +283,12 @@ exports.registerFullMember = async function (req, res) {
     }
 }
 
+exports.updateMemberData = async function (req, res) {
+    let memberId = req.params.id;
+    console.log(req.body,memberId);
+    let result = await memberModel.updateMemberData()
+//
+}
 exports.uploadExcel = async function (req, res) {
     try {
         const { sIdx } = req.body; // 프론트에서 선택한 현장 idx
@@ -328,7 +336,7 @@ exports.uploadExcel = async function (req, res) {
                     visa_code: row['비자코드'],
                     visa_date: row['비자만료일'],
                     bank: row['은행'],
-                    accountNo: row['계좌번호'],
+                    accountNumber: row['계좌번호'],
                     inDate: row['입사일'],
                     outDate: row['퇴사일'],
                     outReason: row['사직사유'],
