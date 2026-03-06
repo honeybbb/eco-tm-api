@@ -237,13 +237,12 @@ exports.getMemberLeave = async function (sIdx, year) {
     let sql = "select ml.*, m.inDate, m.name,"
     sql += " (select itemNm from new_tb_code c where c.itemCd = m.position) as `position`"
     sql += " from new_tb_member m"
-    sql += " left join new_tb_member_annual_leave m; on m.idx = ml.mIdx"
+    sql += " left join new_tb_member_annual_leave ml on m.idx = ml.mIdx"
     sql += " where ml.sIdx in (?) and ml.year in (?)"
     let aParameter = [sIdx, year];
 
-    let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);

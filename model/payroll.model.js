@@ -326,11 +326,11 @@ exports.getPayrollCalculate = async function (year, month) {
     }
 }
 
-exports.setPayrollMonth = async function (mIdx, sIdx, year, month, grossPay, workDays, deductions, netPay, payItems, deductionItems, total){
+exports.setPayrollMonth = async function (mIdx, sIdx, year, month, grossPay, deductions, netPay, payItems, deductionItems, total){
     let sql = "insert into new_tb_member_payroll_month ("
-    sql += "mIdx, sIdx, year, month, grossPay, workDays, deductions, netPay, payItems, deductionItems, total)"
-    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    let aParameter = [mIdx, sIdx, year, month, grossPay, workDays, deductions, netPay, payItems, deductionItems, total];
+    sql += "mIdx, sIdx, year, month, grossPay, deductions, netPay, payItems, deductionItems, total)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    let aParameter = [mIdx, sIdx, year, month, grossPay, deductions, netPay, payItems, deductionItems, total];
 
     let query = mysql.format(sql, aParameter);
     try {

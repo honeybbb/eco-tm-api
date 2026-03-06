@@ -53,6 +53,9 @@ uploadRoutes(app);
 var payrollRoutes = require("./controller/payroll.controller");
 payrollRoutes(app);
 
+var settleRoutes = require("./controller/settle.controller");
+settleRoutes(app);
+
 var workRoutes = require("./controller/work.controller");
 workRoutes(app);
 

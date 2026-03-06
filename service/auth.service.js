@@ -9,6 +9,7 @@ exports.loginUser = async function (req, res) {
 
     try {
         const user = await authModel.findByLoginId(loginId);
+        console.log(user, 'user');
         const match = await bcrypt.compare(password, user?.[0].password);
         delete user?.[0].password;
 

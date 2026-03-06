@@ -284,7 +284,7 @@ exports.setPayrollMonth = async function (req, res) {
         sIdx = req.body.sIdx,
         year = req.body.year,
         month = req.body.month,
-        workDays = req.body.workDays,
+        // workDays = req.body.workDays,
         grossPay = req.body.grossPay,
         deductions = req.body.deductions,
         netPay = req.body.netPay,
@@ -292,7 +292,7 @@ exports.setPayrollMonth = async function (req, res) {
         deductionItems = req.body.deductionItems,
         total = req.body.total;
 
-    let result = await payrollModel.setPayrollMonth(mIdx, sIdx, year, month, grossPay, workDays, deductions, netPay, payItems, deductionItems, total);
+    let result = await payrollModel.setPayrollMonth(mIdx, sIdx, year, month, grossPay, deductions, netPay, payItems, deductionItems, total);
 
     res.json({'result': true, 'data': result})
 }
