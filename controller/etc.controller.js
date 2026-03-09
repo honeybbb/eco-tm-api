@@ -49,9 +49,9 @@ module.exports = function (app) {
     //당해년도 세율 조회
     app.route('/v1/config/tax/rate/:year').get(service.getTaxRate);
 
-    //청소용품 신청
+    //청소용품 및 피복용품 신청
     app.route('/v1/code/item/order/:sIdx').post(service.setOrders);
 
-    //청소용품 신청 리스트
+    //청소용품 및 피복용품 신청 리스트
     app.route('/v1/code/item/order').get(service.getOrders);
 }

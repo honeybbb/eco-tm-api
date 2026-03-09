@@ -465,26 +465,31 @@ exports.getOrders = async function () {
             o.status,
             s.name AS siteName,
             m.name AS applicant,
-            -- 상세 품목들을 JSON 배열로 묶기
+            m.id as memberId,
+            -- 상세 품목들에 상위 카테고리 정보 추가
             JSON_ARRAYAGG(
                     JSON_OBJECT(
                             'idx', o.idx,
-                            'itemName', c.itemNm,
+                            'categoryName', p.itemNm,      -- 상위 카테고리명 (예: 경비원 상의)
+                            'itemName', c.itemNm,          -- 상세 사이즈명 (예: M(90))
+                            'fullItemName', CONCAT(p.itemNm, ' - ', c.itemNm), -- 합쳐진 이름
                             'qty', o.qty,
-                            'price', IFNULL(NULLIF(c.option, ''), 0),
+                            'price', CAST(IFNULL(NULLIF(c.option, ''), 0) AS UNSIGNED),
                             'itemCd', o.itemCd
                     )
             ) AS items,
-            -- 총 금액 합계
             SUM(o.qty * IFNULL(NULLIF(c.option, ''), 0)) AS totalAmount,
             CONCAT(
-                    MAX(c.itemNm),
+                    MAX(p.itemNm), ' (', MAX(c.itemNm), ')',
                     IF(COUNT(o.idx) > 1, CONCAT(' 외 ', COUNT(o.idx) - 1, '건'), '')
             ) AS summary
         FROM new_tb_orders o
                  LEFT JOIN new_tb_site s ON o.sIdx = s.idx
                  LEFT JOIN new_tb_member m ON o.mIdx = m.idx
                  LEFT JOIN new_tb_code c ON o.itemCd = c.itemCd
+            -- 상위 카테고리명을 가져오기 위한 Self Join
+            -- 이미지 구조상 사이즈 코드의 앞 5자리가 상위 카테고리 코드임
+                 LEFT JOIN new_tb_code p ON LEFT(c.itemCd, 5) = p.itemCd
         GROUP BY o.regDt, o.mIdx, o.sIdx, o.status
         ORDER BY o.regDt DESC
     `;

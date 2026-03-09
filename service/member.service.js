@@ -179,6 +179,7 @@ exports.getMemberOff = async function (req, res) {
         endDt = req.query.endDt;
 
     let result = await memberModel.getMemberOff(cIdx, startDt, endDt);
+    console.log(result, 'result')
 
     res.json({'result': true, 'data': result})
 }

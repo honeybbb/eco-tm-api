@@ -37,10 +37,13 @@ exports.getPayrollMonth = async function (req, res) {
         return res.json({ 'result': false, 'msg': '날짜 설정을 확인해주세요.' });
     }
 
+    console.log(year, month);
+
     let result = await payrollModel.getPayrollMonth(year, month);
 
     res.json({'result': true, 'data': result})
 }
+
 exports.getPayrollCalculate = async function (req, res) {
     let { year, month } = req.query;
 
@@ -284,7 +287,8 @@ exports.setPayrollMonth = async function (req, res) {
         sIdx = req.body.sIdx,
         year = req.body.year,
         month = req.body.month,
-        // workDays = req.body.workDays,
+        workedDays = req.body.workedDays,
+        scheduledDays = req.body.scheduledDays,
         grossPay = req.body.grossPay,
         deductions = req.body.deductions,
         netPay = req.body.netPay,
@@ -292,7 +296,10 @@ exports.setPayrollMonth = async function (req, res) {
         deductionItems = req.body.deductionItems,
         total = req.body.total;
 
-    let result = await payrollModel.setPayrollMonth(mIdx, sIdx, year, month, grossPay, deductions, netPay, payItems, deductionItems, total);
+    let result = await payrollModel.setPayrollMonth(
+        mIdx, sIdx, year, month, workedDays, scheduledDays,
+        grossPay, deductions, netPay, payItems, deductionItems, total
+    );
 
     res.json({'result': true, 'data': result})
 }
