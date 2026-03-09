@@ -95,3 +95,31 @@ exports.setSiteContract = async function (sIdx, cIdx, contract, totalCost, start
         return {'data': '-9999'}
     }
 }
+
+exports.updateFilePath = async function (originalName, fileUrl, sIdx){
+    let sql = "update new_tb_site set contractFileOriginal = ?, contractFileSaved = ? where idx = ?"
+    let aParameter = [originalName, fileUrl, sIdx];
+
+    let query = mysql.format(sql, aParameter);
+    try {
+        let res = await pool.query(query);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.downloadFilePath = async function (sIdx) {
+    let sql = "SELECT contractFileOriginal, contractFileSaved FROM new_tb_site WHERE idx in (?)"
+    let aParameter = [sIdx];
+
+    let query = mysql.format(sql, aParameter);
+    try {
+        let res = await pool.query(query);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
