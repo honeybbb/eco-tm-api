@@ -331,6 +331,14 @@ exports.getWorkPayroll = async function(req, res) {
 
     res.json({'result': true, 'data': result})
 }
+
+exports.getPayrollHistory = async function (req, res) {
+    let mIdx = req.params.mIdx;
+
+    let result = await payrollModel.getPayrollHistory();
+
+    res.json({'result': true, 'data': result})
+}
 /*
 
 exports.setPayroll1 = async function (req, res) {

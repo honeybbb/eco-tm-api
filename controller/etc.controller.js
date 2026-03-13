@@ -49,6 +49,12 @@ module.exports = function (app) {
     //당해년도 세율 조회
     app.route('/v1/config/tax/rate/:year').get(service.getTaxRate);
 
+    //당해년도 간이세액표 저장
+    // app.route('/v1/config/tax/income').post(service.setTaxIncome);
+
+    //소득세, 지방소득세 조회
+    app.route('/v1/config/tax/income/:year').get(service.getTaxIncome);
+
     //청소용품 및 피복용품 신청
     app.route('/v1/code/item/order/:sIdx').post(service.setOrders);
 

@@ -1,8 +1,6 @@
 const workModel = require("../model/work.model")
 const memberModel = require("../model/member.model");
-const multer = require("multer");
 const xlsx = require("xlsx");
-const fs = require("fs/promises");
 //출근 여부 확인
 exports.getWorkFl = async function (req, res) {
     let mIdx = req.query.mIdx,
@@ -29,14 +27,14 @@ exports.uploadExcel = async function (req, res) {
         if (!sIdx) {
             return res.status(400).json({ result: false, message: "현장 인덱스(sIdx) 값이 없습니다." });
         }
-        if (!file || !file.buffer) {
+        if (!file || !file.path) {
             return res.status(400).json({ result: false, message: "파일이 업로드되지 않았습니다." });
         }
 
         // ---------------------------------------------------------
         // 2. 엑셀 파일 읽기 (타임존 밀림 방지를 위해 cellDates 옵션 제외)
         // ---------------------------------------------------------
-        const workbook = xlsx.read(file.buffer, { type: 'buffer' });
+        const workbook = xlsx.readFile(file.path);
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
         // 헤더 행(1행) 추출

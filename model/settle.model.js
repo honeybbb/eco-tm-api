@@ -73,3 +73,16 @@ exports.updateSettleData = async function (year, month, type, docNo, billingDt,
         return {'data': '-9999'}
     }
 }
+
+exports.deleteSettleList = async function (idx) {
+    let sql = "delete from new_tb_site_settlement where idx in (?)";
+    let aParameter = [idx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}

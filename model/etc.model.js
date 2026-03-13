@@ -428,6 +428,25 @@ exports.getTaxRate = async function (year){
     }
 }
 
+exports.getTaxIncome = async function (year, salary, familyCnt) {
+    let sql = `
+        SELECT family_${Math.min(Number(familyCnt), 11)} AS tax_amt
+        FROM new_tb_tax_income
+        WHERE apply_year = ?
+          AND income_min <= ?
+          AND income_max > ?
+        LIMIT 1`;
+    let aParameter = [year, salary, salary];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.setOrders = async function (sIdx, orderList, mIdx) {
     const conn = await pool.getConnection();
     try {

@@ -232,6 +232,23 @@ exports.getTaxRate = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
+exports.setTaxIncome = async function (req, res) {
+
+}
+
+exports.getTaxIncome = async function (req, res) {
+    let year = req.params.year,
+        salary = req.query.salary,
+        familyCnt = req.query.familyCnt;
+
+    let result = await etcModel.getTaxIncome(year, salary, familyCnt);
+
+    const incomeTax = result[0]?.tax_amt || 0;
+    const localTax = Math.floor(incomeTax * 0.1 / 10) * 10;
+
+    res.json({ result: true, incomeTax, localTax });
+}
+
 //품목 신청
 exports.setOrders = async function (req, res) {
     try {

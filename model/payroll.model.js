@@ -520,6 +520,10 @@ exports.getWorkPayroll = async function (targetMonth) {
     }
 }
 
+exports.getPayrollHistory = async function (mIdx) {
+    // let sql = "select as `month`, grossPay from new_tb_member_payroll"
+}
+
 /*
 exports.setPayroll1 = async function (mIdx, sIdx, bWage, pWage, oWage){
     let sql = "insert into new_tb_member_wage (mIdx, sIdx, basic_wage, position_wage, other_wage) values (?, ?, ?, ?, ?)"

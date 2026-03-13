@@ -54,3 +54,11 @@ exports.setSettleData = async function (req, res) {
         return res.status(500).json({ result: false, msg: '데이터베이스 처리 중 오류가 발생했습니다.' });
     }
 }
+
+exports.deleteSettleList = async function (req, res) {
+    let idx = req.params.idx;
+
+    let result = await settleModel.deleteSettleList(idx);
+
+    res.json({"result": true, "data": result});
+}
