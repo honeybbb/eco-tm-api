@@ -1,10 +1,10 @@
 const pool = require("../config/mysql");
 const mysql = require("mysql2/promise");
 
-exports.getSettleList = async function (year, month) {
+exports.getSettleList = async function (year, month, docType) {
     let sql = "select *, (select itemNm from new_tb_code where itemCd = type) as `typeNm`"
-    sql += " from new_tb_site_settlement where `year` in (?) and `month` in (?)";
-    let aParameter = [year, month];
+    sql += " from new_tb_site_settlement where `year` in (?) and `month` in (?) and docType in (?)";
+    let aParameter = [year, month, docType];
 
     try {
         let [res] = await pool.query(sql, aParameter);
@@ -84,5 +84,57 @@ exports.deleteSettleList = async function (idx) {
     }catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
+    }
+}
+
+// 상태 업데이트
+// - 입금(1): depositDt 자동 세팅
+// - 미수(2): 미수사유 저장
+// - 되돌리기(0): depositDt / 미수사유 초기화
+exports.updateSettleStatus = async function (idx, status, bigo) {
+    let sql = `
+        UPDATE new_tb_site_settlement
+        SET
+          status      = ?,
+          depositDt   = CASE WHEN ? = 1 THEN CURDATE() ELSE NULL END,
+          bigo  = CASE WHEN ? = 2 THEN ? ELSE NULL END,
+          modDt       = NOW()
+        WHERE idx = ?
+      `
+    let aParameter = [status, status, status, bigo || null, idx];
+    try {
+        const [res] = await pool.query(sql, aParameter)
+        return res
+    } catch (e) {
+        console.error('db err updateSettleStatus', e)
+        return { data: '-9999' }
+    }
+}
+
+exports.getSettleById = async function (idx) {
+    let sql = "SELECT idx, status, sIdx, cIdx FROM new_tb_site_settlement WHERE idx = ? LIMIT 1"
+    let aParameter = [idx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res[0];
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.insertSettleHistory = async function (settleIdx, orgStatus, toStatus, changedBy) {
+    let sql = "INSERT INTO new_tb_site_settlement_history (stIdx, orgStatus, toStatus, managerId, regDt)"
+    sql += " VALUES (?, ?, ?, ?, NOW())";
+
+
+    let aParameter = [settleIdx, orgStatus ?? null, toStatus || null, changedBy || null]
+    try {
+        const [res] = await pool.query(sql, aParameter)
+        return res
+    } catch (e) {
+        console.error('db err insertSettleHistory', e)
+        return { data: '-9999' }
     }
 }

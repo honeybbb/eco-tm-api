@@ -12,6 +12,9 @@ module.exports = function (app) {
     // 현장 데이터 조회
     app.route('/v1/site/data/:sIdx').get(service.getSiteData);
 
+    // 현장 배치 조회
+    app.route('/v1/site/staff/:sIdx').get(service.getAssignedStaff)
+
     // 현장 및 계약 등록
     app.route('/v1/site/register').post(service.registerSiteWithContract);
 
@@ -27,6 +30,7 @@ module.exports = function (app) {
     app.route('/v1/site/modify').post(service.updateSiteData);
 
     //현장 배치 정보 저장
+    /*
     app.route('/v1/site/headcount').post(service.setSiteHeadCount);
 
     app.route('/v1/site/headcount/:sIdx').get(service.getSiteHeadCount)
@@ -36,4 +40,6 @@ module.exports = function (app) {
 
     //청구서 저장
     app.route('/v1/site/account/bill').post(service.setAccountBill);
+
+     */
 }

@@ -30,6 +30,7 @@ exports.setBaseSalary = async function (req, res) {
     res.json({'result': true, 'data': result})
 };
 
+
 exports.getPayrollMonth = async function (req, res) {
     let { year, month } = req.query;
 
@@ -54,6 +55,19 @@ exports.getPayrollCalculate = async function (req, res) {
     let result = await payrollModel.getPayrollCalculate(year, month);
 
     res.json({'result': true, 'data': result})
+}
+
+exports.getMemberPayrollHistory = async function (req, res) {
+    let { mIdx } = req.params;
+
+    if (!mIdx) {
+        return res.json({ 'result': false, 'msg': '직원 인덱스를 확인해주세요.' });
+    }
+
+    let result = await payrollModel.getMemberPayrollHistory(mIdx);
+
+    res.json({'result': true, 'data': result})
+
 }
 
 exports.getPayrollMonth3 = async function (req, res) {
@@ -332,13 +346,6 @@ exports.getWorkPayroll = async function(req, res) {
     res.json({'result': true, 'data': result})
 }
 
-exports.getPayrollHistory = async function (req, res) {
-    let mIdx = req.params.mIdx;
-
-    let result = await payrollModel.getPayrollHistory();
-
-    res.json({'result': true, 'data': result})
-}
 /*
 
 exports.setPayroll1 = async function (req, res) {

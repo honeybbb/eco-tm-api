@@ -101,11 +101,11 @@ exports.saveContract = async function (contract) {
                 UPDATE new_tb_site_contract 
                 SET type=?, jsonData=?, total_cost=?, startDt=?, endDt=?, staffCount=?, staffDetail=?, 
                     workSchedule=?, breaktime=?
-                WHERE scIdx = ? 
+                WHERE idx = ? 
             `;
             let params = [
                 contract.type,
-                contract.jsonData,
+                contract.costBreakdown,
                 contract.totalCost,
                 contract.startDt,
                 contract.endDt,
@@ -121,8 +121,8 @@ exports.saveContract = async function (contract) {
             // [INSERT]
             let sql = `
                 INSERT INTO new_tb_site_contract 
-                (sIdx, cIdx, type, workdays, total_cost, startDt, endDt, staffCount, staffDetail, workSchedule, breaktime) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ? , ?, ?, ?)
+                (sIdx, cIdx, type, workdays, total_cost, startDt, endDt, staffCount, staffDetail, workSchedule, breaktime, jsonData) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ? , ?, ?, ?, ?)
             `;
             let params = [
                 contract.sIdx, // 현장 FK
@@ -135,7 +135,8 @@ exports.saveContract = async function (contract) {
                 contract.staffCount,
                 contract.staffDetail,
                 contract.workSchedule,
-                contract.breaktime
+                contract.breaktime,
+                contract.costBreakdown
             ];
             await connection.query(sql, params);
         }
@@ -334,8 +335,39 @@ exports.getSiteHeadCount = async function (sIdx) {
     }
 }
 
+exports.getAssignedStaff = async function (sIdx) {
+    let sql = `
+        SELECT 
+            ma.mIdx,
+            ma.idx AS assignIdx,
+            DATE_FORMAT(ma.regDt, '%Y-%m-%d') AS assignDate,
+            m.type,
+            m.name,
+            m.phone,
+            m.position,
+            (SELECT itemNm FROM new_tb_code WHERE itemCd = m.position) AS positionName
+        FROM new_tb_member_assignment ma
+        LEFT JOIN new_tb_member m ON m.idx = ma.mIdx
+        WHERE ma.sIdx in (?)
+          AND ma.idx = (
+              SELECT MAX(idx) 
+              FROM new_tb_member_assignment 
+              WHERE sIdx in (?) AND mIdx = ma.mIdx and ma.isActive = 'Y'
+          )
+    `;
+    let aParameter = [sIdx, sIdx];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return [];
+    }
+}
+
 exports.getSiteData = async function (sIdx) {
-    let sql = "select s.*, sa.jsonData, sc.startDt, sc.endDt, sc.total_cost,"
+    /*
+    let sql = "select s.*, sc.startDt, sc.endDt, sc.total_cost,"
     sql += " CONCAT('[',GROUP_CONCAT(DISTINCT CASE WHEN sb.sIdx is not null THEN JSON_OBJECT('bigo', sb.bigo, 'regDt', sb.regDt) END),']') as bigoList,"
     sql += " CONCAT('[',GROUP_CONCAT(DISTINCT CASE WHEN sc.sIdx is not null THEN JSON_OBJECT('workDays', sc.workdays, 'startDt', sc.startDt,"
     sql += " 'endDt', sc.endDt, 'workSchedule', sc.workSchedule, 'breaktime', sc.breaktime,'budget', sc.jsonData, 'scIdx', sc.idx,"
@@ -343,11 +375,62 @@ exports.getSiteData = async function (sIdx) {
     sql += " 'type', (select itemCd from new_tb_code where itemCd = sc.type),"
     sql += " 'staffList', sc.staffDetail, 'staffCount', sc.staffCount) END),']') as `contractList`"
     sql += " from new_tb_site s"
-    sql += " left join new_tb_site_assignment sa on sa.sIdx = s.idx"
     sql += " left join new_tb_site_contract sc on sc.sIdx = s.idx"
     sql += " left join new_tb_site_bigo sb on sb.sIdx = s.idx"
     sql += " where s.idx in (?)";
     // sql += " order by regDt desc limit 1"
+
+     */
+    let sql = `
+      SELECT 
+        s.*,
+        -- type별 최신 계약 1건씩만 묶어서 반환
+        CONCAT('[', GROUP_CONCAT(
+          DISTINCT CASE 
+            WHEN latest_sc.sIdx IS NOT NULL 
+            THEN JSON_OBJECT(
+              'workDays',    latest_sc.workdays,
+              'startDt',     latest_sc.startDt,
+              'endDt',       latest_sc.endDt,
+              'workSchedule',latest_sc.workSchedule,
+              'breaktime',   latest_sc.breaktime,
+              'budget',      latest_sc.jsonData,
+              'scIdx',       latest_sc.idx,
+              'staffList',   latest_sc.staffDetail,
+              'staffCount',  latest_sc.staffCount,
+              'category',    (SELECT itemNm FROM new_tb_code WHERE itemCd = latest_sc.type),
+              'type',        (SELECT itemCd FROM new_tb_code WHERE itemCd = latest_sc.type)
+            ) 
+          END
+        ), ']') AS contractList,
+    
+        -- bigoList는 기존 그대로
+        CONCAT('[', GROUP_CONCAT(
+          DISTINCT CASE 
+            WHEN sb.sIdx IS NOT NULL 
+            THEN JSON_OBJECT('bigo', sb.bigo, 'regDt', sb.regDt) 
+          END
+        ), ']') AS bigoList
+    
+      FROM new_tb_site s
+    
+      -- type별 최신 계약만 조인 (핵심 서브쿼리)
+      LEFT JOIN new_tb_site_contract latest_sc 
+        ON latest_sc.idx = (
+          SELECT idx 
+          FROM new_tb_site_contract
+          WHERE sIdx = s.idx 
+            AND type = latest_sc.type   -- 같은 type 중에서
+          ORDER BY startDt DESC, idx DESC  -- 가장 최근 계약
+          LIMIT 1
+        )
+        AND latest_sc.sIdx = s.idx
+    
+      LEFT JOIN new_tb_site_bigo sb ON sb.sIdx = s.idx
+    
+      WHERE s.idx IN (?)
+      GROUP BY s.idx
+    `;
     let aParameter = [sIdx];
 
     //let query = mysql.format(sql, aParameter);

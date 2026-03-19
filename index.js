@@ -36,6 +36,9 @@ module.exports = app;
 var authRoutes = require('./controller/auth.controller');
 authRoutes(app);
 
+var dashboardRoutes = require('./controller/dashboard.controller');
+dashboardRoutes(app);
+
 var siteRoutes = require("./controller/site.controller");
 siteRoutes(app);
 

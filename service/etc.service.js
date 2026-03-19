@@ -80,7 +80,7 @@ exports.removeNotice = async function (req, res) {
 
 exports.getBaseCode = async function (req, res) {
     let cIdx = req.params.cIdx;
-    if(cIdx == ':cIdx') return res.json({'result': false, 'msg':'회사 정보가 없습니다.'});
+    if(!cIdx) return res.json({'result': false, 'msg':'회사 정보가 없습니다.'});
     let result = await etcModel.getBaseCode(cIdx);
 
     res.json({'result': true, 'data': result})

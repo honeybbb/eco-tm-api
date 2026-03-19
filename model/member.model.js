@@ -1,7 +1,7 @@
 const pool = require("../config/mysql");
 const mysql = require("mysql2/promise");
 
-exports.getMemberList = async function () {
+exports.getMemberList = async function (cIdx) {
     let sql = "select m.*, case when status = 0 then '재직' when status = 1 then '퇴사' else '-' end as `status`,"
     // sql += " mc.jsonData as wage,"
     sql += " ms.sIdx, ms.name as `siteName`,"
@@ -11,8 +11,9 @@ exports.getMemberList = async function () {
     sql += " left join (select b.*, s.name from new_tb_member_assignment b left join new_tb_site s on s.idx = b.sIdx) as `ms` on ms.mIdx = m.idx"
     sql += " left join new_tb_code c on c.itemCd = m.type left join new_tb_code c2 on c2.itemCd = m.position";
     sql += " left join new_tb_code c3 on c3.itemCd = m.disability_grade"
+    sql += " where m.cIdx in (?)"
     sql += " order by ms.sIdx desc, m.idx"
-    let aParameter = [];
+    let aParameter = [cIdx];
 
     //let query = mysql.format(sql, aParameter);
     try {
@@ -43,6 +44,7 @@ exports.getMemberData = async function (id) {
     let sql = `
         SELECT 
             m.*,
+            (select itemNm from new_tb_code where disability_grade = itemCd) as disability_grade,
             IFNULL(ms.sIdx, '0') AS \`sIdx\`,
             s.payment_day,
             cd.itemCd AS \`positionCd\`,
@@ -233,13 +235,38 @@ exports.getPayroll = async function (mIdx, year) {
  */
 
 //직원 연차 조회 (리스트)
-exports.getMemberLeave = async function (sIdx, year) {
+exports.getMemberLeave = async function (cIdx, year) {
+    /*
     let sql = "select ml.*, m.inDate, m.name,"
     sql += " (select itemNm from new_tb_code c where c.itemCd = m.position) as `position`"
     sql += " from new_tb_member m"
     sql += " left join new_tb_member_annual_leave ml on m.idx = ml.mIdx"
     sql += " where ml.sIdx in (?) and ml.year in (?)"
     let aParameter = [sIdx, year];
+
+     */
+    let sql = `
+        select 
+            mal.idx as \`quotaIdx\`,
+            m.inDate,
+            m.type as \`mType\`,
+            m.idx as \`mIdx\`,
+            m.name,
+            m.position,
+            (select itemNm from new_tb_code c where c.itemCd = m.position) as \`role\`,
+            mal.totalCount,
+            mal.usedCount,
+            mal.overCount,
+            mal.payCount,
+            mal.middleDt,
+            ma.sIdx, 
+            (select name from new_tb_site where idx = ma.sIdx) as \`siteName\`
+        from new_tb_member m
+            left join new_tb_member_annual_leave mal on mal.mIdx = m.idx
+            left join new_tb_member_assignment ma on ma.mIdx = m.idx
+        where m.cIdx in (?)
+        `
+    let aParameter = [cIdx, year];
 
     try {
         let [res] = await pool.query(sql, aParameter);
@@ -251,14 +278,40 @@ exports.getMemberLeave = async function (sIdx, year) {
 }
 
 //직원 연차 저장
-exports.setMemberLeave = async function (mIdx, year, personalNo, middle_date, basis_cost, count, over_count, used_count, amount, bigo) {
-    let sql = "insert into new_tb_member_annual_leave (mIdx, year, personalNo, middle_date, basis_cost, count, over_count, used_count, amount, bigo)"
-    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    let aParameter = [mIdx, year, personalNo, middle_date, basis_cost, count, over_count, used_count, amount, bigo];
+exports.setMemberLeave = async function (mIdx, sIdx, name, type, year, middleDt, count, over_count, used_count, bigo, regDt) {
+    let sql = "insert into new_tb_member_annual_leave (mIdx, sIdx, mName, mType, year, middleDt, totalCount, overCount, usedCount, bigo, regDt)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    let aParameter = [mIdx, sIdx, name, type, year, middleDt, count, over_count, used_count, bigo, regDt];
 
-    let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.updateMemberLeave = async function (mIdx, year, totalCount, overCount, usedCount, bigo, modDt){
+    let sql = "update new_tb_member_annual_leave set totalCount=?,overCount=?,usedCount=?,bigo=?,modDt=? where mIdx in (?) and year (?)"
+    let aParameter = [totalCount, overCount, usedCount, bigo, modDt, mIdx, year];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.setAnnualSettlement = async function (mIdx, sIdx, payCount, settleDt, bigo, amount, regDt) {
+    let sql = "insert into new_tb_member_settlement (mIdx, sIdx, payCount, settleDt, bigo, amount, regDt)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?)"
+    let aParameter = [mIdx, sIdx, payCount, settleDt, bigo, amount, regDt];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -301,6 +354,19 @@ exports.getMemberOff = async function (cIdx, startDt, endDt) {
         return {'data': '-9999'}
     }
 }
+
+// 특정 연차 신청 정보 상세 조회
+exports.getMemberOffDetail = async function (idx) {
+    let sql = "SELECT mIdx, sIdx, startDt, endDt FROM new_tb_member_off WHERE idx = ?";
+    let aParameter = [idx];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res[0]; // 데이터 한 건 반환
+    } catch (e) {
+        console.log('db err', e);
+        return null;
+    }
+};
 
 exports.updateOffStatus = async function (idx, status) {
     let sql = "update new_tb_member_off set status = (?) where idx = ?"
@@ -347,8 +413,10 @@ exports.setMemberStaffing = async function (mIdx, sIdx) {
 }
 
 //직원 배치 해제
-exports.removeMemberStaffing = async function (idx) {
-    let sql = "delete from new_tb_member_assignment WHERE idx = ?";
+exports.updateMemberStaffing = async function (idx) {
+    console.log(idx, 'remove1')
+    //let sql = "delete from new_tb_member_assignment WHERE idx = ?";
+    let sql = "update new_tb_member_assignment set isActive = 'N' where idx in (?)"
     let aParameter = [idx];
 
     try {
@@ -426,15 +494,17 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
         // -----------------------------------------------------
         let sqlMember = `
             INSERT INTO new_tb_member 
-            (type, name, id, password, birthDt, phone, position, gender, email,
+            (cIdx, type, name, id, password, birthDt, phone, position, gender, email,
              disability, disability_date, disability_grade, defector, patriot, intern, beneficiary, foreigner, nationality, visa_code, visa_date,
              bank, accountNumber, inDate, outDate, outReason, address, bigo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         let paramMember = [
-            member.type, member.name, member.id, member.password, member.birthDt, member.phone, member.position, member.gender, member.email,
-            member.disability, member.disability_date, member.disability_grade, member.defector, member.patriot, member.intern, member.beneficiary, member.foreigner, member.nationality, member.visa_code, member.visa_date,
+            member.cIdx, member.type, member.name, member.id, member.password, member.birthDt,
+            member.phone, member.position, member.gender, member.email,
+            member.disability, member.disability_date, member.disability_grade, member.defector, member.patriot, member.intern,
+            member.beneficiary, member.foreigner, member.nationality, member.visa_code, member.visa_date,
             member.bank, member.accountNumber, member.inDate, member.outDate, member.outReason, member.address, member.bigo
         ];
 
@@ -489,3 +559,135 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
         connection.release(); // 커넥션 반납
     }
 }
+
+exports.updateMemberWithContractAndStaffing = async function (mIdx, member, contract, staffing) {
+    const connection = await pool.getConnection();
+
+    console.log("=== Update Data Check ===");
+    console.log("contract:", contract);
+    console.log("staffing:", staffing);
+
+    try {
+        await connection.beginTransaction();
+
+        // -----------------------------------------------------
+        // 1. 직원(Member) 업데이트
+        // -----------------------------------------------------
+        // 비밀번호 변경 여부에 따라 쿼리 분기
+        let sqlMember, paramMember;
+
+        if (member.password) {
+            sqlMember = `
+                UPDATE new_tb_member SET
+                    type = ?, name = ?, id = ?, password = ?,
+                    birthDt = ?, phone = ?, position = ?, gender = ?, email = ?,
+                    disability = ?, disability_date = ?, disability_grade = ?,
+                    defector = ?, patriot = ?, intern = ?, beneficiary = ?,
+                    foreigner = ?, nationality = ?, visa_code = ?, visa_date = ?,
+                    bank = ?, accountNumber = ?,
+                    inDate = ?, outDate = ?, outReason = ?,
+                    address = ?, bigo = ?
+                WHERE idx = ?
+            `;
+            paramMember = [
+                member.type, member.name, member.id, member.password,
+                member.birthDt, member.phone, member.position, member.gender, member.email,
+                member.disability, member.disability_date, member.disability_grade,
+                member.defector, member.patriot, member.intern, member.beneficiary,
+                member.foreigner, member.nationality, member.visa_code, member.visa_date,
+                member.bank, member.accountNumber,
+                member.inDate, member.outDate, member.outReason,
+                member.addr, member.bigo,
+                mIdx
+            ];
+        } else {
+            // 비밀번호 제외 업데이트
+            sqlMember = `
+                UPDATE new_tb_member SET
+                    type = ?, name = ?, id = ?,
+                    birthDt = ?, phone = ?, position = ?, gender = ?, email = ?,
+                    disability = ?, disability_date = ?, disability_grade = ?,
+                    defector = ?, patriot = ?, intern = ?, beneficiary = ?,
+                    foreigner = ?, nationality = ?, visa_code = ?, visa_date = ?,
+                    bank = ?, accountNumber = ?,
+                    inDate = ?, outDate = ?, outReason = ?,
+                    address = ?, bigo = ?
+                WHERE idx = ?
+            `;
+            paramMember = [
+                member.type, member.name, member.id,
+                member.birthDt, member.phone, member.position, member.gender, member.email,
+                member.disability, member.disability_date, member.disability_grade,
+                member.defector, member.patriot, member.intern, member.beneficiary,
+                member.foreigner, member.nationality, member.visa_code, member.visa_date,
+                member.bank, member.accountNumber,
+                member.inDate, member.outDate, member.outReason,
+                member.addr, member.bigo,
+                mIdx
+            ];
+        }
+
+        await connection.query(sqlMember, paramMember);
+
+        // -----------------------------------------------------
+        // 2. 계약서(Contract) 업데이트
+        // mIdx 기준 최신 계약을 UPDATE, 없으면 INSERT
+        // -----------------------------------------------------
+        const sqlContractCheck = `
+            SELECT idx FROM new_tb_member_contract 
+            WHERE mIdx = ? 
+            ORDER BY idx DESC LIMIT 1
+        `;
+        const [contractRows] = await connection.query(sqlContractCheck, [mIdx]);
+
+        if (contractRows.length > 0) {
+            // 기존 계약 수정
+            const sqlContract = `
+                UPDATE new_tb_member_contract SET
+                    sIdx = ?, type = ?, jsonData = ?,
+                    startDt = ?, endDt = ?, bigo = ?
+                WHERE idx = ?
+            `;
+            const paramContract = [
+                contract.sIdx, contract.type, contract.jsonData,
+                contract.startDt, contract.endDt, contract.bigo,
+                contractRows[0].idx
+            ];
+            await connection.query(sqlContract, paramContract);
+        } else {
+            // 계약 행이 없으면 새로 INSERT
+            const sqlContract = `
+                INSERT INTO new_tb_member_contract 
+                (mIdx, sIdx, type, jsonData, startDt, endDt, bigo)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `;
+            const paramContract = [
+                mIdx, contract.sIdx, contract.type, contract.jsonData,
+                contract.startDt, contract.endDt, contract.bigo
+            ];
+            await connection.query(sqlContract, paramContract);
+        }
+
+        // -----------------------------------------------------
+        // 3. 배치(Staffing) 업데이트
+        // 등록과 동일하게 ON DUPLICATE KEY UPDATE 활용
+        // -----------------------------------------------------
+        const sqlStaffing = `
+            INSERT INTO new_tb_member_assignment (mIdx, sIdx)
+            VALUES (?, ?)
+            ON DUPLICATE KEY UPDATE sIdx = VALUES(sIdx)
+        `;
+        await connection.query(sqlStaffing, [mIdx, staffing.sIdx]);
+
+        await connection.commit();
+        return { result: true };
+
+    } catch (e) {
+        await connection.rollback();
+        console.log('Transaction Error:', e);
+        return { result: false, error: e };
+
+    } finally {
+        connection.release();
+    }
+};

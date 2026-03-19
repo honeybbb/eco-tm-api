@@ -15,6 +15,9 @@ module.exports = function (app) {
     //직원 급여 계산
     app.route('/v1/member/payroll/calculate').get(service.getPayrollCalculate)
 
+    // 특정 직원의 전체 급여 이력 조회
+    app.route('/v1/member/payroll/history/:mIdx').get(service.getMemberPayrollHistory);
+
     //직원 급여 정보 등록 (월급)
     app.route('/v1/member/payroll/month/:mIdx').post(service.setPayrollMonth);
 

@@ -1,13 +1,15 @@
 const memberModel = require("../model/member.model")
 const contractModel = require("../model/contract.model")
+const workModel = require("../model/work.model")
 const {hashPassword} = require("../utils/password");
 const bcrypt  = require("bcrypt");
 const xlsx = require("xlsx");
 
 //직원 리스트 조회
 exports.getMemberList = async function (req, res) {
+    let cIdx = req.params.cIdx || 1;
     try {
-        let result = await memberModel.getMemberList();
+        let result = await memberModel.getMemberList(cIdx);
         const safeResult = result.map(member => {
             const { password, ...safeMember } = member;  // password만 분리하고 나머지
             return safeMember;
@@ -24,7 +26,6 @@ exports.getMemberData = async function (req, res) {
     let id = req.params.id;
 
     let result = await memberModel.getMemberData(id);
-    console.log(result, 'getMemberData');
     if(result.length > 0) delete result?.[0].password;
 
     res.json({'result': true, 'data': result})
@@ -32,6 +33,7 @@ exports.getMemberData = async function (req, res) {
 
 exports.getMemberAvailable = async function (req, res) {
     let sIdx = req.query.sIdx;
+
     let result = await memberModel.getMemberAvailable(sIdx);
     result.forEach(member => { delete member.password;});
 
@@ -133,10 +135,13 @@ exports.setMemberData = async function(req, res) {
 }
 
 exports.getMemberLeave = async function (req, res) {
-    let sIdx = req.query.sIdx,
+    let cIdx = req.query.cIdx,
+        // sIdx = req.query.sIdx,
         year = req.query.year;
 
-    let result = await memberModel.getMemberLeave(sIdx, year)
+    console.log(cIdx, year)
+
+    let result = await memberModel.getMemberLeave(cIdx, year)
 
     res.json({'result': true, 'data': result})
 }
@@ -144,18 +149,47 @@ exports.getMemberLeave = async function (req, res) {
 //직원 연차 저장
 exports.setMemberLeave = async function (req, res) {
     let mIdx = req.body.mIdx,
-        position = req.body.position,
+        sIdx = req.body.sIdx,
+        name = req.body.name,
+        type = req.body.type,
         year = req.body.year,
-        personalNo = req.body.personalNo,
-        middle_date = req.body.middle_date,
-        basis_cost = req.body.basis_code,
-        count = req.body.count,
-        over_count = req.body.over_count,
-        used_count = req.body.used_count,
-        amount = req.body.amount, //연차추계액
-        bigo = req.body.bigo;
+        middleDt = req.body.middleDt,
+        totalCount = req.body.totalCount,
+        overCount = req.body.overCount,
+        usedCount = req.body.usedCount,
+        bigo = req.body.bigo,
+        regDt = new Date();
 
-    let result = await memberModel.setMemberLeave(mIdx, position, year, personalNo, middle_date, basis_cost, count, over_count, used_count, amount, bigo);
+    let result = await memberModel.setMemberLeave(mIdx, sIdx, name, type, year, middleDt, totalCount, overCount, usedCount, bigo, regDt);
+
+    res.json({'result': true, 'data': result})
+}
+
+exports.updateMemberLeave = async function (req, res) {
+    let mIdx = req.body.mIdx,
+        year = req.body.year,
+        totalCount = req.body.totalCount,
+        overCount = req.body.overCount,
+        usedCount = req.body.usedCount,
+        bigo = req.body.bigo,
+        modDt = new Date();
+
+    let result = await memberModel.updateMemberLeave(mIdx, year, totalCount, overCount, usedCount, bigo, modDt);
+
+    res.json({'result': true, 'data': result})
+}
+
+//연차 정산
+exports.setAnnualSettlement = async function (req, res) {
+    let mIdx = req.body.mIdx,
+        sIdx = req.body.sIdx,
+        payCount = req.body.payCount,
+        settleDt = req.query.settleDt,
+        bigo = req.body.bigo, //산출근거
+        amount = req.body.amount,
+        regDt = new Date();
+
+    let result = await memberModel.setAnnualSettlement(mIdx, sIdx, payCount, settleDt, bigo, amount, regDt);
 
     res.json({'result': true, 'data': result})
 }
@@ -185,12 +219,46 @@ exports.getMemberOff = async function (req, res) {
 }
 
 exports.updateOffStatus = async function (req, res) {
-    let idx = req.body.idx,
-        status = req.body.status;
-    console.log(idx, status)
-    let result = await memberModel.updateOffStatus(idx, status);
+    const { idx, status } = req.body;
 
-    res.json({'result': true, 'data': result})
+    try {
+        // 1. 상태 업데이트 실행
+        let result = await memberModel.updateOffStatus(idx, status);
+
+        // 2. 승인(status == 1)일 경우에만 출근 데이터 등록
+        if (status == 1) {
+            const offInfo = await memberModel.getMemberOffDetail(idx);
+
+            if (offInfo && offInfo.startDt && offInfo.endDt) {
+                const { mIdx, sIdx, startDt, endDt } = offInfo;
+                const workType = 'OFF';
+                const bigo = '연차 승인 자동 등록';
+                const regDt = new Date();
+
+                // 날짜 처리를 위해 Date 객체 생성
+                let currentDate = new Date(startDt);
+                const lastDate = new Date(endDt);
+
+                // 시작일부터 종료일까지 하루씩 증가하며 반복문 실행
+                while (currentDate <= lastDate) {
+                    // YYYY-MM-DD 형식으로 변환 (workStart 함수가 문자열을 받는 경우 대비)
+                    const formattedDate = currentDate.toISOString().split('T')[0];
+
+                    // 각 날짜별로 출근 데이터 생성
+                    await workModel.workStart(mIdx, sIdx, formattedDate, workType, bigo, regDt);
+
+                    // 다음 날로 이동
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+            }
+        }
+
+        res.json({ 'result': true, 'data': result });
+
+    } catch (e) {
+        console.error('연차 승인 중 에러:', e);
+        res.status(500).json({ result: false, message: '처리 중 서버 에러가 발생했습니다.' });
+    }
 }
 
 exports.setMemberStaffing = async function (req, res) {
@@ -202,10 +270,10 @@ exports.setMemberStaffing = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
-exports.removeMemberStaffing = async function (req, res) {
+exports.updateMemberStaffing = async function (req, res) {
     let idx = req.params.idx;
 
-    let result = await memberModel.removeMemberStaffing(idx)
+    let result = await memberModel.updateMemberStaffing(idx)
 
     res.json({'result': true, 'data': result})
 }
@@ -221,6 +289,7 @@ exports.registerFullMember = async function (req, res) {
         // 2. 모델에 넘길 데이터 구조화
         // (1) Member 데이터
         const memberData = {
+            cIdx: body.cIdx,
             type: body.type,
             name: body.name,
             id: body.id,
@@ -285,11 +354,82 @@ exports.registerFullMember = async function (req, res) {
 }
 
 exports.updateMemberData = async function (req, res) {
-    let memberId = req.params.id;
-    console.log(req.body,memberId);
-    let result = await memberModel.updateMemberData()
-//
-}
+    try {
+        const mIdx = req.params.id;
+        const body = req.body;
+        console.log('body.site:', body)
+
+        // 비밀번호 변경 요청 시에만 해시화
+        let hashedPassword = null;
+        if (body.password) {
+            hashedPassword = await bcrypt.hash(body.password, 10);
+        }
+
+        const memberData = {
+            type: body.type,
+            name: body.name,
+            id: body.id,
+            password: hashedPassword, // null이면 모델에서 UPDATE 제외
+            birthDt: body.birthDt,
+            phone: body.phone,
+            position: body.position,
+            gender: body.gender,
+            email: body.email,
+            disability: body.disability,
+            disability_date: body.disability_date,
+            disability_grade: body.disability_grade,
+            defector: body.defector,
+            patriot: body.patriot,
+            intern: body.intern,
+            beneficiary: body.beneficiary,
+            foreigner: body.foreigner,
+            nationality: body.nationality,
+            visa_code: body.visa_code,
+            visa_date: body.visa_date,
+            bank: body.bankName,
+            accountNumber: body.accountNumber,
+            inDate: body.joinDate,
+            outDate: body.endDate,
+            outReason: body.endReason,
+            addr: body.address,
+            bigo: body.bigo,
+
+            retirePension: body.retire_pension,//퇴직연금가입여부
+            fourInsurance:body.four_ins,//4대보험가입여부
+
+        };
+
+        const contractData = {
+            sIdx: body.sIdx,
+            type: body.type,
+            jsonData: JSON.stringify(body.wageInputs || {}),
+            startDt: body.joinDate,
+            endDt: body.endDate,
+            bigo: body.bigo
+        };
+
+        const staffingData = {
+            sIdx: body.sIdx
+        };
+
+        const result = await memberModel.updateMemberWithContractAndStaffing(
+            mIdx,
+            memberData,
+            contractData,
+            staffingData
+        );
+
+        if (result.result) {
+            res.json({ result: true, message: '직원 정보 수정 완료' });
+        } else {
+            res.json({ result: false, message: '수정 중 오류 발생', error: result.error });
+        }
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ result: false, message: '서버 에러' });
+    }
+};
+
 exports.uploadExcel = async function (req, res) {
     try {
         const { sIdx } = req.body; // 프론트에서 선택한 현장 idx

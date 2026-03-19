@@ -301,6 +301,41 @@ exports.getPayrollCalculate = async function (year, month) {
     }
 }
 
+// 특정 직원의 전체 급여 이력 조회
+exports.getMemberPayrollHistory = async function (mIdx) {
+    let sql = `
+        SELECT
+            p1.idx,
+            p1.year,
+            p1.month,
+            CONCAT(p1.year, '.', LPAD(p1.month, 2, '0')) AS payMonth,
+            p1.grossPay AS basic,      /* 총 지급액 */
+            p1.deductions AS allowance, /* 공제액 */
+            p1.netPay AS total,        /* 실지급액 */
+            p1.payItems,
+            p1.regDt
+        FROM new_tb_member_payroll_month p1
+                 INNER JOIN (
+            /* 해당 멤버의 월별 최신 idx만 추출 */
+            SELECT MAX(idx) AS max_idx
+            FROM new_tb_member_payroll_month
+            WHERE mIdx = ?
+            GROUP BY year, month
+        ) p2 ON p1.idx = p2.max_idx
+        ORDER BY p1.year DESC, p1.month DESC
+            LIMIT 12;
+    `;
+    let aParameter = [mIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return [];
+    }
+}
+
 exports.getPayrollCalculateTemp = async function (year, month) {
     let sql = "select"
     sql += " m.idx,"

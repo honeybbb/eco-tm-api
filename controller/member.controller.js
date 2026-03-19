@@ -4,7 +4,7 @@ const service = require("../service/member.service");
 
 module.exports = function (app) {
     //직원 리스트 조회
-    app.route('/v1/member/list').get(service.getMemberList);
+    app.route('/v1/member/list/:cIdx').get(service.getMemberList);
 
     //직원 정보 조회
     app.route('/v1/member/data/:id').get(service.getMemberData);
@@ -16,10 +16,13 @@ module.exports = function (app) {
     app.route('/v1/member/data/:id').put(service.updateMemberData);
 
     //직원 연차 조회
-    app.route('/v1/member/leave').get(service.getMemberLeave);
+    app.route('/v1/member/annual/list').get(service.getMemberLeave);
 
     //직원 연차 저장
-    app.route('/v1/member/leave/register').post(service.setMemberLeave);
+    app.route('/v1/member/annual/register').post(service.setMemberLeave);
+
+    //직원 연차 수정
+    app.route('/v1/member/annual/data/:mIdx').put(service.updateMemberLeave);
 
     //직원 연차 신청
     app.route('/v1/member/off/request/:mIdx').post(service.setMemberOff);
@@ -37,6 +40,6 @@ module.exports = function (app) {
     app.route('/v1/member/staffing/:mIdx').post(service.setMemberStaffing);
 
     //직원 배치 해제
-    app.route('/v1/member/staffing/:idx').delete(service.removeMemberStaffing);
+    app.route('/v1/member/staffing/:idx').put(service.updateMemberStaffing);
 
 }

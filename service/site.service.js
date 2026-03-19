@@ -63,10 +63,8 @@ exports.registerSiteWithContract = async function (req, res) {
             bigo: req.body.bigo || '',
         };
 
-        console.log(siteData, 'siteData');
+        // console.log(siteData, 'siteData');
 
-        // 현장 정보 저장 (INSERT or UPDATE)
-        // 결과로 sIdx(현장 키값)를 받아옵니다.
         let siteResult = await siteModel.saveSite(siteData);
 
         if (!siteResult.success) {
@@ -99,10 +97,10 @@ exports.registerSiteWithContract = async function (req, res) {
                 if(contractItem.staffList && Array.isArray(contractItem.staffList)){
                     currentStaffCount = contractItem.staffList.reduce((acc, cur) => acc + (Number(cur.count)||0), 0);
                 }
-                console.log(contractItem)
+                console.log(contractItem, 'contractItem')
                 // 개별 계약 데이터 객체 생성
                 let contractData = {
-                    scIdx: contractItem.scIdx, // ★ 계약 고유키 (수정 시 필요)
+                    scIdx: contractItem.scIdx,
                     sIdx: targetSIdx,          //현장idx
                     cIdx: req.body.cIdx,
                     type: contractItem.type,
@@ -115,7 +113,8 @@ exports.registerSiteWithContract = async function (req, res) {
                     staffCount: currentStaffCount,
                     staffDetail: JSON.stringify(contractItem.staffList),
                     workSchedule: contractItem.workSchedule,
-                    breaktime: contractItem.breakTime
+                    breaktime: contractItem.breakTime,
+                    costBreakdown: JSON.stringify(contractItem.costBreakdown)
                 };
 
                 // 개별 계약 저장
@@ -183,6 +182,24 @@ exports.getSiteHeadCount = async function (req, res) {
     let result = await siteModel.getSiteHeadCount(sIdx);
 
     res.json({'result': true, 'data': result})
+}
+
+exports.getAssignedStaff = async function (req, res) {
+    const sIdx = req.params.sIdx;
+
+    try {
+        const result = await siteModel.getAssignedStaff(sIdx);
+        if (result) {
+            //console.log(result, 'r')
+            res.json({ result: true, data: result });
+        } else {
+            res.json({ result: false, msg: '배치된 직원이 없습니다.' });
+        }
+
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ result: false, msg: '서버 에러' });
+    }
 }
 
 exports.getSiteData = async function (req, res) {

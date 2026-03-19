@@ -2,9 +2,14 @@ const settleModel = require("../model/settle.model");
 
 exports.getSettleList = async function (req, res) {
     let year = req.query.year,
-        month = req.query.month;
+        month = req.query.month,
+        docType = req.query.docType || ['SERVICE','RETIRE_ANNUAL'];
 
-    let result = await settleModel.getSettleList(year, month);
+    console.log(docType);
+
+    //let docTypeArr = docType.includes(',') ? docType.split(',') : [docType];
+
+    let result = await settleModel.getSettleList(year, month, docType);
 
     res.json({"result": true, "data": result});
 }
@@ -61,4 +66,40 @@ exports.deleteSettleList = async function (req, res) {
     let result = await settleModel.deleteSettleList(idx);
 
     res.json({"result": true, "data": result});
+}
+
+exports.updateSettleStatus = async function (req, res) {
+    const { idx, status, bigo, changedBy } = req.body
+
+    // 필수값 체크
+    if (!idx || status === undefined) {
+        return res.json({ result: false, message: '필수 파라미터 누락' })
+    }
+
+    // 미수처리(2)인데 사유 없으면 거부
+    if (Number(status) === 2 && !bigo?.trim()) {
+        return res.json({ result: false, message: '미수 사유를 입력해주세요.' })
+    }
+
+    try {
+        // 현재 상태 조회 (history의 orgStatus 기록용)
+        const current = await settleModel.getSettleById(idx)
+
+        console.log(current)
+
+        if (!current) {
+            return res.json({ result: false, message: '존재하지 않는 정산 건입니다.' })
+        }
+
+        // 상태 업데이트
+        await settleModel.updateSettleStatus(idx, status, bigo)
+
+        // 이력 기록
+        await settleModel.insertSettleHistory(idx, current.status, status, (changedBy || null))
+
+        return res.json({ result: true })
+    } catch (e) {
+        console.error('updateSettleStatus error:', e)
+        return res.json({ result: false, message: '처리 중 오류가 발생했습니다.' })
+    }
 }
