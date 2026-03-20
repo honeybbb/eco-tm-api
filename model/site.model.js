@@ -443,6 +443,19 @@ exports.getSiteData = async function (sIdx) {
     }
 }
 
+exports.getSiteCoords = async function (sIdx) {
+    let sql = "select latitude, longitude from new_tb_site where idx = ?";
+    let aParameter = [sIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res[0];
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.getSiteData1 = async function (sIdx) {
     // 현장 정보 가져오기
     let sqlSite = `SELECT * FROM new_tb_site WHERE idx = ?`;

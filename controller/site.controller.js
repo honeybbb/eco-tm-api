@@ -12,6 +12,9 @@ module.exports = function (app) {
     // 현장 데이터 조회
     app.route('/v1/site/data/:sIdx').get(service.getSiteData);
 
+    // 현장 위도,경도 조회
+    app.route('/v1/site/coords/:sIdx').get(service.getSiteCoords);
+
     // 현장 배치 조회
     app.route('/v1/site/staff/:sIdx').get(service.getAssignedStaff)
 

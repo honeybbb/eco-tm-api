@@ -220,6 +220,12 @@ exports.getSiteData = async function (req, res) {
     }
 };
 
+exports.getSiteCoords = async function (req, res) {
+    let sIdx = req.params.sIdx;
+    let result = await siteModel.getSiteCoords(sIdx);
+    res.json({ result: true, data: result });
+}
+
 exports.setAccountBill = async function (req, res) {
     let dno = req.body.dno, //문서번호
         cIdx = req.body.cIdx,
