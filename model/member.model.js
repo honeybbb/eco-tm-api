@@ -1,6 +1,44 @@
 const pool = require("../config/mysql");
 const mysql = require("mysql2/promise");
 
+exports.registerManager = async function (cIdx, managerId, managerNm, password, email, phone, isMaster) {
+    let sql = "insert into new_tb_manager (cIdx, managerId, managerNm, password, email, phone, isMaster, regDt)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?, NOW())"
+
+    let aParameter = [cIdx, managerId, managerNm, password, email, phone, isMaster];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.getManagerList = async function (cIdx) {
+    let sql = "select * from new_tb_manager where cIdx = ?"
+    let aParameter = [cIdx];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.deleteManager = async function (managerId) {
+    let sql = "delete from new_tb_manager where managerId = ?"
+    let aParameter = [managerId];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.getMemberList = async function (cIdx) {
     let sql = "select m.*, case when status = 0 then '재직' when status = 1 then '퇴사' else '-' end as `status`,"
     // sql += " mc.jsonData as wage,"
@@ -62,8 +100,8 @@ exports.getMemberData = async function (id) {
                     CASE WHEN mc.idx IS NOT NULL THEN
                         JSON_OBJECT(
                             'contractData', mc.jsonData,
-                            'startDt', mc.startDt,
-                            'endDt', mc.endDt,
+                            'startDt', mc.contractStartDt,
+                            'endDt', mc.contractEndDt,
                             'monthWorkTime', mc.month_work_time,
                             'dayWorkTime', mc.day_work_time
                         )
@@ -335,7 +373,7 @@ exports.setMemberOff = async function (mIdx, sIdx, startDt, endDt, reason) {
 }
 
 exports.getMemberOff = async function (cIdx, startDt, endDt) {
-    let sql = "select mo.idx, m.name as `staff`,"
+    let sql = "select mo.idx, m.name as `staff`, mo.sIdx,"
     sql += " DATE_FORMAT(mo.regDt, '%Y-%m-%d') AS reqDate,"
     sql += " mo.startDt, mo.endDt, DATEDIFF(endDt, startDt) + 1 as `days`,"
     sql += " (select name from new_tb_site where idx = mo.sIdx) as  `site`,"
@@ -517,7 +555,7 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
         // contract 데이터에 위에서 만든 new_mIdx를 사용합니다.
         let sqlContract = `
             INSERT INTO new_tb_member_contract 
-            (mIdx, sIdx, type, jsonData, startDt, endDt, bigo)
+            (mIdx, sIdx, type, jsonData, contractStartDt, contractEndDt, bigo)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         `;
         let paramContract = [
@@ -691,3 +729,15 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
         connection.release();
     }
 };
+
+exports.deleteMember = async function (mId) {
+    let sql = "delete from new_tb_member where id = ?"
+    let aParameter = [mId];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}

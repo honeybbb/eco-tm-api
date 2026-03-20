@@ -8,19 +8,6 @@ module.exports = function (app) {
 
     app.route('/v1/menu/update/:companyNo').put(service.updateMenus);
 
-    /* ======= 공지 관련 ======= */
-    //공지 리스트
-    app.route('/v1/notice/list').get(service.getNoticeList)
-
-    //공지 조회
-    app.route('/v1/notice/data').get(service.getNoticeData)
-
-    //공지 등록
-    app.route('/v1/notice/register').post(service.setNotice);
-
-    //공지 삭제
-    app.route('/v1/notice/remove').delete(service.removeNotice);
-
     /* ======= 코드 관련 ======= */
 
     //기본 코드 조회

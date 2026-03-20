@@ -50,6 +50,9 @@ var contractRoutes = require("./controller/contract.controller");
 contractRoutes(app);
  */
 
+var noticeRoutes = require("./controller/notice.controller");
+noticeRoutes(app);
+
 var uploadRoutes = require("./controller/upload.controller");
 uploadRoutes(app);
 

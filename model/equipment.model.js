@@ -2,14 +2,13 @@ const mysql = require("mysql");
 const pool = require("../config/mysql");
 
 
-exports.setEquipment = async function (cIdx, name, type, model, imgPath, serialNo, purchaseDt, status, bigo) {
-    let sql = "insert into new_tb_equipment (cIdx, name, type, model, serialNo, purchaseDt, status, bigo)"
-    sql += " values (?, ?, ?, ?, ?, ?, ?, ?)"
-    let aParameter = [cIdx, name, type, model, imgPath, serialNo, purchaseDt, status, bigo];
+exports.setEquipment = async function (cIdx, name, type, model, qty, serialNo, purchaseDt, status, bigo) {
+    let sql = "insert into new_tb_equipment (cIdx, name, type, model, qty, serialNo, purchaseDt, status, bigo)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    let aParameter = [cIdx, name, type, model, qty, serialNo, purchaseDt, status, bigo];
 
-    let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -52,9 +51,9 @@ exports.getEquipmentData = async function (idx) {
     }
 }
 
-exports.setEquipmentSite = async function (eqIdx, sIdx, assignDt, bigo, status) {
+exports.setEquipmentSite = async function (eqIdx, sIdx, qty, assignDt, nextCheckDt,  bigo, status) {
     let sql = "insert into new_tb_equipment_assignment (eqIdx, sIdx, assignDt, bigo, status) values (?, ?, ?, ?, ?)"
-    let aParameter = [eqIdx, sIdx, assignDt, bigo, status];
+    let aParameter = [eqIdx, sIdx, assignDt, qty, bigo, status];
 
     let query = mysql.format(sql, aParameter);
     try {
@@ -63,5 +62,23 @@ exports.setEquipmentSite = async function (eqIdx, sIdx, assignDt, bigo, status) 
     }catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
+    }
+}
+
+exports.updateEquipmentSite = async function (assignIdx, qty, status, nextCheckDt, bigo) {
+    try {
+        let sql = "UPDATE new_tb_equipment_assignment"
+        sql += " SET qty = COALESCE(?, qty),"
+        sql += " status = COALESCE(?, status),"
+        sql += " nextCheckDt = COALESCE(?, nextCheckDt),"
+        sql += " bigo = ?"
+        sql += " WHERE idx = ? AND status = 1";
+
+        let aParameter = [qty, status, nextCheckDt, bigo, assignIdx];
+        let [res] = await pool.query(sql, aParameter);
+        return res
+    } catch (e) {
+        console.error('updateEquipmentSite err', e)
+        return { data: '-9999' }
     }
 }

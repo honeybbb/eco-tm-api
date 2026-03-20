@@ -3,6 +3,15 @@
 const service = require("../service/member.service");
 
 module.exports = function (app) {
+    // 관리자 등록
+    app.route('/v1/manager/register').post(service.registerManager);
+
+    //관리자 조회
+    app.route('/v1/manager/list/:cIdx').get(service.getManagerList);
+
+    //관리자 삭제
+    app.route('/v1/manager/:managerId').delete(service.deleteManager);
+
     //직원 리스트 조회
     app.route('/v1/member/list/:cIdx').get(service.getMemberList);
 
@@ -14,6 +23,9 @@ module.exports = function (app) {
     app.route('/v1/member/register').post(service.registerFullMember);
 
     app.route('/v1/member/data/:id').put(service.updateMemberData);
+
+    //직원 삭제
+    app.route('/v1/member/:id').delete(service.deleteMember);
 
     //직원 연차 조회
     app.route('/v1/member/annual/list').get(service.getMemberLeave);

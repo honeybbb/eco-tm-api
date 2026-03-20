@@ -30,54 +30,6 @@ exports.updateMenus = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
-exports.getNoticeList = async function (req, res) {
-    let result = await etcModel.getNoticeList();
-
-    res.json({'result': true, 'data': result})
-}
-
-exports.getNoticeData = async function(req, res) {
-    let idx = req.params.idx;
-
-    let result = await etcModel.getNoticeData(idx);
-
-    res.json({'result': true, 'data': result})
-}
-
-exports.setNotice = async function (req, res) {
-    let must = req.body.must,
-        type = req.body.type,
-        target = req.body.target,
-        title = req.body.title,
-        content = req.body.content,
-        author = req.body.author,
-        regDt = new Date();
-
-    try {
-        let result = await etcModel.setNotice(must, type, target, title, content, author, regDt);
-
-        res.json({'result': true, 'data': result})
-
-    }catch(err) {
-        res.json({'result': false, 'msg': '공지 등록에 실패했습니다.'})
-    }
-
-}
-
-exports.removeNotice = async function (req, res) {
-    let idx = req.query.idx,
-        author = req.query.author;
-
-    try {
-        let result = await etcModel.removeNotice(idx, author);
-
-        res.json({'result': true, 'data': result})
-
-    }catch(err) {
-        res.json({'result': false, 'msg': '공지 삭제에 실패했습니다.'})
-    }
-}
-
 exports.getBaseCode = async function (req, res) {
     let cIdx = req.params.cIdx;
     if(!cIdx) return res.json({'result': false, 'msg':'회사 정보가 없습니다.'});

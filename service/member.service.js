@@ -5,6 +5,42 @@ const {hashPassword} = require("../utils/password");
 const bcrypt  = require("bcrypt");
 const xlsx = require("xlsx");
 
+//관리자 등록
+exports.registerManager = async function (req, res) {
+    let cIdx = req.body.cIdx,
+        managerId = req.body.managerId,
+        managerNm = req.body.managerNm,
+        password = req.body.password,
+        email = req.body.email,
+        phone = req.body.phone,
+        isMaster = req.body.isMaster;
+
+    const hash = await bcrypt.hash(req.body.password, 10);
+
+    if(!cIdx) return res.json({'result': false, 'msg':'회사 정보가 없습니다.'});
+    if(!managerId) return res.json({'result': false, 'msg':'관리자 아이디가 없습니다.'});
+
+    let result = await memberModel.registerManager(cIdx, managerId, managerNm, hash, email, phone, isMaster);
+
+    res.json({'result': true, 'data': result})
+}
+
+exports.getManagerList = async function (req, res) {
+    let cIdx = req.params.cIdx;
+
+    let result = await memberModel.getManagerList(cIdx);
+
+    res.json({'result': true, 'data': result})
+}
+
+exports.deleteManager = async function (req, res) {
+    let managerId = req.params.managerId;
+
+    let result = await memberModel.deleteManager(managerId);
+
+    res.json({'result': true, 'data': result})
+}
+
 //직원 리스트 조회
 exports.getMemberList = async function (req, res) {
     let cIdx = req.params.cIdx || 1;
@@ -213,7 +249,6 @@ exports.getMemberOff = async function (req, res) {
         endDt = req.query.endDt;
 
     let result = await memberModel.getMemberOff(cIdx, startDt, endDt);
-    console.log(result, 'result')
 
     res.json({'result': true, 'data': result})
 }
@@ -300,7 +335,7 @@ exports.registerFullMember = async function (req, res) {
             gender: body.gender,
             email: body.email,
             disability: body.disability,
-            disability_date: body.disability_date,
+            disability_date: body.disability_date || '',
             disability_grade: body.disability_grade,
             defector: body.defector,
             patriot: body.patriot,
@@ -309,13 +344,13 @@ exports.registerFullMember = async function (req, res) {
             foreigner: body.foreigner,
             nationality: body.nationality,
             visa_code: body.visa_code,
-            visa_date: body.visa_date,
+            visa_date: body.visa_date || '',
             bank: body.bankName,
             accountNumber: body.accountNumber,
             inDate: body.joinDate,
-            outDate: body.endDate, // 혹은 body.outDate
+            outDate: body.outDate || '', // 혹은 body.outDate
             outReason: body.endReason, // 필요시 추가
-            addr: body.address,
+            address: body.address,
             bigo: body.bigo
         };
 
@@ -527,3 +562,11 @@ exports.uploadExcel = async function (req, res) {
         res.status(500).json({ result: false, message: '서버 에러' });
     }
 };
+
+exports.deleteMember = async function (req, res) {
+    let mId = req.params.id;
+    console.log(mId, 'deleteMember')
+
+    let result = await memberModel.deleteMember(mId);
+    res.json({'result': true, 'data': result});
+}
