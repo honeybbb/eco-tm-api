@@ -213,91 +213,112 @@ exports.getPayrollMonth = async function (year, month) {
 }
 
 exports.getPayrollCalculate = async function (year, month) {
-    let sql = "select"
-    sql += " m.idx,"
-    sql += " m.id,"
-    sql += " m.type,"
-    sql += " (select name from new_tb_site where ma.sIdx = idx) as siteName,"
-    sql += " (select idx from new_tb_site where ma.sIdx = idx) as sIdx,"
-    sql += " (select itemNm from new_tb_code where m.position = itemCd) as role,"
-    sql += " (select payment_day from new_tb_site where idx = ma.sIdx) as payment_day,"
-    sql += " m.name as staff,"
+    // workedDays 서브쿼리 — 반복 사용
+    const workedDaysSub = `
+    SELECT COUNT(DISTINCT DATE(workStartDt))
+    FROM new_tb_work
+    WHERE mIdx = m.idx
+    AND YEAR(workStartDt) = ? AND MONTH(workStartDt) = ?
+    AND workType IN ('work', 'annual', 'holiday', 'off')
+  `
 
-    // 1. 결근 일수 (absentDays)
-    sql += " ("
-    sql += "   SELECT COUNT(DISTINCT DATE(workStartDt)) FROM new_tb_work"
-    sql += "   WHERE mIdx = m.idx"
-    sql += "   AND YEAR(workStartDt) = ? AND MONTH(workStartDt) = ?"
-    sql += "   AND workType = 'absent'"
-    sql += " ) as absentDays,"
+    let sql = `
+    SELECT
+      m.idx,
+      m.id,
+      m.type,
+      (SELECT name FROM new_tb_site WHERE ma.sIdx = idx) AS siteName,
+      (SELECT idx  FROM new_tb_site WHERE ma.sIdx = idx) AS sIdx,
+      (SELECT itemNm FROM new_tb_code WHERE m.position = itemCd) AS role,
+      (SELECT payment_day FROM new_tb_site WHERE idx = ma.sIdx) AS payment_day,
+      m.name AS staff,
 
-    // 2. 기준 근무일수 (scheduledDays): 근태 기록이 없으면 계약 정보(mc)에서 가져옵니다.
-    sql += " ("
-    sql += "   SELECT CASE"
-    sql += "     WHEN COUNT(idx) > 0 THEN COUNT(DISTINCT DATE(workStartDt))"
-    sql += "     ELSE IF(IFNULL(mc.day_work_time, 0) > 0, ROUND(mc.month_work_time / mc.day_work_time, 0), 0)"
-    sql += "   END"
-    sql += "   FROM new_tb_work"
-    sql += "   WHERE mIdx = m.idx"
-    sql += "   AND YEAR(workStartDt) = ? AND MONTH(workStartDt) = ?"
-    sql += "   AND workType IN ('work', 'annual', 'absent','holiday')"
-    sql += " ) as scheduledDays,"
+      -- 1. 결근 일수
+      (SELECT COUNT(DISTINCT DATE(workStartDt)) FROM new_tb_work
+       WHERE mIdx = m.idx
+       AND YEAR(workStartDt) = ? AND MONTH(workStartDt) = ?
+       AND workType = 'absent'
+      ) AS absentDays,
 
-    // ★ 3. 실제 일한 일수 (workedDays) [수정됨]
-    // 계약 정보로 대체하는 로직(ELSE)을 완전히 제거했습니다.
-    // 'work', 'annual' 기록만 카운트하며, 기록이 아예 없으면 자동으로 0이 반환됩니다.
-    sql += " ("
-    sql += "   SELECT COUNT(DISTINCT DATE(workStartDt))"
-    sql += "   FROM new_tb_work"
-    sql += "   WHERE mIdx = m.idx"
-    sql += "   AND YEAR(workStartDt) = ? AND MONTH(workStartDt) = ?"
-    sql += "   AND workType IN ('work', 'annual','holiday')"
-    sql += " ) as workedDays,"
+      -- 2. 기준 근무일수
+      (SELECT CASE
+         WHEN COUNT(idx) > 0 THEN COUNT(DISTINCT DATE(workStartDt))
+         ELSE IF(IFNULL(mc.day_work_time, 0) > 0,
+                 ROUND(mc.month_work_time / mc.day_work_time, 0), 0)
+       END
+       FROM new_tb_work
+       WHERE mIdx = m.idx
+       AND YEAR(workStartDt) = ? AND MONTH(workStartDt) = ?
+       AND workType IN ('work', 'annual', 'absent', 'holiday')
+      ) AS scheduledDays,
 
-    // 4. [급여 및 공제 내역]
-    sql += " IFNULL(mpm.payItems, bs.payItems) as payItems,"
-    sql += " IFNULL(mpm.deductionItems, bs.deductionItems) as deductionItems,"
-    sql += " IFNULL(mpm.grossPay, bs.grossPay) as grossPay,"
-    sql += " IFNULL(mpm.checkedItems, bs.checkedItems) as checkedItems,"
-    sql += " IFNULL(mpm.deductions, 0) as totalDeduction,"
-    sql += " IFNULL(mpm.netPay, 0) as netPay,"
-    sql += " IF(mpm.idx IS NOT NULL, 1, 0) as status"
+      -- 3. 실제 근무일수
+      (${workedDaysSub}) AS workedDays,
 
-    sql += " from new_tb_member m";
+      -- 4. 지급/공제 — 근무일 0이면 전부 0/NULL 처리
+      CASE WHEN (${workedDaysSub}) = 0 THEN NULL
+           ELSE IFNULL(mpm.payItems,       bs.payItems)
+      END AS payItems,
 
-    // --- [JOIN 1] 연/월 급여 내역 (mpm) ---
-    sql += " left join new_tb_member_payroll_month mpm ON mpm.idx = (";
-    sql += "     SELECT idx FROM new_tb_member_payroll_month";
-    sql += "     WHERE mIdx = m.idx AND year = ? AND month = ?";
-    sql += "     ORDER BY regDt DESC LIMIT 1";
-    sql += " )";
+      CASE WHEN (${workedDaysSub}) = 0 THEN NULL
+           ELSE IFNULL(mpm.deductionItems, bs.deductionItems)
+      END AS deductionItems,
 
-    // --- [JOIN 2] 최신 기본급 설정 (bs) ---
-    sql += " left join new_tb_member_base_salary bs ON bs.idx = (";
-    sql += "     SELECT idx FROM new_tb_member_base_salary";
-    sql += "     WHERE mIdx = m.idx ORDER BY regDt DESC LIMIT 1";
-    sql += " )";
+      CASE WHEN (${workedDaysSub}) = 0 THEN 0
+           ELSE IFNULL(mpm.grossPay,       bs.grossPay)
+      END AS grossPay,
 
-    // --- [JOIN 3] 최신 근로계약 정보 (mc) ---
-    sql += " left join new_tb_member_contract mc ON mc.idx = (";
-    sql += "     SELECT idx FROM new_tb_member_contract";
-    sql += "     WHERE mIdx = m.idx ORDER BY regDt DESC LIMIT 1";
-    sql += " )";
+      CASE WHEN (${workedDaysSub}) = 0 THEN NULL
+           ELSE IFNULL(mpm.checkedItems,   bs.checkedItems)
+      END AS checkedItems,
 
-    sql += " left join new_tb_member_assignment ma on ma.mIdx = m.idx";
-    sql += " left join new_tb_site s on s.idx = ma.sIdx";
+      IFNULL(mpm.deductions, 0) AS totalDeduction,
+      IFNULL(mpm.netPay,     0) AS netPay,
+      IF(mpm.idx IS NOT NULL, 1, 0) AS status
 
-    sql += " order by s.name, m.name";
+    FROM new_tb_member m
 
-    // 파라미터 매칭: absent(2) + scheduled(2) + worked(2) + mpm조인(2) = 총 8개
-    let aParameter = [year, month, year, month, year, month, year, month];
+    LEFT JOIN new_tb_member_payroll_month mpm ON mpm.idx = (
+      SELECT idx FROM new_tb_member_payroll_month
+      WHERE mIdx = m.idx AND year = ? AND month = ?
+      ORDER BY regDt DESC LIMIT 1
+    )
+    LEFT JOIN new_tb_member_base_salary bs ON bs.idx = (
+      SELECT idx FROM new_tb_member_base_salary
+      WHERE mIdx = m.idx ORDER BY regDt DESC LIMIT 1
+    )
+    LEFT JOIN new_tb_member_contract mc ON mc.idx = (
+      SELECT idx FROM new_tb_member_contract
+      WHERE mIdx = m.idx ORDER BY regDt DESC LIMIT 1
+    )
+    LEFT JOIN new_tb_member_assignment ma ON ma.mIdx = m.idx
+    LEFT JOIN new_tb_site s ON s.idx = ma.sIdx
+
+    ORDER BY s.name, m.name
+  `
+
+    // 파라미터 순서:
+    // absentDays(2) + scheduledDays(2)
+    // + workedDays AS(2) + payItems CASE(2) + deductionItems CASE(2)
+    // + grossPay CASE(2) + checkedItems CASE(2)
+    // + mpm JOIN(2) = 총 16개
+    const aParameter = [
+        year, month,  // absentDays
+        year, month,  // scheduledDays
+        year, month,  // workedDays (AS)
+        year, month,  // payItems CASE
+        year, month,  // deductionItems CASE
+        year, month,  // grossPay CASE
+        year, month,  // checkedItems CASE
+        year, month,  // mpm JOIN
+    ]
 
     try {
-        let [res] = await pool.query(sql, aParameter);
-        return res;
+        const [res] = await pool.query(sql, aParameter)
+        return res
     } catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
+        console.log('db err', e)
+        return { data: '-9999' }
     }
 }
 
