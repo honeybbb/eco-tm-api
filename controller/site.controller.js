@@ -9,6 +9,9 @@ module.exports = function (app) {
     //현장 비고 저장
     app.route('/v1/site/bigo/register').post(service.setSiteBigo);
 
+    //현장 비품 예산 설정
+    app.route('/v1/site/order/budgets').post(service.setSiteOrderBudgets);
+
     // 현장 데이터 조회
     app.route('/v1/site/data/:sIdx').get(service.getSiteData);
 

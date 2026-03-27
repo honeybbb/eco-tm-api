@@ -42,12 +42,21 @@ exports.deleteManager = async function (managerId) {
 exports.getMemberList = async function (cIdx) {
     let sql = "select m.*, case when status = 0 then '재직' when status = 1 then '퇴사' else '-' end as `status`,"
     // sql += " mc.jsonData as wage,"
-    sql += " ms.sIdx, ms.name as `siteName`,"
-    sql += " c.itemNm as `type`, c2.itemNm as `position`, c3.option `badgeColor`, c3.itemNm as `disability_grade`"
+    sql += " ms.sIdx, ms.name as `siteName`, mc.contractEndDt as `contract`,"
+    sql += " c.itemNm as `type`, c2.itemNm as `position`, c3.option as `badgeColor`, c3.itemNm as `disability_grade`"
     sql += " from new_tb_member m"
-    sql += " left join new_tb_member_contract mc on mc.mIdx = m.idx"
+
+    // 직원별로 가장 최근(idx가 제일 큰) 계약서 딱 1건만 찾아내서 조인
+    sql += " left join ("
+    sql += "   select c1.* from new_tb_member_contract c1"
+    sql += "   inner join ("
+    sql += "     select mIdx, max(idx) as max_idx from new_tb_member_contract group by mIdx"
+    sql += "   ) c2 on c1.idx = c2.max_idx"
+    sql += " ) mc on mc.mIdx = m.idx"
+
     sql += " left join (select b.*, s.name from new_tb_member_assignment b left join new_tb_site s on s.idx = b.sIdx) as `ms` on ms.mIdx = m.idx"
-    sql += " left join new_tb_code c on c.itemCd = m.type left join new_tb_code c2 on c2.itemCd = m.position";
+    sql += " left join new_tb_code c on c.itemCd = m.type "
+    sql += " left join new_tb_code c2 on c2.itemCd = m.position"
     sql += " left join new_tb_code c3 on c3.itemCd = m.disability_grade"
     sql += " where m.cIdx in (?)"
     sql += " order by ms.sIdx desc, m.idx"
@@ -100,8 +109,8 @@ exports.getMemberData = async function (id) {
                     CASE WHEN mc.idx IS NOT NULL THEN
                         JSON_OBJECT(
                             'contractData', mc.jsonData,
-                            'startDt', mc.contractStartDt,
-                            'endDt', mc.contractEndDt,
+                            'contractStartDt', mc.contractStartDt,
+                            'contractEndDt', mc.contractEndDt,
                             'monthWorkTime', mc.month_work_time,
                             'dayWorkTime', mc.day_work_time
                         )
@@ -532,17 +541,26 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
         // -----------------------------------------------------
         let sqlMember = `
             INSERT INTO new_tb_member 
-            (cIdx, type, name, id, password, birthDt, phone, position, gender, email,
-             disability, disability_date, disability_grade, defector, patriot, intern, beneficiary, foreigner, nationality, visa_code, visa_date,
+            (cIdx, type, name, id, password, birthDt, rrn, phone, position, gender, email,
+             disability, disability_date, disability_grade, defector, patriot, intern, beneficiary,
+             foreigner, nationality, visa_code, visa_date,
+             etc_name_1, etc_value_1, etc_name_2, etc_value_2, etc_name_3, etc_value_3,
              bank, accountNumber, inDate, outDate, outReason, address, bigo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?)
         `;
 
         let paramMember = [
-            member.cIdx, member.type, member.name, member.id, member.password, member.birthDt,
+            member.cIdx, member.type, member.name, member.id, member.password, member.birthDt, member.rrn,
             member.phone, member.position, member.gender, member.email,
             member.disability, member.disability_date, member.disability_grade, member.defector, member.patriot, member.intern,
             member.beneficiary, member.foreigner, member.nationality, member.visa_code, member.visa_date,
+            member.etc_name_1, member.etc_value_1,
+            member.etc_name_2, member.etc_value_2,
+            member.etc_name_3, member.etc_value_3,
             member.bank, member.accountNumber, member.inDate, member.outDate, member.outReason, member.address, member.bigo
         ];
 

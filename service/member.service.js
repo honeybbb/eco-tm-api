@@ -1,8 +1,9 @@
 const memberModel = require("../model/member.model")
 const contractModel = require("../model/contract.model")
 const workModel = require("../model/work.model")
-const {hashPassword} = require("../utils/password");
 const bcrypt  = require("bcrypt");
+const crypto = require("crypto");
+const { encryptRRN, decryptRRN, hashPassword} = require("../utils/password");
 const xlsx = require("xlsx");
 
 //관리자 등록
@@ -318,9 +319,14 @@ exports.registerFullMember = async function (req, res) {
         const body = req.body;
         console.log('전체 등록 요청 데이터:', body);
 
-        // 1. 비밀번호 해시화
+        // 비밀번호 해시화
         const hash = await bcrypt.hash(body.password, 10);
 
+        // 주민번호 해시화
+        const fullRrn = (body.firstNumber && body.lastNumber)
+            ? `${body.firstNumber}-${body.lastNumber}`
+            : null;
+        const encryptedRrn = encryptRRN(fullRrn);
         // 2. 모델에 넘길 데이터 구조화
         // (1) Member 데이터
         const memberData = {
@@ -330,6 +336,7 @@ exports.registerFullMember = async function (req, res) {
             id: body.id,
             password: hash, // 해시된 비밀번호
             birthDt: body.birthDate,
+            rrn: encryptedRrn, // 해시된 주민번호
             phone: body.phone,
             position: body.position,
             gender: body.gender,
@@ -345,6 +352,12 @@ exports.registerFullMember = async function (req, res) {
             nationality: body.nationality,
             visa_code: body.visa_code,
             visa_date: body.visa_date || '',
+            etc_name_1: body.etc_name_1,
+            etc_value_1: body.etc_value_1,
+            etc_name_2: body.etc_name_2,
+            etc_value_2: body.etc_value_2,
+            etc_name_3: body.etc_name_3,
+            etc_value_3: body.etc_value_3,
             bank: body.bankName,
             accountNumber: body.accountNumber,
             inDate: body.joinDate,

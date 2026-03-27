@@ -173,9 +173,10 @@ exports.getWageCode = async function (cIdx) {
     sql += " CASE groupCd"
     sql += "    WHEN '04001' THEN '지급항목'"
     sql += "    WHEN '04002' THEN '공제항목'"
+    sql += "    WHEN '04003' THEN '정산항목'"
     sql += " END AS groupNm"
     sql += " FROM new_tb_code"
-    sql += " WHERE groupCd IN ('04001', '04002') and cIdx in (?)"
+    sql += " WHERE groupCd IN ('04001', '04002','04003') and cIdx in (?)"
     sql += " ORDER BY sort";
     let aParameter = [cIdx];
 
@@ -453,9 +454,9 @@ exports.getOrders = async function () {
     }
 };
 
-exports.updateOrderStatus = async function (sIdx, oIdx, mIdx, status) {
-    let sql = "update new_tb_orders set status = ? WHERE sIdx = ? and idx = ? and mIdx = ?";
-    let aParameter = [status, sIdx, oIdx, mIdx];
+exports.updateOrderStatus = async function (sIdx, oIdx, status, managerId) {
+    let sql = "update new_tb_orders set status = ?, modDt = NOW() WHERE sIdx = ? and idx = ? and managerId = ?";
+    let aParameter = [status, sIdx, oIdx, managerId];
 
     try {
         let [res] = await pool.query(sql, aParameter);

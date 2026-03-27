@@ -19,13 +19,14 @@ exports.setSettleData = async function (req, res) {
     const {
         idx, year, month, type, docNo, billingDt,
         subTotal, vatAmount, grandTotal,
-        billingData, payrollData
+        billingData, payrollData, viewConfig
     } = req.body;
 
     try {
         // JSON 데이터를 DB에 넣기 위해 문자열로 변환
         const strBillingData = JSON.stringify(billingData);
         const strPayrollData = JSON.stringify(payrollData);
+        const strViewConfig  = JSON.stringify(viewConfig || {}); // viewConfig만 남김
 
         if (idx) {
             // ============================================
@@ -33,7 +34,8 @@ exports.setSettleData = async function (req, res) {
             // ============================================
             let result = await settleModel.updateSettleData(
                 year, month, type, docNo, billingDt,
-                subTotal, vatAmount, grandTotal, strBillingData, strPayrollData, idx, sIdx);
+                subTotal, vatAmount, grandTotal, strBillingData, strPayrollData, strViewConfig,
+                idx, sIdx);
             return res.json({ result: true, data: result });
 
         } else {
@@ -49,7 +51,7 @@ exports.setSettleData = async function (req, res) {
             let result = await settleModel.setSettleData(
                 sIdx, cIdx, year, month, docNo, type, billingDt,
                 subTotal, vatAmount, grandTotal,
-                strBillingData, strPayrollData)
+                strBillingData, strPayrollData, strViewConfig)
 
             return res.json({ result: true, data: result });
         }

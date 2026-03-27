@@ -17,11 +17,13 @@ exports.setBaseSalary = async function (mIdx, sIdx, year, paymentList, deduction
 }
 
 //직원급여조회
+/*
 exports.getBaseSalary = async function () {
     let sql = "select"
     sql += " m.idx,"    //idx
     sql += " m.id," //사번
     sql += " m.type,"   //직원구분
+    sql += " m.birthDt," //생년월일 가져와야 법정기준연령 계산가능함
     sql += " (select name from new_tb_site where ma.sIdx = idx) as siteName,"   //현장명
     sql += " (select idx from new_tb_site where ma.sIdx = idx) as sIdx,"    //현장idx
     sql += " (select itemNm from new_tb_code where m.position = itemCd) as role,"   //직책
@@ -44,6 +46,50 @@ exports.getBaseSalary = async function () {
         let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+ */
+exports.getBaseSalary = async function () {
+    let sql = "select";
+    sql += " m.idx,";
+    sql += " m.id,";
+    sql += " m.type,";
+    sql += " m.birthDt,";
+    sql += " (select name from new_tb_site where ma.sIdx = idx) as siteName,";
+    sql += " (select idx from new_tb_site where ma.sIdx = idx) as sIdx,";
+    sql += " (select itemNm from new_tb_code where m.position = itemCd) as role,";
+    sql += " m.name as staff,";
+
+    // 1. 급여 항목 데이터 매핑
+    sql += " IFNULL(mbs.payItems, mc.jsonData) as payItems,";
+    sql += " IFNULL(mbs.deductionItems, JSON_OBJECT()) as deductionItems,";
+    sql += " IFNULL(mbs.checkedItems, JSON_OBJECT()) as checkedItems,";
+
+    // 2. 상태값(status) 처리: mbs 데이터가 없으면(NULL이면) 0, 있으면 1(또는 mbs의 기존 상태값)
+    // mbs.idx가 없다는 것은 계약서에서 데이터를 끌어왔다는 의미이므로 0을 반환합니다.
+    sql += " CASE WHEN mbs.idx IS NULL THEN 0 ELSE 1 END as status,";
+
+    sql += " mbs.grossPay, mbs.deductions AS totalDeduction, mbs.netPay";
+    sql += " from new_tb_member m";
+
+    // 기본급 정보 (최신 1건)
+    sql += " left join new_tb_member_base_salary mbs ON mbs.idx = (SELECT idx FROM new_tb_member_base_salary WHERE mIdx = m.idx ORDER BY regDt DESC LIMIT 1)";
+
+    // 계약서 정보 (최신 1건)
+    sql += " left join new_tb_member_contract mc ON mc.idx = (SELECT idx FROM new_tb_member_contract WHERE mIdx = m.idx ORDER BY regDt DESC LIMIT 1)";
+
+    sql += " left join new_tb_site s on s.idx = mbs.sIdx";
+    sql += " left join new_tb_member_assignment ma on ma.mIdx = m.idx";
+    sql += " order by s.idx, m.idx";
+
+    let aParameter = [];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
     }
@@ -145,6 +191,9 @@ exports.getPayrollMonth = async function (year, month) {
             m.id, 
             m.type, 
             m.name AS staff,
+            m.rrn as personalNo,
+            m.inDate AS inDate,
+            m.outDate AS outDate,
             s.idx AS sIdx,
             s.name AS siteName,
             s.payment_day,

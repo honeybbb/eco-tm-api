@@ -47,4 +47,6 @@ module.exports = function (app) {
 
     //청소용품 및 피복용품 신청 리스트
     app.route('/v1/code/item/order').get(service.getOrders);
+
+    app.route('/v1/code/item/order/status').put(service.updateOrderStatus);
 }

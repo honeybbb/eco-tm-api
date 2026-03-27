@@ -17,6 +17,15 @@ exports.setSiteBigo = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
+exports.setSiteOrderBudgets = async function (req, res) {
+    let sIdx = req.body.cIdx,
+        value = req.body.value,
+        admin = req.body.admin;
+
+    let result = await siteModel.setSiteOrderBudgets(sIdx, value, admin);
+    res.json({'result': true, 'data': result})
+}
+
 exports.setSiteData = async function (req, res) {
     let cIdx = req.body.cIdx,
         name = req.body.name,

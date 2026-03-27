@@ -233,9 +233,9 @@ exports.getOrders = async function (req, res) {
 exports.updateOrderStatus = async function (req, res) {
     let sIdx = req.body.sIdx,
         oIdx = req.body.oIdx,
-        mIdx = req.body.mIdx,
-        status = req.body.status;
+        status = req.body.status,
+        managerId = req.body.managerId;
 
-    let result = await etcModel.updateOrderStatus(sIdx, oIdx, mIdx, status);
+    let result = await etcModel.updateOrderStatus(sIdx, oIdx, status, managerId);
     res.json({'result': true, 'data': result})
 }

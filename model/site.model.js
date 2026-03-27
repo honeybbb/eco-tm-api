@@ -1,6 +1,7 @@
 const pool = require("../config/mysql");
 const mysql = require("mysql2/promise")
 
+/*
 exports.getSiteList = async function (cIdx) {
     let sql = "select s.*, case when s.status = 'Y' then '운영 중' else '계약 종료' end as `status`,"
     sql += " CONCAT(DATE_FORMAT(sc.startDt, '%Y-%m-%d'), ' ~ ', DATE_FORMAT(sc.endDt, '%Y-%m-%d')) AS contract,"
@@ -21,9 +22,63 @@ exports.getSiteList = async function (cIdx) {
     }
 }
 
+ */
+exports.getSiteList = async function (cIdx) {
+    let sql = `
+        SELECT s.*,
+               CASE WHEN s.status = 'Y' THEN '운영 중' ELSE '계약 종료' END AS status,
+               (
+                   SELECT JSON_ARRAYAGG(
+                       JSON_OBJECT(
+                           'type', sc.type,
+                           'contract_period', CONCAT(DATE_FORMAT(sc.startDt, '%Y-%m-%d'), ' ~ ', DATE_FORMAT(sc.endDt, '%Y-%m-%d')),
+                           'total_cost', sc.total_cost,
+                           'jsonData', sc.jsonData,
+                           'staffDetail', sc.staffDetail
+                       )
+                   )
+                   FROM new_tb_site_contract sc
+                   INNER JOIN (
+                       -- 각 현장(sIdx) 및 구분(type)별로 가장 최신(MAX idx) 계약을 찾음
+                       SELECT MAX(idx) AS max_idx
+                       FROM new_tb_site_contract
+                       GROUP BY sIdx, type
+                   ) latest ON sc.idx = latest.max_idx
+                   WHERE sc.sIdx = s.idx
+               ) AS contracts
+        FROM new_tb_site s
+        WHERE s.cIdx = ?
+    `;
+
+    let aParameter = [cIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.setSiteBigo = async function (sIdx, bigo, admin) {
     let sql = "insert into new_tb_site_bigo (sIdx, bigo, admin_id) values (?, ?, ?)"
     let aParameter = [sIdx, bigo, admin];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.setSiteOrderBudgets = async function (sIdx, value, admin) {
+    let sql = "insert into new_tb_site_budget (sIdx, value, admin, regDt) values (?, ?, ?, NOW())";
+    sql += " ON DUPLICATE KEY UPDATE value = ?, managerId = ?, modDt = NOW()";
+
+    let aParameter = [sIdx, value, admin, value, admin];
 
     try {
         let [res] = await pool.query(sql, aParameter);
