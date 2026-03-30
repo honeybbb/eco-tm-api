@@ -57,7 +57,9 @@ exports.registerSiteWithContract = async function (req, res) {
             // site_id: req.body.site_id,
             // type: req.body.type,
             status: req.body.status,
-            area: req.body.area,
+            area: req.body.area,//연면적
+            areaUnder: req.body.areaUnder, //135
+            areaOver: req.body.areaOver,
             is_vat: req.body.is_vat,
             building_su: req.body.building_su,
             unit_su: req.body.unit_su,

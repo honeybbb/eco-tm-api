@@ -112,12 +112,15 @@ exports.saveSite = async function (site) {
             // [UPDATE]
             let sql = `
                 UPDATE new_tb_site 
-                SET sType=?, name=?, address=?, phone=?, building_su=?, unit_su=?, area=?,is_vat=?, director=?, director_phone=?, payment_day=?
+                SET sType=?, name=?, address=?, phone=?, building_su=?, unit_su=?, 
+                    area=?, areaUnder=?, areaOver=?, is_vat=?, 
+                    director=?, director_phone=?, payment_day=?
                 WHERE idx = ?
             `;
             let params = [
-                site.sType, site.name, site.address, site.phone, site.building_su,
-                site.unit_su, site.area, site.is_vat, site.director, site.director_phone, site.payment_day,
+                site.sType, site.name, site.address, site.phone, site.building_su, site.unit_su,
+                site.area, site.areaUnder, site.areaOver, site.is_vat,
+                site.director, site.director_phone, site.payment_day,
                 new_sIdx
             ];
             await connection.query(sql, params);
@@ -125,12 +128,13 @@ exports.saveSite = async function (site) {
             // [INSERT]
             let sql = `
                 INSERT INTO new_tb_site 
-                (cIdx, sType, name, address, phone, building_su, unit_su, area, is_vat, director, director_phone, payment_day) 
-                VALUES (?, ?,  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (cIdx, sType, name, address, phone, building_su, unit_su, area, areaUnider, areaOver, is_vat, director, director_phone, payment_day) 
+                VALUES (?, ?,  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             let params = [
-                site.cIdx, site.sType, site.name, site.address, site.phone, site.building_su,
-                site.unit_su, site.area, site.is_vat, site.director, site.director_phone, site.payment_day
+                site.cIdx, site.sType, site.name, site.address, site.phone, site.building_su, site.unit_su,
+                site.area, site.areaUnder, site.areaOver, site.is_vat,
+                site.director, site.director_phone, site.payment_day
             ];
             let result = await connection.query(sql, params);
             new_sIdx = result[0].insertId;

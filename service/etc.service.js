@@ -91,10 +91,10 @@ exports.updateBaseCode = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
-exports.getCompanyConfig = async function (req, res) {
+exports.getCompanyData = async function (req, res) {
     let idx = req.params.idx;
 
-    let result = await etcModel.getCompanyConfig(idx);
+    let result = await etcModel.getCompanyData(idx);
 
     res.json({'result': true, 'data': result})
 }

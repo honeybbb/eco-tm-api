@@ -153,14 +153,14 @@ exports.updateBaseCode = async function (itemCd, itemNm, useFl, option, sort, mo
     }
 }
 
-exports.getCompanyConfig = async function (cIdx) {
+exports.getCompanyData = async function (cIdx) {
     let sql = "select * from new_tb_config where idx in (?)"
     let aParameter = [cIdx];
 
-    let query = mysql.format(sql, aParameter);
+    //let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
-        return res;
+        let [res] = await pool.query(sql, aParameter);
+        return res[0];
     }catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
