@@ -44,7 +44,7 @@ exports.deleteManager = async function (req, res) {
 
 //직원 리스트 조회
 exports.getMemberList = async function (req, res) {
-    let cIdx = req.params.cIdx || 1;
+    let cIdx = req.user.cIdx || 1;
     try {
         let result = await memberModel.getMemberList(cIdx);
         const safeResult = result.map(member => {
@@ -69,12 +69,17 @@ exports.getMemberData = async function (req, res) {
 }
 
 exports.getMemberAvailable = async function (req, res) {
-    let sIdx = req.query.sIdx;
+    let cIdx = req.user.cIdx,
+        sIdx = req.query.sIdx;
 
-    let result = await memberModel.getMemberAvailable(sIdx);
-    result.forEach(member => { delete member.password;});
-
-    res.json({'result': true, 'data': result})
+    try {
+        let result = await memberModel.getMemberAvailable(sIdx, cIdx);
+        result.forEach(member => { delete member.password;});
+        res.json({'result': true, 'data': result})
+    } catch (e) {
+        console.error('getMemberAvailable Error:', e);
+        res.json({result: false, msg: '조회 중 오류가 발생했습니다.'});
+    }
 }
 
 exports.setMemberData1 = async function (req, res) {
@@ -335,14 +340,14 @@ exports.registerFullMember = async function (req, res) {
             name: body.name,
             id: body.id,
             password: hash, // 해시된 비밀번호
-            birthDt: body.birthDate,
+            birthDt: body.birthDate || null,
             rrn: encryptedRrn, // 해시된 주민번호
             phone: body.phone,
             position: body.position,
             gender: body.gender,
             email: body.email,
             disability: body.disability,
-            disability_date: body.disability_date || '',
+            disability_date: body.disability_date || null,
             disability_grade: body.disability_grade,
             defector: body.defector,
             patriot: body.patriot,
@@ -351,7 +356,7 @@ exports.registerFullMember = async function (req, res) {
             foreigner: body.foreigner,
             nationality: body.nationality,
             visa_code: body.visa_code,
-            visa_date: body.visa_date || '',
+            visa_date: body.visa_date || null,
             etc_name_1: body.etc_name_1,
             etc_value_1: body.etc_value_1,
             etc_name_2: body.etc_name_2,
@@ -360,8 +365,8 @@ exports.registerFullMember = async function (req, res) {
             etc_value_3: body.etc_value_3,
             bank: body.bankName,
             accountNumber: body.accountNumber,
-            inDate: body.joinDate,
-            outDate: body.outDate || '', // 혹은 body.outDate
+            inDate: body.joinDate || null,
+            outDate: body.outDate || null,
             outReason: body.endReason, // 필요시 추가
             address: body.address,
             bigo: body.bigo
@@ -372,8 +377,8 @@ exports.registerFullMember = async function (req, res) {
             sIdx: body.site,      // 현장 ID
             type: body.type,      // 계약 타입 (직원 구분 등)
             jsonData: JSON.stringify(body.wageInputs || {}), // 급여 정보 JSON화
-            startDt: body.joinDate,
-            endDt: body.endDate,
+            contractStartDt: body.contractData.contractStartDt || null,
+            contractEndDt: body.contractData.contractEndDt || null,
             bigo: body.bigo
         };
 
@@ -451,8 +456,8 @@ exports.updateMemberData = async function (req, res) {
             sIdx: body.sIdx,
             type: body.type,
             jsonData: JSON.stringify(body.wageInputs || {}),
-            startDt: body.joinDate,
-            endDt: body.endDate,
+            startDt: body.contractStartDt,
+            endDt: body.contractEndDt,
             bigo: body.bigo
         };
 

@@ -1,7 +1,7 @@
 const siteModel = require("../model/site.model");
 
 exports.getSiteList = async function (req, res) {
-    let cIdx = req.params.cIdx;
+    let cIdx = req.user.cIdx;
 
     let result = await siteModel.getSiteList(cIdx);
 
@@ -46,6 +46,7 @@ exports.setSiteData = async function (req, res) {
 
 exports.registerSiteWithContract = async function (req, res) {
     try {
+        console.log(req.body);
         // ====================================================
         // Step 1. 현장(Site) 데이터 준비
         // ====================================================
@@ -63,6 +64,7 @@ exports.registerSiteWithContract = async function (req, res) {
             is_vat: req.body.is_vat,
             building_su: req.body.building_su,
             unit_su: req.body.unit_su,
+            zipcode: req.body.postalCode,
             address: req.body.address,
             address_detail: req.body.addressDetail,
             payment_day: req.body.payment_day,
@@ -152,11 +154,12 @@ exports.registerBudget = async function (req, res) {
 }
 
 exports.getSiteBudget = async function (req, res) {
-    let sIdx = req.query.sIdx;
+    let sIdx = req.query.sIdx,
+        type = req.query.type;
 
     if(!sIdx) return res.json({ 'result': false, 'msg': '현장 인덱스 정보가 없습니다.' });
 
-    let result = await siteModel.getSiteBudget(sIdx);
+    let result = await siteModel.getSiteBudget(sIdx, type);
 
     res.json({ 'result': true, 'data': result });
 }

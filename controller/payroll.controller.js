@@ -1,10 +1,11 @@
 'use strict';
 
 const service = require("../service/payroll.service");
+const {verifyAdmin} = require("../middleware/auth");
 
 module.exports = function (app) {
     //직원 기본 급여 정보 조회
-    app.route('/v1/member/payroll').get(service.getBaseSalary);
+    app.route('/v1/member/payroll').get(verifyAdmin, service.getBaseSalary);
 
     //직원 기본 급여 등록
     app.route('/v1/member/base/salary/:mIdx').post(service.setBaseSalary);

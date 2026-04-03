@@ -52,15 +52,15 @@ exports.getBaseSalary = async function () {
 }
 
  */
-exports.getBaseSalary = async function () {
+exports.getBaseSalary = async function (cIdx) {
     let sql = "select";
     sql += " m.idx,";
     sql += " m.id,";
     sql += " m.type,";
     sql += " m.birthDt,";
-    sql += " (select name from new_tb_site where ma.sIdx = idx) as siteName,";
-    sql += " (select idx from new_tb_site where ma.sIdx = idx) as sIdx,";
-    sql += " (select itemNm from new_tb_code where m.position = itemCd) as role,";
+    sql += " (SELECT name FROM new_tb_site WHERE idx = ma.sIdx LIMIT 1) as siteName,";
+    sql += " ma.sIdx as sIdx,";
+    sql += " (SELECT itemNm FROM new_tb_code WHERE itemCd = m.position AND cIdx = m.cIdx LIMIT 1) as role,";
     sql += " m.name as staff,";
 
     // 1. 급여 항목 데이터 매핑
@@ -83,9 +83,10 @@ exports.getBaseSalary = async function () {
 
     sql += " left join new_tb_site s on s.idx = mbs.sIdx";
     sql += " left join new_tb_member_assignment ma on ma.mIdx = m.idx";
+    sql += " WHERE m.cIdx = ?";
     sql += " order by s.idx, m.idx";
 
-    let aParameter = [];
+    let aParameter = [cIdx];
     try {
         let [res] = await pool.query(sql, aParameter);
         return res;
@@ -184,16 +185,15 @@ exports.getPayrollMonthTemp = async function (year, month) {
 }
 
 //직원 급여 내역 조회 (일할 일수 반올림)
-exports.getPayrollMonth = async function (year, month) {
+exports.getPayrollMonth = async function (year, month, cIdx) {
     let sql = `
         SELECT 
             m.idx, 
             m.id, 
             m.type, 
             m.name AS staff,
+            m.birthDt AS birthDt,
             m.rrn as personalNo,
-            m.inDate AS inDate,
-            m.outDate AS outDate,
             s.idx AS sIdx,
             s.name AS siteName,
             s.payment_day,
@@ -221,7 +221,7 @@ exports.getPayrollMonth = async function (year, month) {
         FROM new_tb_member m
         
         /* 기본 정보 조인 */
-        LEFT JOIN new_tb_code c ON c.itemCd = m.position
+        LEFT JOIN new_tb_code c ON c.itemCd = m.position AND c.cIdx = m.cIdx
         LEFT JOIN new_tb_member_assignment ma ON ma.mIdx = m.idx
         LEFT JOIN new_tb_site s ON s.idx = ma.sIdx
 
@@ -245,12 +245,12 @@ exports.getPayrollMonth = async function (year, month) {
                 GROUP BY mIdx
             ) p2 ON p1.idx = p2.max_idx
         ) mpm ON mpm.mIdx = m.idx
-
+        WHERE m.cIdx = ?
         ORDER BY s.idx, m.idx
     `;
 
     // 파라미터 매칭: 근태 조인(2) + 급여 조인(2) = 총 4개
-    let aParameter = [year, month, year, month];
+    let aParameter = [year, month, year, month, cIdx];
 
     try {
         let [res] = await pool.query(sql, aParameter);
@@ -261,14 +261,14 @@ exports.getPayrollMonth = async function (year, month) {
     }
 }
 
-exports.getPayrollCalculate = async function (year, month) {
+exports.getPayrollCalculate = async function (year, month, cIdx) {
     let sql = "select"
     sql += " m.idx,"
     sql += " m.id,"
     sql += " m.type,"
     sql += " (select name from new_tb_site where ma.sIdx = idx) as siteName,"
     sql += " (select idx from new_tb_site where ma.sIdx = idx) as sIdx,"
-    sql += " (select itemNm from new_tb_code where m.position = itemCd) as role,"
+    sql += " (SELECT itemNm FROM new_tb_code WHERE itemCd = m.position AND cIdx = m.cIdx LIMIT 1) as role,"
     sql += " (select payment_day from new_tb_site where idx = ma.sIdx) as payment_day,"
     sql += " m.name as staff,"
 
@@ -335,11 +335,11 @@ exports.getPayrollCalculate = async function (year, month) {
 
     sql += " left join new_tb_member_assignment ma on ma.mIdx = m.idx";
     sql += " left join new_tb_site s on s.idx = ma.sIdx";
-
+    sql += " WHERE m.cIdx = ?";
     sql += " order by s.name, m.name";
 
     // 파라미터 매칭: absent(2) + scheduled(2) + worked(2) + mpm조인(2) = 총 8개
-    let aParameter = [year, month, year, month, year, month, year, month];
+    let aParameter = [year, month, year, month, year, month, year, month, cIdx];
 
     try {
         let [res] = await pool.query(sql, aParameter);

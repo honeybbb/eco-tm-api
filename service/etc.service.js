@@ -40,10 +40,13 @@ exports.getBaseCode = async function (req, res) {
 }
 
 exports.getGroupCode = async function (req, res) {
-    let groupCd = req.params.groupCd;
+    let cIdx = req.user.cIdx,
+        groupCd = req.params.groupCd;
+
+    if(!cIdx) return res.json({'result': false, 'msg':'회사 정보가 없습니다.'});
     if(groupCd == ':groupCd') return res.json({'result': false, 'msg':'그룹코드가 없습니다.'});
 
-    let result = await etcModel.getGroupCode(groupCd);
+    let result = await etcModel.getGroupCode(cIdx, groupCd);
 
     res.json({'result': true, 'data': result})
 }
@@ -92,7 +95,7 @@ exports.updateBaseCode = async function (req, res) {
 }
 
 exports.getCompanyData = async function (req, res) {
-    let idx = req.params.idx;
+    let idx = req.user.cIdx;
 
     let result = await etcModel.getCompanyData(idx);
 

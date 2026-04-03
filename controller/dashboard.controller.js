@@ -11,5 +11,5 @@ module.exports = function (app) {
     // app.route('/v1/dashboard/approval/status/:cIdx').get(service.getPendingApprovals);
 
     //대시보드
-    app.route('/v1/dashboard/:cIdx').get(service.getDashboards);
+    app.route('/v1/dashboard').get(service.getDashboards);
 }

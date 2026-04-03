@@ -112,13 +112,13 @@ exports.saveSite = async function (site) {
             // [UPDATE]
             let sql = `
                 UPDATE new_tb_site 
-                SET sType=?, name=?, address=?, phone=?, building_su=?, unit_su=?, 
+                SET sType=?, name=?, zipcode = ?, address=?, phone=?, building_su=?, unit_su=?, 
                     area=?, areaUnder=?, areaOver=?, is_vat=?, 
                     director=?, director_phone=?, payment_day=?
                 WHERE idx = ?
             `;
             let params = [
-                site.sType, site.name, site.address, site.phone, site.building_su, site.unit_su,
+                site.sType, site.name, site.zipcode, site.address, site.phone, site.building_su, site.unit_su,
                 site.area, site.areaUnder, site.areaOver, site.is_vat,
                 site.director, site.director_phone, site.payment_day,
                 new_sIdx
@@ -128,11 +128,12 @@ exports.saveSite = async function (site) {
             // [INSERT]
             let sql = `
                 INSERT INTO new_tb_site 
-                (cIdx, sType, name, address, phone, building_su, unit_su, area, areaUnider, areaOver, is_vat, director, director_phone, payment_day) 
-                VALUES (?, ?,  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (cIdx, sType, name, zipcode, address, phone, building_su, unit_su, area, areaUnder, areaOver, is_vat, director, director_phone, payment_day) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             let params = [
-                site.cIdx, site.sType, site.name, site.address, site.phone, site.building_su, site.unit_su,
+                site.cIdx, site.sType, site.name, site.zipcode, site.address,
+                site.phone, site.building_su, site.unit_su,
                 site.area, site.areaUnder, site.areaOver, site.is_vat,
                 site.director, site.director_phone, site.payment_day
             ];
@@ -335,9 +336,9 @@ exports.registerBudget = async function (sIdx, jsonData) {
     }
 }
 
-exports.getSiteBudget = async function (sIdx) {
-    let sql = "select * from new_tb_site_contract where sIdx = ? order by regDt desc limit 1"
-    let aParameter = [sIdx];
+exports.getSiteBudget = async function (sIdx, type) {
+    let sql = "select * from new_tb_site_contract where sIdx = ? and type=? order by regDt desc limit 1"
+    let aParameter = [sIdx, type];
 
     try {
         let [res] = await pool.query(sql, aParameter);
@@ -396,7 +397,7 @@ exports.getSiteHeadCount = async function (sIdx) {
 
 exports.getAssignedStaff = async function (sIdx) {
     let sql = `
-        SELECT 
+        SELECT
             ma.mIdx,
             ma.idx AS assignIdx,
             DATE_FORMAT(ma.regDt, '%Y-%m-%d') AS assignDate,
@@ -404,15 +405,15 @@ exports.getAssignedStaff = async function (sIdx) {
             m.name,
             m.phone,
             m.position,
-            (SELECT itemNm FROM new_tb_code WHERE itemCd = m.position) AS positionName
+            (SELECT itemNm FROM new_tb_code WHERE itemCd = m.position AND cIdx = m.cIdx LIMIT 1) AS positionName
         FROM new_tb_member_assignment ma
-        LEFT JOIN new_tb_member m ON m.idx = ma.mIdx
-        WHERE ma.sIdx in (?)
+            LEFT JOIN new_tb_member m ON m.idx = ma.mIdx
+        WHERE ma.sIdx IN (?)
           AND ma.idx = (
-              SELECT MAX(idx) 
-              FROM new_tb_member_assignment 
-              WHERE sIdx in (?) AND mIdx = ma.mIdx and ma.isActive = 'Y'
-          )
+            SELECT MAX(idx)
+            FROM new_tb_member_assignment
+            WHERE sIdx IN (?) AND mIdx = ma.mIdx AND isActive = 'Y'
+            )
     `;
     let aParameter = [sIdx, sIdx];
     try {
@@ -441,11 +442,11 @@ exports.getSiteData = async function (sIdx) {
 
      */
     let sql = `
-      SELECT 
-        s.*,
-        -- type별 최신 계약 1건씩만 묶어서 반환
-        CONCAT('[', GROUP_CONCAT(
-          DISTINCT CASE 
+        SELECT
+            s.*,
+            -- type별 최신 계약 1건씩만 묶어서 반환
+            CONCAT('[', GROUP_CONCAT(
+                DISTINCT CASE 
             WHEN latest_sc.sIdx IS NOT NULL 
             THEN JSON_OBJECT(
               'workDays',    latest_sc.workdays,
@@ -454,41 +455,44 @@ exports.getSiteData = async function (sIdx) {
               'workSchedule',latest_sc.workSchedule,
               'breaktime',   latest_sc.breaktime,
               'budget',      latest_sc.jsonData,
+              'totalCost',   latest_sc.total_cost,
               'scIdx',       latest_sc.idx,
               'staffList',   latest_sc.staffDetail,
               'staffCount',  latest_sc.staffCount,
-              'category',    (SELECT itemNm FROM new_tb_code WHERE itemCd = latest_sc.type),
-              'type',        (SELECT itemCd FROM new_tb_code WHERE itemCd = latest_sc.type)
+              -- ★ 수정 1: cIdx 일치 조건 및 LIMIT 1 추가 (다중 행 에러 방지)
+              'category',    (SELECT itemNm FROM new_tb_code WHERE itemCd = latest_sc.type AND cIdx = latest_sc.cIdx LIMIT 1),
+              -- ★ 수정 2: 불필요한 서브쿼리 제거 (어차피 동일한 값이므로 그냥 컬럼 사용)
+              'type',        latest_sc.type
             ) 
           END
         ), ']') AS contractList,
-    
-        -- bigoList는 기존 그대로
-        CONCAT('[', GROUP_CONCAT(
-          DISTINCT CASE 
+
+            -- bigoList는 기존 그대로
+            CONCAT('[', GROUP_CONCAT(
+                DISTINCT CASE 
             WHEN sb.sIdx IS NOT NULL 
             THEN JSON_OBJECT('bigo', sb.bigo, 'regDt', sb.regDt) 
           END
         ), ']') AS bigoList
-    
-      FROM new_tb_site s
-    
-      -- type별 최신 계약만 조인 (핵심 서브쿼리)
-      LEFT JOIN new_tb_site_contract latest_sc 
-        ON latest_sc.idx = (
-          SELECT idx 
-          FROM new_tb_site_contract
-          WHERE sIdx = s.idx 
-            AND type = latest_sc.type   -- 같은 type 중에서
-          ORDER BY startDt DESC, idx DESC  -- 가장 최근 계약
-          LIMIT 1
-        )
-        AND latest_sc.sIdx = s.idx
-    
-      LEFT JOIN new_tb_site_bigo sb ON sb.sIdx = s.idx
-    
-      WHERE s.idx IN (?)
-      GROUP BY s.idx
+
+        FROM new_tb_site s
+
+                 -- type별 최신 계약만 조인
+                 LEFT JOIN new_tb_site_contract latest_sc
+                           ON latest_sc.idx = (
+                               SELECT idx
+                               FROM new_tb_site_contract
+                               WHERE sIdx = s.idx
+                                 AND type = latest_sc.type   -- 같은 type 중에서
+                               ORDER BY startDt DESC, idx DESC  -- 가장 최근 계약
+            LIMIT 1
+            )
+            AND latest_sc.sIdx = s.idx
+
+            LEFT JOIN new_tb_site_bigo sb ON sb.sIdx = s.idx
+
+        WHERE s.idx IN (?)
+        GROUP BY s.idx
     `;
     let aParameter = [sIdx];
 

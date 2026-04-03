@@ -7,7 +7,9 @@ const wageModel = require("../model/etc.model");
 
 //직원기본급여조회
 exports.getBaseSalary = async function (req, res) {
-    let result = await payrollModel.getBaseSalary();
+    let cIdx = req.user.cIdx;
+
+    let result = await payrollModel.getBaseSalary(cIdx);
 
     res.json({'result': true, 'data': result})
 }
@@ -32,27 +34,27 @@ exports.setBaseSalary = async function (req, res) {
 
 
 exports.getPayrollMonth = async function (req, res) {
+    let cIdx = req.user.cIdx;
     let { year, month } = req.query;
 
     if (!year || !month) {
         return res.json({ 'result': false, 'msg': '날짜 설정을 확인해주세요.' });
     }
 
-    console.log(year, month);
-
-    let result = await payrollModel.getPayrollMonth(year, month);
+    let result = await payrollModel.getPayrollMonth(year, month, cIdx);
 
     res.json({'result': true, 'data': result})
 }
 
 exports.getPayrollCalculate = async function (req, res) {
+    let cIdx = req.user.cIdx;
     let { year, month } = req.query;
 
     if (!year || !month) {
         return res.json({ 'result': false, 'msg': '날짜 설정을 확인해주세요.' });
     }
 
-    let result = await payrollModel.getPayrollCalculate(year, month);
+    let result = await payrollModel.getPayrollCalculate(year, month, cIdx);
 
     res.json({'result': true, 'data': result})
 }

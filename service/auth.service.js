@@ -9,7 +9,6 @@ exports.loginUser = async function (req, res) {
 
     try {
         const user = await authModel.findByLoginId(loginId);
-        console.log(user, 'user');
         const match = await bcrypt.compare(password, user?.[0].password);
         delete user?.[0].password;
 
@@ -17,7 +16,7 @@ exports.loginUser = async function (req, res) {
         if(match) {
             // JWT 토큰 발급
             const token = jwt.sign(
-                { id: user[0].id, role: 'user' },  // 토큰에 담을 정보
+                { id: user[0].id, role: 'user', cIdx: user[0].cIdx },  // 토큰에 담을 정보
                 process.env.JWT_SECRET,
                 { expiresIn: '8h' }
             );
@@ -42,7 +41,7 @@ exports.loginManager = async function (req, res) {
 
         if(match) {
             const token = jwt.sign(
-                { id: admin[0].id, role: 'admin' },
+                { id: admin[0].id, role: 'admin', cIdx: admin[0].cIdx },
                 process.env.JWT_SECRET,
                 { expiresIn: '60m' }
             );

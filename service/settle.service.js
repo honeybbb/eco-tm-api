@@ -1,6 +1,7 @@
 const settleModel = require("../model/settle.model");
 
 exports.getSettleList = async function (req, res) {
+    let cIdx = req.user.cIdx;
     let year = req.query.year,
         month = req.query.month,
         docType = req.query.docType || ['SERVICE','RETIRE_ANNUAL'];
@@ -9,7 +10,7 @@ exports.getSettleList = async function (req, res) {
 
     //let docTypeArr = docType.includes(',') ? docType.split(',') : [docType];
 
-    let result = await settleModel.getSettleList(year, month, docType);
+    let result = await settleModel.getSettleList(year, month, docType, cIdx);
 
     res.json({"result": true, "data": result});
 }

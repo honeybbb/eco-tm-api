@@ -47,7 +47,7 @@ exports.getEmployeeStatus = async function (req, res) {
 
 // 3. 메인 대시보드 함수
 exports.getDashboards = async function (req, res) {
-    const { cIdx } = req.params;
+    const { cIdx } = req.user;
     if (!cIdx) return res.status(400).json({ message: "회사코드가 없습니다." });
 
     try {

@@ -59,43 +59,54 @@ exports.getBaseCode = async function (cIdx) {
     let sql ="SELECT"
     sql += " L1.itemCd   AS groupCode,"
     sql += " L1.itemNm   AS groupName," // Level 1 (대분류: 그룹)
-    sql += " L1.useFl, L1.deleteFl, L1.editFl,L1.option,L1.sort,"
+    sql += " L1.useFl, L1.deleteFl, L1.editFl, L1.option, L1.sort,"
     sql += " L2.itemCd   AS subCode,"
     sql += " L2.itemNm   AS subName,"   // Level 2 (중분류: 서브그룹 혹은 직접 코드)
-    sql += " L2.useFl, L2.deleteFl, L2.editFl,L2.option,L2.sort,"
+    sql += " L2.useFl, L2.deleteFl, L2.editFl, L2.option, L2.sort,"
     sql += " L3.itemCd   AS detailCode,"
     sql += " L3.itemNm   AS detailName," // Level 3 (소분류: 실제 상세 코드)
-    sql += " L3.useFl, L3.deleteFl, L3.editFl,L3.option, L3.sort"
-    sql += " FROM (SELECT * FROM new_tb_code WHERE LENGTH(itemCd) = 2"
-    // sql += " AND useFl = 'Y'"
-    sql += ") L1"
+    sql += " L3.useFl, L3.deleteFl, L3.editFl, L3.option, L3.sort"
+
+    // 서브쿼리 대신 메인 쿼리에서 직접 테이블을 잡습니다.
+    sql += " FROM new_tb_code L1"
+
+    // ★ 수정포인트 1: L2 조인 시 cIdx도 일치해야 함
     sql += " LEFT JOIN new_tb_code L2"
-    sql += " ON L2.groupCd = L1.itemCd"
-    sql += " AND LENGTH(L2.itemCd) = 5"
-    // sql += " AND L2.useFl = 'Y'"
+    sql += "        ON L2.groupCd = L1.itemCd"
+    sql += "       AND L2.cIdx = L1.cIdx"    // <--- 핵심: 같은 회사의 코드만 조인
+    sql += "       AND LENGTH(L2.itemCd) = 5"
+    // sql += "       AND L2.useFl = 'Y'"
+
+    // ★ 수정포인트 2: L3 조인 시 cIdx도 일치해야 함
     sql += " LEFT JOIN new_tb_code L3"
-    sql += " ON L3.groupCd = L2.itemCd"
-    sql += " AND LENGTH(L3.itemCd) = 8"
-    // sql += " AND L3.useFl = 'Y'"
-    sql += " WHERE L1.cIdx in (?)"  // 특정 회사/현장 ID
+    sql += "        ON L3.groupCd = L2.itemCd"
+    sql += "       AND L3.cIdx = L2.cIdx"    // <--- 핵심: 같은 회사의 코드만 조인
+    sql += "       AND LENGTH(L3.itemCd) = 8"
+    // sql += "       AND L3.useFl = 'Y'"
+
+    // ★ 메인 필터 조건: 요청한 cIdx와 대분류 길이(2) 필터링
+    sql += " WHERE L1.cIdx = ?"
+    sql += "   AND LENGTH(L1.itemCd) = 2"
+    // sql += "   AND L1.useFl = 'Y'"
+
     sql += " ORDER BY L1.itemCd, L2.itemCd, L3.itemCd";
+
     let aParameter = [cIdx];
 
-    //let query = mysql.format(sql, aParameter);
     try {
         console.log("2. 쿼리 실행 직전 (여기서 멈추면 DB 연결 풀 문제)");
         let [res] = await pool.query(sql, aParameter);
         console.log('DB 조회 결과:', res);
         return res;
-    }catch (e) {
+    } catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
     }
 }
 
-exports.getGroupCode = async function (groupCd) {
-    let sql = "select * from new_tb_code where groupCd in (?) and itemCd <> groupCd"
-    let aParameter = [groupCd];
+exports.getGroupCode = async function (cIdx, groupCd) {
+    let sql = "select * from new_tb_code where groupCd in (?) and itemCd <> groupCd and cIdx in (?)"
+    let aParameter = [groupCd, cIdx];
 
     //let query = mysql.format(sql, aParameter);
     try {

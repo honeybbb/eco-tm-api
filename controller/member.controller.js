@@ -1,6 +1,7 @@
 'use strict';
 
 const service = require("../service/member.service");
+const {verifyAdmin} = require("../middleware/auth");
 
 module.exports = function (app) {
     // 관리자 등록
@@ -13,7 +14,7 @@ module.exports = function (app) {
     app.route('/v1/manager/:managerId').delete(service.deleteManager);
 
     //직원 리스트 조회
-    app.route('/v1/member/list/:cIdx').get(service.getMemberList);
+    app.route('/v1/member/list').get(service.getMemberList);
 
     //직원 정보 조회
     app.route('/v1/member/data/:id').get(service.getMemberData);

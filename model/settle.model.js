@@ -1,15 +1,19 @@
 const pool = require("../config/mysql");
 const mysql = require("mysql2/promise");
 
-exports.getSettleList = async function (year, month, docType) {
-    let sql = "select *, (select itemNm from new_tb_code where itemCd = type) as `typeNm`"
-    sql += " from new_tb_site_settlement where `year` in (?) and `month` in (?) and docType in (?)";
-    let aParameter = [year, month, docType];
+exports.getSettleList = async function (year, month, docType, cIdx) {
+    let sql = "SELECT ss.*, ";
+    sql += " (SELECT itemNm FROM new_tb_code WHERE itemCd = ss.type AND cIdx = ? LIMIT 1) AS typeNm";
+    sql += " FROM new_tb_site_settlement ss ";
+    sql += " WHERE ss.year IN (?) AND ss.month IN (?) AND ss.docType IN (?)";
+    sql += " AND ss.cIdx = ?";
+
+    let aParameter = [cIdx, year, month, docType, cIdx];
 
     try {
         let [res] = await pool.query(sql, aParameter);
         return res;
-    }catch (e) {
+    } catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
     }
@@ -17,10 +21,10 @@ exports.getSettleList = async function (year, month, docType) {
 
 exports.setSettleData = async function (sIdx, cIdx, year, month, docNo, type, billingDt,
                                         subTotal, vatAmount, grandTotal,
-                                        strBillingData, strPayrollData) {
+                                        strBillingData, strPayrollData, strViewConfig) {
     let sql = `
         INSERT INTO new_tb_site_settlement
-        (sIdx, cIdx, year, month, docType, docNo, type, billingDt, subTotal, vatAmount, grandTotal, billingData, payrollData, strViewConfig)
+        (sIdx, cIdx, year, month, docType, docNo, type, billingDt, subTotal, vatAmount, grandTotal, billingData, payrollData, viewConfig)
         VALUES (?, ?, ?, ?, 'SERVICE', ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     let aParameter = [

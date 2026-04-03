@@ -25,7 +25,7 @@ module.exports = function (app) {
     app.route('/v1/code/:itemCd').delete(service.deleteBaseCode);
 
     //company 정보 조회
-    app.route('/v1/config/company/:idx').get(service.getCompanyData);
+    app.route('/v1/config/company').get(service.getCompanyData);
 
     //급여항목 조회
     app.route('/v1/config/code/wage/:cIdx').get(service.getWageCode);

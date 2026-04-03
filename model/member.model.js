@@ -55,18 +55,21 @@ exports.getMemberList = async function (cIdx) {
     sql += " ) mc on mc.mIdx = m.idx"
 
     sql += " left join (select b.*, s.name from new_tb_member_assignment b left join new_tb_site s on s.idx = b.sIdx) as `ms` on ms.mIdx = m.idx"
-    sql += " left join new_tb_code c on c.itemCd = m.type "
-    sql += " left join new_tb_code c2 on c2.itemCd = m.position"
-    sql += " left join new_tb_code c3 on c3.itemCd = m.disability_grade"
+
+    // ★ 수정된 부분: AND c.cIdx = m.cIdx 조건을 모두 추가하여 내 회사의 코드만 1:1로 매칭시킴
+    sql += " left join new_tb_code c on c.itemCd = m.type and c.cIdx = m.cIdx"
+    sql += " left join new_tb_code c2 on c2.itemCd = m.position and c2.cIdx = m.cIdx"
+    sql += " left join new_tb_code c3 on c3.itemCd = m.disability_grade and c3.cIdx = m.cIdx"
+
     sql += " where m.cIdx in (?)"
     sql += " order by ms.sIdx desc, m.idx"
+
     let aParameter = [cIdx];
 
-    //let query = mysql.format(sql, aParameter);
     try {
         let [res] = await pool.query(sql, aParameter);
         return res;
-    }catch (e) {
+    } catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
     }
@@ -142,18 +145,26 @@ exports.getMemberData = async function (id) {
     }
 };
 
-exports.getMemberAvailable = async function(sIdx) {
-    let sql = "SELECT *, (select itemNm from new_tb_code where m.position = itemCd) as `role` FROM new_tb_member m WHERE m.idx NOT IN"
-    sql += " (SELECT ma.mIdx"
-    sql += " FROM new_tb_member_assignment ma"
-    sql += " WHERE ma.sIdx in (?)) and m.status = 0"; //m.stauts 0 : 재직 / 1: 퇴사
-    let aParameter = [sIdx];
+exports.getMemberAvailable = async function(sIdx, cIdx) {
+    // 1. role 서브쿼리에 cIdx = m.cIdx 조건과 안전장치(LIMIT 1) 추가
+    let sql = "SELECT m.*, ";
+    sql += " (SELECT itemNm FROM new_tb_code WHERE itemCd = m.position AND cIdx = m.cIdx LIMIT 1) AS role";
+    sql += " FROM new_tb_member m";
 
-    //let query = mysql.format(sql, aParameter);
+    // 2. 전체 직원이 아닌 '내 회사(cIdx)' 소속이면서 '재직 중(status=0)'인 사람만 필터링
+    sql += " WHERE m.cIdx = ? AND m.status = 0";
+
+    // 3. 해당 현장(sIdx)에 이미 배치된 직원은 제외 (NOT IN)
+    sql += " AND m.idx NOT IN (";
+    sql += "   SELECT ma.mIdx FROM new_tb_member_assignment ma WHERE ma.sIdx = ?";
+    sql += " )";
+
+    let aParameter = [cIdx, sIdx]; // 맵핑: cIdx, sIdx 순서
+
     try {
         let [res] = await pool.query(sql, aParameter);
         return res;
-    }catch (e) {
+    } catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
     }
@@ -581,8 +592,8 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
             contract.sIdx,
             contract.type,
             contract.jsonData, // JSON 문자열 상태
-            contract.startDt,
-            contract.endDt,
+            contract.contractStartDt,
+            contract.contractEndDt,
             contract.bigo
         ];
 
@@ -714,7 +725,7 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
             // 계약 행이 없으면 새로 INSERT
             const sqlContract = `
                 INSERT INTO new_tb_member_contract 
-                (mIdx, sIdx, type, jsonData, startDt, endDt, bigo)
+                (mIdx, sIdx, type, jsonData, contractStartDt, contractEndDt, bigo)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             `;
             const paramContract = [
