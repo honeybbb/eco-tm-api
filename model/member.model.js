@@ -94,7 +94,7 @@ exports.getMemberData = async function (id) {
     let sql = `
         SELECT 
             m.*,
-            (select itemNm from new_tb_code where disability_grade = itemCd) as disability_grade,
+            (SELECT itemNm FROM new_tb_code WHERE itemCd = m.disability_grade LIMIT 1) AS disability_grade,
             IFNULL(ms.sIdx, '0') AS \`sIdx\`,
             s.payment_day,
             cd.itemCd AS \`positionCd\`,
