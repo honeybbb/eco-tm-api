@@ -138,13 +138,23 @@ exports.setWageCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl
 }
 
 exports.setBaseCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt) {
-    let sql = "insert into new_tb_code (cIdx, groupCd, itemCd, itemNm, sort, useFl, `option`, regDt) values (?, ?, ?, ?, ?, ?, ?, ?)"
+    // ON DUPLICATE KEY UPDATE 구문 추가
+    let sql = `
+        INSERT INTO new_tb_code (cIdx, groupCd, itemCd, itemNm, sort, useFl, \`option\`, regDt) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE 
+            itemNm = VALUES(itemNm),
+            sort = VALUES(sort),
+            useFl = VALUES(useFl),
+            \`option\` = VALUES(\`option\`)
+    `;
+
     let aParameter = [cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt];
 
     try {
         let [res] = await pool.query(sql, aParameter);
         return res;
-    }catch (e) {
+    } catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
     }
