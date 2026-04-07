@@ -35,6 +35,8 @@ module.exports = function (app) {
 
     app.route('/v1/site/modify').post(service.updateSiteData);
 
+    app.route('/v1/site/:id').delete(service.DeleteSite);
+
     //현장 배치 정보 저장
     /*
     app.route('/v1/site/headcount').post(service.setSiteHeadCount);

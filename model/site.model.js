@@ -363,6 +363,19 @@ exports.updateSiteData = async function (sIdx, name, address, phone, bigo, build
     }
 }
 
+exports.DeleteSite = async function (cIdx, sIdx) {
+    let sql = "delete from new_tb_site where cIdx = ? and sIdx = ?"
+    let aParameter = [cIdx, sIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.setSiteHeadCount = async function (cIdx, sIdx, jsonData) {
     let sql = "insert into new_tb_site_assignment (cIdx, sIdx, jsonData) values (?, ?, ?)";
     let aParameter = [cIdx, sIdx, jsonData];
