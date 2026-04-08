@@ -23,7 +23,7 @@ module.exports = function (app) {
     // app.route('/v1/member/register').post(service.setMemberData);
     app.route('/v1/member/register').post(service.registerFullMember);
 
-    app.route('/v1/member/data/:id').put(service.updateMemberData);
+    app.route('/v1/member/data/:idx').put(service.updateMemberData);
 
     //직원 삭제
     app.route('/v1/member/:id').delete(service.deleteMember);

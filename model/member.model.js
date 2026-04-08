@@ -629,131 +629,90 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
 
 exports.updateMemberWithContractAndStaffing = async function (mIdx, member, contract, staffing) {
     const connection = await pool.getConnection();
-
-    console.log("=== Update Data Check ===");
-    console.log("contract:", contract);
-    console.log("staffing:", staffing);
-
     try {
         await connection.beginTransaction();
 
-        // -----------------------------------------------------
-        // 1. 직원(Member) 업데이트
-        // -----------------------------------------------------
-        // 비밀번호 변경 여부에 따라 쿼리 분기
         let sqlMember, paramMember;
+        const commonFields = `
+            type = ?, name = ?, id = ?, birthDt = ?, phone = ?, position = ?, 
+            gender = ?, email = ?, disability = ?, disability_date = ?, 
+            disability_grade = ?, defector = ?, patriot = ?, intern = ?, 
+            beneficiary = ?, foreigner = ?, nationality = ?, visa_code = ?, 
+            visa_date = ?, bank = ?, accountNumber = ?, inDate = ?, 
+            outDate = ?, outReason = ?, address = ?, bigo = ?, 
+            four_ins = ?, retire_pension = ?
+        `;
 
         if (member.password) {
-            sqlMember = `
-                UPDATE new_tb_member SET
-                    type = ?, name = ?, id = ?, password = ?,
-                    birthDt = ?, phone = ?, position = ?, gender = ?, email = ?,
-                    disability = ?, disability_date = ?, disability_grade = ?,
-                    defector = ?, patriot = ?, intern = ?, beneficiary = ?,
-                    foreigner = ?, nationality = ?, visa_code = ?, visa_date = ?,
-                    bank = ?, accountNumber = ?,
-                    inDate = ?, outDate = ?, outReason = ?,
-                    address = ?, bigo = ?
-                WHERE idx = ?
-            `;
+            sqlMember = `UPDATE new_tb_member SET ${commonFields}, password = ? WHERE idx = ?`;
             paramMember = [
-                member.type, member.name, member.id, member.password,
-                member.birthDt, member.phone, member.position, member.gender, member.email,
-                member.disability, member.disability_date, member.disability_grade,
-                member.defector, member.patriot, member.intern, member.beneficiary,
-                member.foreigner, member.nationality, member.visa_code, member.visa_date,
-                member.bank, member.accountNumber,
-                member.inDate, member.outDate, member.outReason,
-                member.addr, member.bigo,
-                mIdx
+                member.type, member.name, member.id, member.birthDt, member.phone, member.position,
+                member.gender, member.email, member.disability, member.disability_date,
+                member.disability_grade, member.defector, member.patriot, member.intern,
+                member.beneficiary, member.foreigner, member.nationality, member.visa_code,
+                member.visa_date, member.bank, member.accountNumber, member.inDate,
+                member.outDate, member.outReason, member.addr, member.bigo,
+                // 👇 여기가 중요합니다! (컨트롤러에서 넘긴 이름과 동일하게)
+                member.fourInsurance, member.retirePension, member.password, mIdx
             ];
         } else {
-            // 비밀번호 제외 업데이트
-            sqlMember = `
-                UPDATE new_tb_member SET
-                    type = ?, name = ?, id = ?,
-                    birthDt = ?, phone = ?, position = ?, gender = ?, email = ?,
-                    disability = ?, disability_date = ?, disability_grade = ?,
-                    defector = ?, patriot = ?, intern = ?, beneficiary = ?,
-                    foreigner = ?, nationality = ?, visa_code = ?, visa_date = ?,
-                    bank = ?, accountNumber = ?,
-                    inDate = ?, outDate = ?, outReason = ?,
-                    address = ?, bigo = ?
-                WHERE idx = ?
-            `;
+            sqlMember = `UPDATE new_tb_member SET ${commonFields} WHERE idx = ?`;
             paramMember = [
-                member.type, member.name, member.id,
-                member.birthDt, member.phone, member.position, member.gender, member.email,
-                member.disability, member.disability_date, member.disability_grade,
-                member.defector, member.patriot, member.intern, member.beneficiary,
-                member.foreigner, member.nationality, member.visa_code, member.visa_date,
-                member.bank, member.accountNumber,
-                member.inDate, member.outDate, member.outReason,
-                member.addr, member.bigo,
-                mIdx
+                member.type, member.name, member.id, member.birthDt, member.phone, member.position,
+                member.gender, member.email, member.disability, member.disability_date,
+                member.disability_grade, member.defector, member.patriot, member.intern,
+                member.beneficiary, member.foreigner, member.nationality, member.visa_code,
+                member.visa_date, member.bank, member.accountNumber, member.inDate,
+                member.outDate, member.outReason, member.addr, member.bigo,
+                // 👇 여기가 중요합니다!
+                member.fourInsurance, member.retirePension, mIdx
             ];
         }
-
         await connection.query(sqlMember, paramMember);
 
-        // -----------------------------------------------------
-        // 2. 계약서(Contract) 업데이트
-        // mIdx 기준 최신 계약을 UPDATE, 없으면 INSERT
-        // -----------------------------------------------------
-        const sqlContractCheck = `
-            SELECT idx FROM new_tb_member_contract 
-            WHERE mIdx = ? 
-            ORDER BY idx DESC LIMIT 1
-        `;
+        // ... (나머지 계약/배치 업데이트 코드는 기존과 동일하게 유지)
+
+        // 2. Contract 업데이트
+        const sqlContractCheck = `SELECT idx FROM new_tb_member_contract WHERE mIdx = ? ORDER BY idx DESC LIMIT 1`;
         const [contractRows] = await connection.query(sqlContractCheck, [mIdx]);
 
         if (contractRows.length > 0) {
-            // 기존 계약 수정
             const sqlContract = `
                 UPDATE new_tb_member_contract SET
-                    sIdx = ?, type = ?, jsonData = ?,
-                    startDt = ?, endDt = ?, bigo = ?
+                                                  sIdx = ?, type = ?, jsonData = ?,
+                                                  contractStartDt = ?, contractEndDt = ?, bigo = ?
                 WHERE idx = ?
             `;
-            const paramContract = [
+            await connection.query(sqlContract, [
                 contract.sIdx, contract.type, contract.jsonData,
-                contract.startDt, contract.endDt, contract.bigo,
-                contractRows[0].idx
-            ];
-            await connection.query(sqlContract, paramContract);
+                contract.startDt, contract.endDt, contract.bigo, contractRows[0].idx
+            ]);
         } else {
-            // 계약 행이 없으면 새로 INSERT
             const sqlContract = `
-                INSERT INTO new_tb_member_contract 
-                (mIdx, sIdx, type, jsonData, contractStartDt, contractEndDt, bigo)
+                INSERT INTO new_tb_member_contract
+                    (mIdx, sIdx, type, jsonData, contractStartDt, contractEndDt, bigo)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             `;
-            const paramContract = [
+            await connection.query(sqlContract, [
                 mIdx, contract.sIdx, contract.type, contract.jsonData,
                 contract.startDt, contract.endDt, contract.bigo
-            ];
-            await connection.query(sqlContract, paramContract);
+            ]);
         }
 
-        // -----------------------------------------------------
-        // 3. 배치(Staffing) 업데이트
-        // 등록과 동일하게 ON DUPLICATE KEY UPDATE 활용
-        // -----------------------------------------------------
+        // 3. Staffing 업데이트
         const sqlStaffing = `
             INSERT INTO new_tb_member_assignment (mIdx, sIdx)
             VALUES (?, ?)
-            ON DUPLICATE KEY UPDATE sIdx = VALUES(sIdx)
+                ON DUPLICATE KEY UPDATE sIdx = VALUES(sIdx)
         `;
         await connection.query(sqlStaffing, [mIdx, staffing.sIdx]);
 
         await connection.commit();
         return { result: true };
-
     } catch (e) {
         await connection.rollback();
-        console.log('Transaction Error:', e);
+        console.error("DB 업데이트 에러:", e); // 에러 확인용
         return { result: false, error: e };
-
     } finally {
         connection.release();
     }

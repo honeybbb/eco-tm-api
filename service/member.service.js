@@ -408,53 +408,49 @@ exports.registerFullMember = async function (req, res) {
 
 exports.updateMemberData = async function (req, res) {
     try {
-        const mIdx = req.params.id;
+        const mIdx = req.params.idx;
         const body = req.body;
-        console.log('body.site:', body)
 
-        // 비밀번호 변경 요청 시에만 해시화
         let hashedPassword = null;
         if (body.password) {
             hashedPassword = await bcrypt.hash(body.password, 10);
         }
 
         const memberData = {
-            type: body.type,
+            type: body.typeCd || body.type,
             name: body.name,
             id: body.id,
-            password: hashedPassword, // null이면 모델에서 UPDATE 제외
+            password: hashedPassword,
             birthDt: body.birthDt,
             phone: body.phone,
             position: body.position,
             gender: body.gender,
             email: body.email,
-            disability: body.disability,
-            disability_date: body.disability_date,
-            disability_grade: body.disability_grade,
+            disability: body.disability || 'N',
+            disability_date: body.disability_date || null,
+            disability_grade: body.disability_grade || null,
             defector: body.defector,
             patriot: body.patriot,
             intern: body.intern,
             beneficiary: body.beneficiary,
-            foreigner: body.foreigner,
-            nationality: body.nationality,
-            visa_code: body.visa_code,
-            visa_date: body.visa_date,
+            foreigner: body.foreigner || 'N',
+            nationality: body.nationality || null,
+            visa_code: body.visa_code || null,
+            visa_date: body.visa_date || null,
             bank: body.bankName,
             accountNumber: body.accountNumber,
             inDate: body.joinDate,
-            outDate: body.endDate,
-            outReason: body.endReason,
+            outDate: body.status == '1' ? body.endDate : null,
+            outReason: body.status == '1' ? body.endReason : null,
             addr: body.address,
             bigo: body.bigo,
-
-            retirePension: body.retire_pension,//퇴직연금가입여부
-            fourInsurance:body.four_ins,//4대보험가입여부
-
+            retirePension: body.retire_pension,
+            fourInsurance: body.four_ins,
         };
 
         const contractData = {
             sIdx: body.sIdx,
-            type: body.type,
+            type: body.typeCd || body.type,
             jsonData: JSON.stringify(body.wageInputs || {}),
             startDt: body.contractStartDt,
             endDt: body.contractEndDt,
