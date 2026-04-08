@@ -21,16 +21,16 @@ exports.getSettleList = async function (year, month, docType, cIdx) {
 
 exports.setSettleData = async function (sIdx, cIdx, year, month, docNo, type, billingDt,
                                         subTotal, vatAmount, grandTotal,
-                                        strBillingData, strPayrollData, strViewConfig) {
+                                        strBillingData, strPayrollData) {
     let sql = `
         INSERT INTO new_tb_site_settlement
-        (sIdx, cIdx, year, month, docType, docNo, type, billingDt, subTotal, vatAmount, grandTotal, billingData, payrollData, viewConfig)
-        VALUES (?, ?, ?, ?, 'SERVICE', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (sIdx, cIdx, year, month, docType, docNo, type, billingDt, subTotal, vatAmount, grandTotal, billingData, payrollData)
+        VALUES (?, ?, ?, ?, 'SERVICE', ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     let aParameter = [
         sIdx, cIdx, year, month, docNo, type, billingDt,
         subTotal, vatAmount, grandTotal,
-        strBillingData, strPayrollData, strViewConfig
+        strBillingData, strPayrollData
     ];
 
     try {
@@ -45,7 +45,6 @@ exports.setSettleData = async function (sIdx, cIdx, year, month, docNo, type, bi
 exports.updateSettleData = async function (year, month, type, docNo, billingDt,
                                            subTotal, vatAmount, grandTotal,
                                            strBillingData, strPayrollData,
-                                           strViewConfig,
                                            idx, sIdx) {
     let sql = `
                 UPDATE new_tb_site_settlement 
@@ -60,14 +59,13 @@ exports.updateSettleData = async function (year, month, type, docNo, billingDt,
                     grandTotal = ?, 
                     billingData = ?, 
                     payrollData = ?,
-                    strViewConfig = ?,
                     modDt = CURRENT_TIMESTAMP
                 WHERE idx = ? AND sIdx = ?
             `;
     let aParameter = [
         year, month, type, docNo, billingDt,
         subTotal, vatAmount, grandTotal,
-        strBillingData, strPayrollData, strViewConfig,
+        strBillingData, strPayrollData,
         idx, sIdx
     ];
 
