@@ -8,4 +8,6 @@ module.exports = function (app) {
 
     //관리자 로그인
     app.route('/v1/auth/manager').post(service.loginManager);
+
+    app.route('/v1/auth/refresh').post(service.refreshToken);
 };
