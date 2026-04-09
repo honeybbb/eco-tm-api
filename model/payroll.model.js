@@ -58,6 +58,7 @@ exports.getBaseSalary = async function (cIdx) {
     sql += " m.id,";
     sql += " m.type,";
     sql += " m.birthDt,";
+    sql += " m.inDate, m.outDate,"
     sql += " (SELECT name FROM new_tb_site WHERE idx = ma.sIdx LIMIT 1) as siteName,";
     sql += " ma.sIdx as sIdx,";
     sql += " (SELECT itemNm FROM new_tb_code WHERE itemCd = m.position AND cIdx = m.cIdx LIMIT 1) as role,";
@@ -102,7 +103,6 @@ exports.getPayrollMonthTemp = async function (year, month) {
     sql += " m.idx,"
     sql += " m.id,"
     sql += " m.type,"
-    sql += " m.inDate, m.outDate,"
     sql += " (select name from new_tb_site where ma.sIdx = idx) as siteName,"
     sql += " (select idx from new_tb_site where ma.sIdx = idx) as sIdx,"
     sql += " (select itemNm from new_tb_code where m.position = itemCd) as role,"
