@@ -1,5 +1,6 @@
 const pool = require("../config/mysql");
 const mysql = require("mysql2/promise");
+const { encryptRRN, decryptRRN, hashPassword} = require("../utils/password");
 
 exports.registerManager = async function (cIdx, managerId, managerNm, password, email, phone, isMaster) {
     let sql = "insert into new_tb_manager (cIdx, managerId, managerNm, password, email, phone, isMaster, regDt)"
@@ -39,6 +40,17 @@ exports.deleteManager = async function (managerId) {
     }
 }
 
+const maskRRN = (rrn) => {
+    if (!rrn) return null;
+    // 하이픈이 있든 없든 처리하기 위해 숫자만 추출하거나 포맷 확인
+    const clean = rrn.replace(/[^0-9]/g, '');
+    if (clean.length === 13) {
+        // 앞 6자리 + 뒤 1자리 + ******
+        return `${clean.substring(0, 6)}-${clean.substring(6, 7)}******`;
+    }
+    return rrn; // 형식이 이상하면 그대로 반환하거나 아예 가림
+};
+
 exports.getMemberList = async function (cIdx) {
     let sql = "select m.*, case when status = 0 then '재직' when status = 1 then '퇴사' else '-' end as `status`,"
     // sql += " mc.jsonData as wage,"
@@ -68,7 +80,23 @@ exports.getMemberList = async function (cIdx) {
 
     try {
         let [res] = await pool.query(sql, aParameter);
-        return res;
+
+        const processedRes = res.map(member => {
+            if (member.rrn) {
+                try {
+                    // 1. 일단 복호화
+                    const decrypted = decryptRRN(member.rrn);
+                    // 2. ★ 중요: 복호화된 원본 대신 마스킹된 값을 전달
+                    member.rrn = maskRRN(decrypted);
+                } catch (err) {
+                    member.rrn = "복호화 오류";
+                }
+            }
+            return member;
+        });
+
+        return processedRes;
+        // return res;
     } catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
@@ -142,6 +170,32 @@ exports.getMemberData = async function (id) {
     } catch (e) {
         console.log('db err', e);
         return {'data': '-9999'};
+    }
+};
+
+exports.getStaffBySite = async function(sIdx, cIdx) {
+    let sql = `
+        SELECT m.idx, m.name, m.id AS memberId
+        FROM new_tb_member m
+                 INNER JOIN new_tb_member_assignment ma ON ma.mIdx = m.idx
+                 INNER JOIN (
+            SELECT mIdx, MAX(idx) AS maxIdx
+            FROM new_tb_member_assignment
+            WHERE sIdx = ?
+            GROUP BY mIdx
+        ) latest ON latest.mIdx = ma.mIdx AND latest.maxIdx = ma.idx
+        WHERE m.cIdx = ?
+        ORDER BY m.name ASC
+    `;
+
+    let aParameter = [sIdx, cIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
     }
 };
 

@@ -20,21 +20,25 @@ exports.setSettleData = async function (req, res) {
     const {
         idx, year, month, type, docNo, billingDt,
         subTotal, vatAmount, grandTotal,
-        billingData, payrollData, viewConfig
+        billingData, payrollData, viewConfig // 프론트에서 넘어온 viewConfig 받기
     } = req.body;
 
     try {
         // JSON 데이터를 DB에 넣기 위해 문자열로 변환
         const strBillingData = JSON.stringify(billingData);
         const strPayrollData = JSON.stringify(payrollData);
+        const strViewConfig  = JSON.stringify(viewConfig); // ★ viewConfig 문자열 변환 추가
+
         if (idx) {
             // ============================================
             // 1. idx가 존재하면 기존 데이터 수정 (UPDATE)
             // ============================================
             let result = await settleModel.updateSettleData(
                 year, month, type, docNo, billingDt,
-                subTotal, vatAmount, grandTotal, strBillingData, strPayrollData,
-                idx, sIdx);
+                subTotal, vatAmount, grandTotal,
+                strBillingData, strPayrollData, strViewConfig, // ★ 파라미터 추가
+                idx, sIdx
+            );
             return res.json({ result: true, data: result });
 
         } else {
@@ -43,14 +47,11 @@ exports.setSettleData = async function (req, res) {
             // ============================================
             const cIdx = req.body.cIdx;
 
-            console.log(sIdx, cIdx, year, month, docNo, type, billingDt,
-                subTotal, vatAmount, grandTotal,
-                strBillingData, strPayrollData)
-
             let result = await settleModel.setSettleData(
                 sIdx, cIdx, year, month, docNo, type, billingDt,
                 subTotal, vatAmount, grandTotal,
-                strBillingData, strPayrollData)
+                strBillingData, strPayrollData, strViewConfig // ★ 파라미터 추가
+            );
 
             return res.json({ result: true, data: result });
         }

@@ -21,22 +21,22 @@ exports.getSettleList = async function (year, month, docType, cIdx) {
 
 exports.setSettleData = async function (sIdx, cIdx, year, month, docNo, type, billingDt,
                                         subTotal, vatAmount, grandTotal,
-                                        strBillingData, strPayrollData) {
+                                        strBillingData, strPayrollData, strViewConfig) { // ★ 매개변수 추가
     let sql = `
         INSERT INTO new_tb_site_settlement
-        (sIdx, cIdx, year, month, docType, docNo, type, billingDt, subTotal, vatAmount, grandTotal, billingData, payrollData)
-        VALUES (?, ?, ?, ?, 'SERVICE', ?, ?, ?, ?, ?, ?, ?, ?)
+        (sIdx, cIdx, year, month, docType, docNo, type, billingDt, subTotal, vatAmount, grandTotal, billingData, payrollData, viewConfig) -- ★ viewConfig 컬럼 추가
+        VALUES (?, ?, ?, ?, 'SERVICE', ?, ?, ?, ?, ?, ?, ?, ?, ?) -- ★ ? 개수 1개 추가
     `;
     let aParameter = [
         sIdx, cIdx, year, month, docNo, type, billingDt,
         subTotal, vatAmount, grandTotal,
-        strBillingData, strPayrollData
+        strBillingData, strPayrollData, strViewConfig // ★ 배열에 추가
     ];
 
     try {
         let [res] = await pool.query(sql, aParameter);
         return res;
-    }catch (e) {
+    } catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
     }
@@ -44,35 +44,36 @@ exports.setSettleData = async function (sIdx, cIdx, year, month, docNo, type, bi
 
 exports.updateSettleData = async function (year, month, type, docNo, billingDt,
                                            subTotal, vatAmount, grandTotal,
-                                           strBillingData, strPayrollData,
+                                           strBillingData, strPayrollData, strViewConfig, // ★ 매개변수 추가
                                            idx, sIdx) {
     let sql = `
-                UPDATE new_tb_site_settlement 
-                SET 
-                    year = ?, 
-                    month = ?, 
-                    type = ?, 
-                    docNo = ?, 
-                    billingDt = ?, 
-                    subTotal = ?, 
-                    vatAmount = ?, 
-                    grandTotal = ?, 
-                    billingData = ?, 
-                    payrollData = ?,
-                    modDt = CURRENT_TIMESTAMP
-                WHERE idx = ? AND sIdx = ?
-            `;
+        UPDATE new_tb_site_settlement
+        SET
+            year = ?,
+            month = ?,
+            type = ?,
+            docNo = ?,
+            billingDt = ?,
+            subTotal = ?,
+            vatAmount = ?,
+            grandTotal = ?,
+            billingData = ?,
+            payrollData = ?,
+            viewConfig = ?, -- ★ SET 절에 추가
+            modDt = CURRENT_TIMESTAMP
+        WHERE idx = ? AND sIdx = ?
+    `;
     let aParameter = [
         year, month, type, docNo, billingDt,
         subTotal, vatAmount, grandTotal,
-        strBillingData, strPayrollData,
+        strBillingData, strPayrollData, strViewConfig, // ★ 배열 위치 주의 (WHERE 절 변수 전)
         idx, sIdx
     ];
 
     try {
         let [res] = await pool.query(sql, aParameter);
         return res;
-    }catch (e) {
+    } catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
     }
