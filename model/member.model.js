@@ -40,6 +40,31 @@ exports.deleteManager = async function (managerId) {
     }
 }
 
+// model
+exports.getMemberRRNBatch = async function (mIdxList, cIdx) {
+    let sql = "SELECT idx, rrn FROM new_tb_member WHERE idx IN (?) AND cIdx = ?";
+    let aParameter = [mIdxList, cIdx];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+
+        const result = {};
+        res.forEach(member => {
+            if (!member.rrn) return;
+            result[member.idx] = decryptRRN(member.rrn);
+        });
+
+        // 로그 일괄 기록
+        let logSql = "INSERT INTO new_tb_access_log (type, targetIdx, cIdx, regDt) VALUES ?";
+        let logParams = mIdxList.map(mIdx => ['RRN_VIEW', mIdx, cIdx, new Date()]);
+        await pool.query(logSql, [logParams]);
+
+        return result; // { 101: '900101-1234567', 102: '850305-2345678', ... }
+    } catch (e) {
+        console.log('db err', e);
+        return { 'data': '-9999' };
+    }
+};
+
 const maskRRN = (rrn) => {
     if (!rrn) return null;
     // 하이픈이 있든 없든 처리하기 위해 숫자만 추출하거나 포맷 확인

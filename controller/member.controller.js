@@ -16,6 +16,8 @@ module.exports = function (app) {
     //직원 리스트 조회
     app.route('/v1/member/list').get(service.getMemberList);
 
+    app.route('/v1/member/rrn/batch').post(service.getMemberRRNBatch);
+
     //직원 정보 조회
     app.route('/v1/member/data/:id').get(service.getMemberData);
 

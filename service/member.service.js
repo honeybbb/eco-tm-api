@@ -58,6 +58,23 @@ exports.getMemberList = async function (req, res) {
     }
 }
 
+exports.getMemberRRNBatch = async function (req, res) {
+    try {
+        const { mIdxList } = req.body;
+        const cIdx = req.user?.cIdx; // 미들웨어에서 세션/토큰으로 주입
+
+        if (!mIdxList || !mIdxList.length) {
+            return res.status(400).json({ result: false, message: '회원 리스트 정보가 없습니다.' });
+        }
+
+        const data = await memberModel.getMemberRRNBatch(mIdxList, cIdx);
+        res.status(200).json({ result: true, data });
+    } catch (e) {
+        console.error('RRN batch 오류:', e);
+        res.status(500).json({ result: false, message: '서버 오류' });
+    }
+};
+
 //직원 데이터 조회
 exports.getMemberData = async function (req, res) {
     let id = req.params.id;
