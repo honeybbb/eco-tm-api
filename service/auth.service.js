@@ -41,7 +41,7 @@ exports.loginManager = async function (req, res) {
 
         if(match) {
             const token = jwt.sign(
-                { id: admin[0].id, role: 'admin', cIdx: admin[0].cIdx },
+                { id: admin[0].managerId, role: 'admin', cIdx: admin[0].cIdx },
                 process.env.JWT_SECRET,
                 { expiresIn: '2h' }
             );

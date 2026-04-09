@@ -40,8 +40,7 @@ exports.deleteManager = async function (managerId) {
     }
 }
 
-// model
-exports.getMemberRRNBatch = async function (mIdxList, cIdx) {
+exports.getMemberRRNBatch = async function (mIdxList, adminId, cIdx, clientIp) {
     let sql = "SELECT idx, rrn FROM new_tb_member WHERE idx IN (?) AND cIdx = ?";
     let aParameter = [mIdxList, cIdx];
     try {
@@ -54,9 +53,9 @@ exports.getMemberRRNBatch = async function (mIdxList, cIdx) {
         });
 
         // 로그 일괄 기록
-        let logSql = "INSERT INTO new_tb_access_log (type, targetIdx, cIdx, regDt) VALUES ?";
-        let logParams = mIdxList.map(mIdx => ['RRN_VIEW', mIdx, cIdx, new Date()]);
-        await pool.query(logSql, [logParams]);
+        let logSql = "INSERT INTO new_tb_access_log (type, adminId, cIdx, clientIp, regDt) VALUES ('RRN_VIEW', ?, ?, ?, NOW())";
+        let logParams = [adminId, cIdx, clientIp];
+        await pool.query(logSql, logParams);
 
         return result; // { 101: '900101-1234567', 102: '850305-2345678', ... }
     } catch (e) {

@@ -62,12 +62,19 @@ exports.getMemberRRNBatch = async function (req, res) {
     try {
         const { mIdxList } = req.body;
         const cIdx = req.user?.cIdx; // 미들웨어에서 세션/토큰으로 주입
+        const adminId = req.user?.id;
+
+        let clientIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.ip;
+        // x-forwarded-for 가 여러 IP의 콤마 배열로 들어올 경우 첫 번째 IP만 추출
+        if (clientIp && clientIp.includes(',')) {
+            clientIp = clientIp.split(',')[0].trim();
+        }
 
         if (!mIdxList || !mIdxList.length) {
             return res.status(400).json({ result: false, message: '회원 리스트 정보가 없습니다.' });
         }
 
-        const data = await memberModel.getMemberRRNBatch(mIdxList, cIdx);
+        const data = await memberModel.getMemberRRNBatch(mIdxList, adminId, cIdx, clientIp);
         res.status(200).json({ result: true, data });
     } catch (e) {
         console.error('RRN batch 오류:', e);
