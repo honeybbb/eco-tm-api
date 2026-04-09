@@ -102,6 +102,7 @@ exports.getPayrollMonthTemp = async function (year, month) {
     sql += " m.idx,"
     sql += " m.id,"
     sql += " m.type,"
+    sql += " m.inDate, m.outDate,"
     sql += " (select name from new_tb_site where ma.sIdx = idx) as siteName,"
     sql += " (select idx from new_tb_site where ma.sIdx = idx) as sIdx,"
     sql += " (select itemNm from new_tb_code where m.position = itemCd) as role,"

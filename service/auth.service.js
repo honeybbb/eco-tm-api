@@ -33,49 +33,43 @@ exports.loginUser = async function (req, res) {
 exports.loginManager = async function (req, res) {
     let loginId = req.body.id,
         password = req.body.password;
-
     try {
         const admin = await authModel.findByAdminId(loginId);
         const match = await bcrypt.compare(password, admin?.[0].password);
         delete admin?.[0].password;
 
         if (match) {
-            // 단기 Access Token (1~2시간)
-            const accessToken = jwt.sign(
+            const token = jwt.sign(
                 { id: admin[0].managerId, role: 'admin', cIdx: admin[0].cIdx },
                 process.env.JWT_SECRET,
                 { expiresIn: '2h' }
             );
-
-            // 장기 Refresh Token (7일)
             const refreshToken = jwt.sign(
-                { id: admin[0].managerId },
+                { id: admin[0].managerId, cIdx: admin[0].cIdx },
                 process.env.JWT_REFRESH_SECRET,
                 { expiresIn: '7d' }
             );
-
-            res.json({ result: true, accessToken, refreshToken, data: admin });
-        }else {
-            res.json({'result': false, 'msg': '아이디 혹은 비밀번호를 확인해주세요.'})
+            res.json({ result: true, token, refreshToken, data: admin });
+        } else {
+            res.json({ result: false, msg: '아이디 혹은 비밀번호를 확인해주세요.' });
         }
     } catch(err) {
-        res.json({'result': false, 'msg': '회원정보를 찾을 수 없습니다.'})
+        res.json({ result: false, msg: '회원정보를 찾을 수 없습니다.' });
     }
+};
 
-}
-
+// refreshToken - decoded.cIdx 정상 동작
 exports.refreshToken = async function (req, res) {
     const { refreshToken } = req.body;
     if (!refreshToken) return res.status(401).json({ result: false, msg: '토큰 없음' });
-
     try {
         const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-        const newAccessToken = jwt.sign(
-            { id: decoded.id, role: 'admin', cIdx: decoded.cIdx },
+        const newToken = jwt.sign(
+            { id: decoded.id, role: 'admin', cIdx: decoded.cIdx }, // ✅ cIdx 정상
             process.env.JWT_SECRET,
             { expiresIn: '2h' }
         );
-        res.json({ result: true, accessToken: newAccessToken });
+        res.json({ result: true, token: newToken }); // ✅ token으로 통일
     } catch (e) {
         res.status(401).json({ result: false, msg: '재로그인 필요' });
     }
