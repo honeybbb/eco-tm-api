@@ -39,14 +39,22 @@ exports.loginManager = async function (req, res) {
         const match = await bcrypt.compare(password, admin?.[0].password);
         delete admin?.[0].password;
 
-        if(match) {
-            const token = jwt.sign(
+        if (match) {
+            // 단기 Access Token (1~2시간)
+            const accessToken = jwt.sign(
                 { id: admin[0].managerId, role: 'admin', cIdx: admin[0].cIdx },
                 process.env.JWT_SECRET,
-                { expiresIn: '10h' }
+                { expiresIn: '2h' }
             );
 
-            res.json({'result': true, token, 'data': admin})
+            // 장기 Refresh Token (7일)
+            const refreshToken = jwt.sign(
+                { id: admin[0].managerId },
+                process.env.JWT_REFRESH_SECRET,
+                { expiresIn: '7d' }
+            );
+
+            res.json({ result: true, accessToken, refreshToken, data: admin });
         }else {
             res.json({'result': false, 'msg': '아이디 혹은 비밀번호를 확인해주세요.'})
         }
@@ -55,3 +63,20 @@ exports.loginManager = async function (req, res) {
     }
 
 }
+
+exports.refreshToken = async function (req, res) {
+    const { refreshToken } = req.body;
+    if (!refreshToken) return res.status(401).json({ result: false, msg: '토큰 없음' });
+
+    try {
+        const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+        const newAccessToken = jwt.sign(
+            { id: decoded.id, role: 'admin', cIdx: decoded.cIdx },
+            process.env.JWT_SECRET,
+            { expiresIn: '2h' }
+        );
+        res.json({ result: true, accessToken: newAccessToken });
+    } catch (e) {
+        res.status(401).json({ result: false, msg: '재로그인 필요' });
+    }
+};
