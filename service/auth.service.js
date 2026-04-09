@@ -43,7 +43,7 @@ exports.loginManager = async function (req, res) {
             const token = jwt.sign(
                 { id: admin[0].managerId, role: 'admin', cIdx: admin[0].cIdx },
                 process.env.JWT_SECRET,
-                { expiresIn: '2h' }
+                { expiresIn: '10h' }
             );
 
             res.json({'result': true, token, 'data': admin})
