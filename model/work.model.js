@@ -291,3 +291,75 @@ exports.getWorkOffList = async function (month, sIdx) {
         return {'data': '-9999'}
     }
 }
+
+// work.model.js
+
+// 특정 날짜 근태 조회 (수동 수정용)
+exports.getWorkByMemberDate = async function(mIdx, sIdx, date) {
+    let sql = `
+        SELECT idx, workType, bigo
+        FROM new_tb_work
+        WHERE mIdx = ? AND sIdx = ?
+          AND DATE(workStartDt) = ?
+        LIMIT 1
+    `;
+    let aParameter = [mIdx, sIdx, date];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res[0] || null;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
+
+// 근태 타입 UPDATE (수동 수정)
+exports.updateWorkType = async function(idx, workType, bigo) {
+    let sql = `
+        UPDATE new_tb_work
+        SET workType = ?, bigo = ?, modDt = NOW()
+        WHERE idx = ?
+    `;
+    let aParameter = [workType, bigo || '', idx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
+
+// 근태 삭제
+exports.deleteWork = async function(idx) {
+    let sql = `DELETE FROM new_tb_work WHERE idx = ?`;
+    let aParameter = [idx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
+
+// 해당 월 현장 전체 근태 삭제
+exports.deleteWorkByMonth = async function(sIdx, month) {
+    let sql = `
+        DELETE FROM new_tb_work
+        WHERE sIdx = ?
+          AND DATE_FORMAT(workStartDt, '%Y-%m') = ?
+    `;
+    let aParameter = [sIdx, month];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};

@@ -28,4 +28,10 @@ module.exports = function (app) {
 
     //직원 출근일괄 등록
     app.route('/v1/work/bulk').post(service.bulkRegisterWork);
+
+    // 수동 등록/수정
+    app.route('/v1/work/upsert').post(service.upsertWork);
+
+    // 근태 삭제
+    app.route('/v1/work/:idx').delete(service.deleteWork);
 }

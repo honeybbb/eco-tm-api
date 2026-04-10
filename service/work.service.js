@@ -879,6 +879,53 @@ exports.bulkRegisterWork = async function (req, res) {
     }
 };
 
+// 근태 수동 등록/수정 (UPDATE 우선, 없으면 INSERT)
+exports.upsertWork = async function(req, res) {
+    try {
+        const { mIdx, sIdx, workStartDt, workType, bigo } = req.body;
+
+        if (!mIdx || !sIdx || !workStartDt || !workType) {
+            return res.status(400).json({ result: false, message: '필수값이 없습니다.' });
+        }
+
+        const date = workStartDt.split(' ')[0]; // 날짜만 추출
+
+        // 기존 레코드 조회
+        const existing = await workModel.getWorkByMemberDate(mIdx, sIdx, date);
+
+        if (existing) {
+            // UPDATE
+            await workModel.updateWorkType(existing.idx, workType, bigo);
+            console.log(`✅ UPDATE: mIdx=${mIdx}, date=${date}, ${existing.workType} → ${workType}`);
+        } else {
+            // INSERT (일괄등록 안 된 날짜에 수동 등록하는 경우)
+            await workModel.workStart(mIdx, Number(sIdx), date, workType, bigo || '', new Date());
+            console.log(`✅ INSERT: mIdx=${mIdx}, date=${date}, workType=${workType}`);
+        }
+
+        res.json({ result: true, message: '근태가 등록되었습니다.' });
+
+    } catch (e) {
+        console.error('❌ upsertWork 오류:', e);
+        res.status(500).json({ result: false, message: '서버 오류' });
+    }
+};
+
+// 근태 삭제
+exports.deleteWork = async function(req, res) {
+    try {
+        const { idx } = req.params;
+        if (!idx) return res.status(400).json({ result: false, message: 'idx가 없습니다.' });
+
+        await workModel.deleteWork(idx);
+        res.json({ result: true, message: '삭제되었습니다.' });
+
+    } catch (e) {
+        console.error('❌ deleteWork 오류:', e);
+        res.status(500).json({ result: false, message: '서버 오류' });
+    }
+};
+
 /**
  * 계약 근무일 여부 판단
  * workhours 형식: {"0": {"isActive": false, "isBiweekly": false, ...}, "1": {...}, ...}
