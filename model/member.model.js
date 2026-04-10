@@ -76,7 +76,8 @@ const maskRRN = (rrn) => {
 };
 
 exports.getMemberList = async function (cIdx) {
-    let sql = "select m.*, case when status = 0 then '재직' when status = 1 then '퇴사' else '-' end as `status`,"
+    let sql = "select m.*,"
+    // sql += " case when status = 0 then '재직' when status = 1 then '퇴사' else '-' end as `status`,"
     // sql += " mc.jsonData as wage,"
     sql += " ms.sIdx, ms.name as `siteName`, mc.contractEndDt as `contract`,"
     sql += " c.itemNm as `type`, c2.itemNm as `position`, c3.option as `badgeColor`, c3.itemNm as `disability_grade`"
