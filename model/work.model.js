@@ -16,6 +16,47 @@ exports.getWorkFl = async function (mIdx, sIdx, today) {
     }
 }
 
+// 특정 날짜 출근 기록 존재 여부 확인 (중복 방지용)
+exports.getWorkByDate = async function(mIdx, sIdx, date) {
+    const query = `
+        SELECT idx FROM new_tb_work
+        WHERE mIdx = ? AND sIdx = ?
+          AND DATE(workStartDt) = ?
+        LIMIT 1
+    `;
+    const [rows] = await pool.query(query, [mIdx, sIdx, date]);
+    return rows;
+};
+
+exports.getWorkScheduleBySite = async function(sIdx) {
+    let sql = `
+        SELECT wc.position, wc.workhours, wc.breaktime
+        FROM new_tb_work_contract wc
+                 INNER JOIN new_tb_site_contract sc ON sc.idx = wc.scIdx
+        WHERE wc.sIdx = ?
+          AND sc.idx = (
+            -- 최신 유효 계약 idx 1개만 서브쿼리로 특정
+            SELECT idx
+            FROM new_tb_site_contract
+            WHERE sIdx = ?
+              AND startDt <= CURDATE()
+              AND endDt >= CURDATE()
+            ORDER BY regDt DESC
+            LIMIT 1
+            )
+    `;
+
+    let aParameter = [sIdx, sIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.workStart = async function (mIdx, sIdx, workStartDt, workType, bigo, regDt) {
     let sql = "insert into new_tb_work (mIdx, sIdx, workStartDt, workType, bigo, regDt)"
     sql += " values (?, ?, ? , ?, ?, ?)"

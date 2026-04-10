@@ -137,7 +137,16 @@ exports.registerSiteWithContract = async function (req, res) {
                 };
 
                 // 개별 계약 저장
-                await siteModel.saveContract(contractData);
+                //await siteModel.saveContract(contractData);
+                let contractResult = await siteModel.saveContract(contractData);
+
+                if (contractResult.success) {
+                    // ★ 2. 방금 저장된 계약의 PK(scIdx)를 받아와서 직책별 근무 스케줄(workhours) 저장
+                    const savedCtIdx = contractResult.scIdx;
+
+                    // 프론트에서 받은 staffList 원본 (JSON 변환 안 된 상태) 그대로 넘김
+                    await siteModel.syncWorkContracts(savedCtIdx, targetSIdx, contractItem.staffList);
+                }
             }
         }
 
@@ -230,21 +239,84 @@ exports.getAssignedStaff = async function (req, res) {
         res.status(500).json({ result: false, msg: '서버 에러' });
     }
 }
-
+/*
 exports.getSiteData = async function (req, res) {
     const sIdx = req.params.sIdx;
+    if(!sIdx) return res.json({ 'result': false, message: '해당 현장 정보가 없습니다.' });
 
     try {
         const result = await siteModel.getSiteData(sIdx);
 
         if (result) {
-           //console.log(result, 'r')
             res.json({ result: true, data: result });
         } else {
             res.json({ result: false, message: '해당 현장 정보가 없습니다.' });
         }
     } catch (e) {
         console.error(e);
+        res.status(500).json({ result: false, message: '서버 에러' });
+    }
+};
+
+ */
+exports.getSiteData = async function (req, res) {
+    const sIdx = req.params.sIdx;
+    if(!sIdx) return res.json({ 'result': false, message: '현장 index 정보가 없습니다.' });
+
+    try {
+        // 1. 기본 현장 및 계약 정보 가져오기
+        const result = await siteModel.getSiteData(sIdx);
+
+        if (result && result.length > 0) {
+            const siteData = result[0]; // 현장 데이터 1건
+
+            // 2. 추가로 해당 현장의 근무 스케줄 가져오기
+            const schedules = await siteModel.getWorkContracts(sIdx);
+
+            // 3. 스케줄 데이터를 매핑하기 쉽게 변환 { scIdx(계약idx): { position(직책코드): JSON스케줄 } }
+            const scheduleMap = {};
+            if (schedules && schedules.length > 0) {
+                for (const s of schedules) {
+                    if (!scheduleMap[s.scIdx]) scheduleMap[s.scIdx] = {};
+
+                    // DB의 JSON 컬럼이 string으로 넘어올 수 있으므로 안전하게 파싱
+                    scheduleMap[s.scIdx][s.position] = typeof s.workhours === 'string' ? JSON.parse(s.workhours) : s.workhours;
+                }
+            }
+
+            // 4. 현장 데이터 안의 contractList에 스케줄 데이터 주입 (Merge)
+            if (siteData.contractList && siteData.contractList !== '[null]') {
+                let contracts = JSON.parse(siteData.contractList);
+
+                contracts.forEach(contract => {
+                    if (contract.staffList) {
+                        // staffList 파싱 (문자열로 저장된 배열)
+                        let staffArr = typeof contract.staffList === 'string' ? JSON.parse(contract.staffList) : contract.staffList;
+
+                        staffArr.forEach(staff => {
+                            // 현재 계약(contract.scIdx)의 해당 직책(staff.code)에 매핑된 스케줄이 있다면 삽입!
+                            if (scheduleMap[contract.scIdx] && scheduleMap[contract.scIdx][staff.code]) {
+                                staff.schedule = scheduleMap[contract.scIdx][staff.code];
+                            }
+                        });
+
+                        // 변경된 객체 배열로 덮어씌우기
+                        contract.staffList = staffArr;
+                    }
+                });
+
+                // 프론트엔드가 `JSON.parse(result.contractList)`를 기대하므로, 다시 문자열로 만들어서 덮어씌움
+                siteData.contractList = JSON.stringify(contracts);
+            }
+
+            // 5. 프론트로 조립된 데이터 응답
+            res.json({ result: true, data: [siteData] });
+
+        } else {
+            res.json({ result: false, message: '해당 현장 정보가 없습니다.' });
+        }
+    } catch (e) {
+        console.error("getSiteData 에러:", e);
         res.status(500).json({ result: false, message: '서버 에러' });
     }
 };

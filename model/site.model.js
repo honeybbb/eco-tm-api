@@ -161,7 +161,8 @@ exports.saveContract = async function (contract) {
     const connection = await pool.getConnection();
     try {
         // scIdx(계약 PK)가 있으면 UPDATE, 없으면 INSERT
-        if (contract.scIdx) {
+        let current_scIdx = contract.scIdx;
+        if (current_scIdx) {
             // [UPDATE]
             let sql = `
                 UPDATE new_tb_site_contract 
@@ -204,13 +205,56 @@ exports.saveContract = async function (contract) {
                 contract.breaktime,
                 contract.costBreakdown
             ];
-            await connection.query(sql, params);
+            let [result] = await connection.query(sql, params);
+            current_scIdx = result.insertId;
         }
 
-        return { success: true };
+        return { success: true, scIdx: current_scIdx };
 
     } catch (e) {
         console.error("Contract Save Error:", e);
+        return { success: false, error: e };
+    } finally {
+        connection.release();
+    }
+}
+
+exports.syncWorkContracts = async function (scIdx, sIdx, staffList) {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // 1. 해당 계약(scIdx)의 기존 스케줄 데이터 일괄 삭제
+        await connection.query(`DELETE FROM new_tb_work_contract WHERE scIdx = ?`, [scIdx]);
+
+        // 2. 넘어온 인원(직책) 리스트를 순회하며 새로 Insert
+        if (staffList && Array.isArray(staffList) && staffList.length > 0) {
+            let sql = `
+                INSERT INTO new_tb_work_contract 
+                (scIdx, sIdx, position, workhours, breaktime, regDt) 
+                VALUES (?, ?, ?, ?, ?, NOW())
+            `;
+
+            for (const staff of staffList) {
+                // 프론트에서 넘어온 객체를 JSON 문자열로 변환 (없으면 빈 객체)
+                const workhoursJson = staff.schedule ? JSON.stringify(staff.schedule) : '{}';
+
+                await connection.query(sql, [
+                    scIdx,
+                    sIdx,
+                    staff.code,       // position 컬럼 (직책 코드)
+                    workhoursJson,    // workhours json 컬럼
+                    null              // 휴게시간은 json 내부에 있으므로 공란(null) 처리 또는 기본값
+                ]);
+            }
+        }
+
+        await connection.commit();
+        return { success: true };
+
+    } catch (e) {
+        await connection.rollback();
+        console.error("Work Contract Sync Error:", e);
         return { success: false, error: e };
     } finally {
         connection.release();
@@ -522,6 +566,17 @@ exports.getSiteData = async function (sIdx) {
     }catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
+    }
+}
+
+exports.getWorkContracts = async function (sIdx) {
+    let sql = `SELECT scIdx, position, workhours FROM new_tb_work_contract WHERE sIdx = ?`;
+    try {
+        let [res] = await pool.query(sql, [sIdx]);
+        return res;
+    } catch (e) {
+        console.log('work contract db err', e);
+        return [];
     }
 }
 

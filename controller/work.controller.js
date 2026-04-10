@@ -25,4 +25,7 @@ module.exports = function (app) {
 
     //직원 출근 일수에 따른 급여
     //app.route('/v1/work/day/count').get(service.getWorkDayCount);
+
+    //직원 출근일괄 등록
+    app.route('/v1/work/bulk').post(service.bulkRegisterWork);
 }

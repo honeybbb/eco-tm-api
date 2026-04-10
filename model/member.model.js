@@ -207,7 +207,7 @@ exports.getMemberData = async function (id) {
 
 exports.getStaffBySite = async function(sIdx, cIdx) {
     let sql = `
-        SELECT m.idx, m.name, m.id AS memberId
+        SELECT m.idx, m.name, m.id AS memberId, m.position
         FROM new_tb_member m
                  INNER JOIN new_tb_member_assignment ma ON ma.mIdx = m.idx
                  INNER JOIN (
@@ -229,6 +229,26 @@ exports.getStaffBySite = async function(sIdx, cIdx) {
         console.log('db err', e);
         return {'data': '-9999'}
     }
+};
+
+// 최신 계약 기준 현장 직책별 스케줄 전체 조회
+exports.getWorkScheduleBySite = async function(sIdx) {
+    const query = `
+        SELECT wc.position, wc.workhours, wc.breaktime
+        FROM new_tb_work_contract wc
+        INNER JOIN new_tb_site_contract sc ON sc.idx = wc.ctIdx
+        WHERE wc.sIdx = ?
+          AND sc.idx = (
+              SELECT idx FROM new_tb_site_contract
+              WHERE sIdx = ?
+                AND startDt <= CURDATE()
+                AND endDt >= CURDATE()
+              ORDER BY regDt DESC
+              LIMIT 1
+          )
+    `;
+    const [rows] = await pool.query(query, [sIdx, sIdx]);
+    return rows;
 };
 
 exports.getMemberAvailable = async function(sIdx, cIdx) {
