@@ -58,7 +58,7 @@ exports.getBaseSalary = async function (cIdx) {
     sql += " m.id,";
     sql += " m.type,";
     sql += " m.birthDt,";
-    sql += " m.inDate, m.outDate,"
+    sql += " m.inDate, m.outDate, m.mStatus,"
     sql += " (SELECT name FROM new_tb_site WHERE idx = ma.sIdx LIMIT 1) as siteName,";
     sql += " ma.sIdx as sIdx,";
     sql += " (SELECT itemNm FROM new_tb_code WHERE itemCd = m.position AND cIdx = m.cIdx LIMIT 1) as role,";
@@ -103,11 +103,13 @@ exports.getPayrollMonthTemp = async function (year, month) {
     sql += " m.idx,"
     sql += " m.id,"
     sql += " m.type,"
+    sql += " m.birthDt,";
     sql += " (select name from new_tb_site where ma.sIdx = idx) as siteName,"
     sql += " (select idx from new_tb_site where ma.sIdx = idx) as sIdx,"
     sql += " (select itemNm from new_tb_code where m.position = itemCd) as role,"
     sql += " (select payment_day from new_tb_site where idx = ma.sIdx) as payment_day,"
     sql += " m.name as staff,"
+    sql += " m.status as mStatus,";
 
     // =================================================================================
     // 1. 결근 일수 (absentDays) - 근태 테이블(new_tb_work)에서 결근(absent)만 카운트
