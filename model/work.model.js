@@ -57,6 +57,24 @@ exports.getWorkScheduleBySite = async function(sIdx) {
     }
 }
 
+// 해당 월 현장 전체 근태 삭제
+exports.deleteWorkByMonth = async function(sIdx, month) {
+    let sql = `
+        DELETE FROM new_tb_work
+        WHERE sIdx = ?
+          AND DATE_FORMAT(workStartDt, '%Y-%m') = ?
+    `;
+    let aParameter = [sIdx, month];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
+
 exports.workStart = async function (mIdx, sIdx, workStartDt, workType, bigo, regDt) {
     let sql = "insert into new_tb_work (mIdx, sIdx, workStartDt, workType, bigo, regDt)"
     sql += " values (?, ?, ? , ?, ?, ?)"

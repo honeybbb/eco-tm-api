@@ -799,6 +799,8 @@ exports.bulkRegisterWork = async function (req, res) {
                 : c.workhours;
         }
         console.log('🗺️ contractMap keys:', Object.keys(contractMap));
+        const deleted = await workModel.deleteWorkByMonth(sIdx, month);
+        console.log(`🗑️ 기존 데이터 삭제: ${deleted.affectedRows}건`);
 
         // ── 3. 해당 월 전체 날짜 생성
         const allDates = getAllDatesOfMonth(month);
@@ -818,7 +820,23 @@ exports.bulkRegisterWork = async function (req, res) {
                 continue;
             }
 
+            // ── 퇴사자 처리: 퇴사일 이후 날짜는 등록 안 함 ──
+            const outDate = (staff.status === 1 && staff.outDate)
+                ? staff.outDate.toISOString
+                    ? staff.outDate.toISOString().split('T')[0]  // Date 객체인 경우
+                    : String(staff.outDate).split('T')[0]        // 문자열인 경우
+                : null;
+
+            if (outDate) {
+                console.log(`👋 [${staff.name}] 퇴사자 - 퇴사일: ${outDate} 이후 날짜 제외`);
+            }
+
             for (const date of allDates) {
+                // 퇴사일 이후면 스킵
+                if (outDate && date > outDate) continue;
+                // date > outDate  →  스킵 (퇴사일 이후)
+                // date <= outDate →  계약 근무일이면 등록 (퇴사일 당일 포함)
+
                 // 계약 근무일 아니면 스킵
                 if (!isContractWorkDay(date, workhours)) continue;
 
