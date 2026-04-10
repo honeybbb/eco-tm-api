@@ -717,7 +717,7 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
             disability_grade = ?, defector = ?, patriot = ?, intern = ?, 
             beneficiary = ?, foreigner = ?, nationality = ?, visa_code = ?, 
             visa_date = ?, bank = ?, accountNumber = ?, inDate = ?, 
-            outDate = ?, outReason = ?, address = ?, bigo = ?, 
+            outDate = ?, outReason = ?, address = ?, bigo = ?, status = ?,
             four_ins = ?, retire_pension = ?
         `;
 
@@ -729,8 +729,7 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
                 member.disability_grade, member.defector, member.patriot, member.intern,
                 member.beneficiary, member.foreigner, member.nationality, member.visa_code,
                 member.visa_date, member.bank, member.accountNumber, member.inDate,
-                member.outDate, member.outReason, member.addr, member.bigo,
-                // 👇 여기가 중요합니다! (컨트롤러에서 넘긴 이름과 동일하게)
+                member.outDate, member.outReason, member.addr, member.bigo, member.status,
                 member.fourInsurance, member.retirePension, member.password, mIdx
             ];
         } else {
@@ -741,8 +740,7 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
                 member.disability_grade, member.defector, member.patriot, member.intern,
                 member.beneficiary, member.foreigner, member.nationality, member.visa_code,
                 member.visa_date, member.bank, member.accountNumber, member.inDate,
-                member.outDate, member.outReason, member.addr, member.bigo,
-                // 👇 여기가 중요합니다!
+                member.outDate, member.outReason, member.addr, member.bigo, member.status,
                 member.fourInsurance, member.retirePension, mIdx
             ];
         }
@@ -757,8 +755,8 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
         if (contractRows.length > 0) {
             const sqlContract = `
                 UPDATE new_tb_member_contract SET
-                                                  sIdx = ?, type = ?, jsonData = ?,
-                                                  contractStartDt = ?, contractEndDt = ?, bigo = ?
+                    sIdx = ?, type = ?, jsonData = ?,
+                    contractStartDt = ?, contractEndDt = ?, bigo = ?
                 WHERE idx = ?
             `;
             await connection.query(sqlContract, [

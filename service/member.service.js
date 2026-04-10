@@ -468,6 +468,7 @@ exports.updateMemberData = async function (req, res) {
             outReason: body.status == '1' ? body.endReason : null,
             addr: body.address,
             bigo: body.bigo,
+            status: body.status,
             retirePension: body.retire_pension,
             fourInsurance: body.four_ins,
         };
