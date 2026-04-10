@@ -90,9 +90,16 @@ exports.getMemberList = async function (cIdx) {
     sql += "   ) c2 on c1.idx = c2.max_idx"
     sql += " ) mc on mc.mIdx = m.idx"
 
-    sql += " left join (select b.*, s.name from new_tb_member_assignment b left join new_tb_site s on s.idx = b.sIdx) as `ms` on ms.mIdx = m.idx"
+    // 직원별로 가장 최근(idx가 제일 큰) 배정 내역 딱 1건만 찾아내서 조인
+    sql += " left join ("
+    sql += "    select a1.*, s.name from new_tb_member_assignment a1"
+    sql += "    inner join ("
+    sql += "      select mIdx, max(idx) as max_idx from new_tb_member_assignment group by mIdx"
+    sql += "    ) a2 on a1.idx = a2.max_idx"
+    sql += "    left join new_tb_site s on s.idx = a1.sIdx"
+    sql += " ) as `ms` on ms.mIdx = m.idx"
 
-    // ★ 수정된 부분: AND c.cIdx = m.cIdx 조건을 모두 추가하여 내 회사의 코드만 1:1로 매칭시킴
+    // AND c.cIdx = m.cIdx 조건을 모두 추가하여 내 회사의 코드만 1:1로 매칭시킴
     sql += " left join new_tb_code c on c.itemCd = m.type and c.cIdx = m.cIdx"
     sql += " left join new_tb_code c2 on c2.itemCd = m.position and c2.cIdx = m.cIdx"
     sql += " left join new_tb_code c3 on c3.itemCd = m.disability_grade and c3.cIdx = m.cIdx"
