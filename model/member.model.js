@@ -207,7 +207,7 @@ exports.getMemberData = async function (id) {
 
 exports.getStaffBySite = async function(sIdx, cIdx) {
     let sql = `
-        SELECT m.idx, m.name, m.id AS memberId, m.position, m.status, m.outDate
+        SELECT m.idx, m.name, m.id AS memberId, m.position, m.status, m.outDate, m.inDate
         FROM new_tb_member m
                  INNER JOIN new_tb_member_assignment ma ON ma.mIdx = m.idx
                  INNER JOIN (

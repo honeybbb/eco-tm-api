@@ -94,9 +94,9 @@ exports.getBaseCode = async function (cIdx) {
     let aParameter = [cIdx];
 
     try {
-        console.log("2. 쿼리 실행 직전 (여기서 멈추면 DB 연결 풀 문제)");
+        // console.log("2. 쿼리 실행 직전 (여기서 멈추면 DB 연결 풀 문제)");
         let [res] = await pool.query(sql, aParameter);
-        console.log('DB 조회 결과:', res);
+        // console.log('DB 조회 결과:', res);
         return res;
     } catch (e) {
         console.log('db err', e);
