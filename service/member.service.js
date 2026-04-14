@@ -392,6 +392,7 @@ exports.registerFullMember = async function (req, res) {
             inDate: body.joinDate || null,
             outDate: body.outDate || null,
             outReason: body.endReason, // 필요시 추가
+            status: body.status,
             address: body.address,
             bigo: body.bigo
         };
