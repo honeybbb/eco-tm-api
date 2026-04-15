@@ -72,7 +72,6 @@ exports.getBaseSalary = async function (cIdx) {
     // 2. 상태값(status) 처리: mbs 데이터가 없으면(NULL이면) 0, 있으면 1(또는 mbs의 기존 상태값)
     // mbs.idx가 없다는 것은 계약서에서 데이터를 끌어왔다는 의미이므로 0을 반환합니다.
     sql += " CASE WHEN mbs.idx IS NULL THEN 0 ELSE 1 END as status,";
-
     sql += " mbs.grossPay, mbs.deductions AS totalDeduction, mbs.netPay";
     sql += " from new_tb_member m";
 
@@ -83,7 +82,10 @@ exports.getBaseSalary = async function (cIdx) {
     sql += " left join new_tb_member_contract mc ON mc.idx = (SELECT idx FROM new_tb_member_contract WHERE mIdx = m.idx ORDER BY regDt DESC LIMIT 1)";
 
     sql += " left join new_tb_site s on s.idx = mbs.sIdx";
-    sql += " left join new_tb_member_assignment ma on ma.mIdx = m.idx";
+    sql += " left join new_tb_member_assignment ma ON ma.idx = (";
+    sql += "     SELECT idx FROM new_tb_member_assignment ";
+    sql += "     WHERE mIdx = m.idx ORDER BY idx DESC LIMIT 1"; // 최신 배정 정보 1건만
+    sql += " )";
     sql += " WHERE m.cIdx = ?";
     sql += " order by s.idx, m.idx";
 
@@ -225,7 +227,11 @@ exports.getPayrollMonth = async function (year, month, cIdx) {
         
         /* 기본 정보 조인 */
         LEFT JOIN new_tb_code c ON c.itemCd = m.position AND c.cIdx = m.cIdx
-        LEFT JOIN new_tb_member_assignment ma ON ma.mIdx = m.idx
+        LEFT JOIN new_tb_member_assignment ma ON ma.idx = (
+            SELECT idx FROM new_tb_member_assignment
+            WHERE mIdx = m.idx
+            ORDER BY idx DESC LIMIT 1
+            )
         LEFT JOIN new_tb_site s ON s.idx = ma.sIdx
 
         /* --- [JOIN 1] 근태: 해당 월의 결근 횟수만 집계 --- */
