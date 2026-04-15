@@ -259,7 +259,7 @@ exports.getMemberAvailable = async function(sIdx, cIdx) {
     sql += " FROM new_tb_member m";
 
     // 2. 전체 직원이 아닌 '내 회사(cIdx)' 소속이면서 '재직 중(status=0)'인 사람만 필터링
-    sql += " WHERE m.cIdx = ? AND m.status = 0";
+    sql += " WHERE m.cIdx = ?"// AND m.status = 0";
 
     // 3. 해당 현장(sIdx)에 이미 배치된 직원은 제외 (NOT IN)
     sql += " AND m.idx NOT IN (";
