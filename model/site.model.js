@@ -131,11 +131,11 @@ exports.saveSite = async function (site) {
         } else {
             // [INSERT]
             let sql = `
-                INSERT INTO new_tb_site 
-                (cIdx, sType, name, zipcode, address, phone, 
-                 building_su, unit_su, area, areaUnder, areaOver, is_vat, manager
+                INSERT INTO new_tb_site
+                (cIdx, sType, name, zipcode, address, phone,
+                 building_su, unit_su, area, areaUnder, areaOver, is_vat, manager,
                  director, director_phone, payment_day,
-                 businessNumber, representative, businessType, businessItem, 
+                 businessNumber, representative, businessType, businessItem,
                  email, viewConfig)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
