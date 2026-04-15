@@ -113,7 +113,7 @@ exports.saveSite = async function (site) {
             let sql = `
                 UPDATE new_tb_site 
                 SET sType=?, name=?, zipcode = ?, address=?, phone=?, building_su=?, unit_su=?, 
-                    area=?, areaUnder=?, areaOver=?, is_vat=?, 
+                    area=?, areaUnder=?, areaOver=?, is_vat=?, manager=?,
                     director=?, director_phone=?, payment_day=?,
                     businessNumber=?, representative=?, businessType=?, businessItem=?, 
                     email=?, viewConfig=?
@@ -121,7 +121,7 @@ exports.saveSite = async function (site) {
             `;
             let params = [
                 site.sType, site.name, site.zipcode, site.address, site.phone, site.building_su, site.unit_su,
-                site.area, site.areaUnder, site.areaOver, site.is_vat,
+                site.area, site.areaUnder, site.areaOver, site.is_vat,site.manager,
                 site.director, site.director_phone, site.payment_day,
                 site.businessNumber, site.representative, site.businessType, site.businessItem,
                 site.email, site.viewConfig,
@@ -133,16 +133,16 @@ exports.saveSite = async function (site) {
             let sql = `
                 INSERT INTO new_tb_site 
                 (cIdx, sType, name, zipcode, address, phone, 
-                 building_su, unit_su, area, areaUnder, areaOver, is_vat, 
+                 building_su, unit_su, area, areaUnder, areaOver, is_vat, manager
                  director, director_phone, payment_day,
                  businessNumber, representative, businessType, businessItem, 
                  email, viewConfig)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             let params = [
                 site.cIdx, site.sType, site.name, site.zipcode, site.address,
                 site.phone, site.building_su, site.unit_su,
-                site.area, site.areaUnder, site.areaOver, site.is_vat,
+                site.area, site.areaUnder, site.areaOver, site.is_vat, site.manager,
                 site.director, site.director_phone, site.payment_day,
                 site.businessNumber, site.representative, site.businessType, site.businessItem,
                 site.email, site.viewConfig
