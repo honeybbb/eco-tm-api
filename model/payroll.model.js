@@ -61,7 +61,8 @@ exports.getBaseSalary = async function (cIdx) {
     sql += " m.inDate, m.outDate, m.status as mStatus,"
     sql += " (SELECT name FROM new_tb_site WHERE idx = ma.sIdx LIMIT 1) as siteName,";
     sql += " ma.sIdx as sIdx,";
-    sql += " (SELECT itemNm FROM new_tb_code WHERE itemCd = m.position AND cIdx = m.cIdx LIMIT 1) as role,";
+    sql += " c.itemNm as role,";
+    sql += " c.sort,";
     sql += " m.name as staff,";
 
     // 1. 급여 항목 데이터 매핑
@@ -86,8 +87,9 @@ exports.getBaseSalary = async function (cIdx) {
     sql += "     SELECT idx FROM new_tb_member_assignment ";
     sql += "     WHERE mIdx = m.idx ORDER BY idx DESC LIMIT 1"; // 최신 배정 정보 1건만
     sql += " )";
+    sql += " left join new_tb_code c on c.itemCd = m.position and c.cIdx = m.cIdx";
     sql += " WHERE m.cIdx = ?";
-    sql += " order by s.idx, m.idx";
+    sql += " order by s.idx, c.sort, m.idx";
 
     let aParameter = [cIdx];
     try {
@@ -203,6 +205,7 @@ exports.getPayrollMonth = async function (year, month, cIdx) {
             s.name AS siteName,
             s.payment_day,
             c.itemNm AS role,
+            c.sort,
             m.inDate, m.outDate,
             
             /* 1. 결근 일수는 사실상 확정 정보이므로 무조건 보여줌 (없으면 0) */
@@ -255,7 +258,7 @@ exports.getPayrollMonth = async function (year, month, cIdx) {
             ) p2 ON p1.idx = p2.max_idx
         ) mpm ON mpm.mIdx = m.idx
         WHERE m.cIdx = ?
-        ORDER BY s.idx, m.idx
+        ORDER BY s.idx, c.sort, m.idx
     `;
 
     // 파라미터 매칭: 근태 조인(2) + 급여 조인(2) = 총 4개

@@ -76,7 +76,7 @@ const maskRRN = (rrn) => {
 };
 
 exports.getMemberList = async function (cIdx) {
-    let sql = "select m.*,"
+    let sql = "select m.*, c2.sort,"
     // sql += " case when status = 0 then '재직' when status = 1 then '퇴사' else '-' end as `status`,"
     // sql += " mc.jsonData as wage,"
     sql += " ms.sIdx, ms.name as `siteName`, mc.contractEndDt as `contract`,"
@@ -106,7 +106,8 @@ exports.getMemberList = async function (cIdx) {
     sql += " left join new_tb_code c3 on c3.itemCd = m.disability_grade and c3.cIdx = m.cIdx"
 
     sql += " where m.cIdx in (?)"
-    sql += " order by ms.sIdx desc, m.idx"
+    // sql += " order by ms.sIdx desc, m.idx"
+    sql += " order by ms.sIdx desc, c2.sort, m.idx"
 
     let aParameter = [cIdx];
 
@@ -118,7 +119,7 @@ exports.getMemberList = async function (cIdx) {
                 try {
                     // 1. 일단 복호화
                     const decrypted = decryptRRN(member.rrn);
-                    // 2. ★ 중요: 복호화된 원본 대신 마스킹된 값을 전달
+                    // 2. 복호화된 원본 대신 마스킹된 값을 전달
                     member.rrn = maskRRN(decrypted);
                 } catch (err) {
                     member.rrn = "복호화 오류";
