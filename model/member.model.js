@@ -217,7 +217,7 @@ exports.getStaffBySite = async function(sIdx, cIdx) {
             WHERE sIdx = ?
             GROUP BY mIdx
         ) latest ON latest.mIdx = ma.mIdx AND latest.maxIdx = ma.idx
-        WHERE m.cIdx = ?
+        WHERE m.cIdx = ? and m.status in (0, 1) /*재직과 퇴사만(일용,대근은 X)*/
         ORDER BY m.name ASC
     `;
 
