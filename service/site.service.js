@@ -80,6 +80,8 @@ exports.registerSiteWithContract = async function (req, res) {
             director: req.body.director,
             director_phone: req.body.directorContact,
             bigo: req.body.bigo || '',
+
+            viewConfig: req.body.viewConfig || null,
         };
 
         // console.log(siteData, 'siteData');
