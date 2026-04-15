@@ -24,7 +24,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // 로그인 라우트는 토큰 검증 제외
 app.use((req, res, next) => {
-    const excludePaths = ['/v1/auth/member', '/v1/auth/manager'];
+    const excludePaths = ['/v1/auth/member', '/v1/auth/manager', '/v1/auth/refresh'];
     if (excludePaths.includes(req.path)) {
         return next();
     }
