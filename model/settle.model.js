@@ -1,6 +1,26 @@
 const pool = require("../config/mysql");
 const mysql = require("mysql2/promise");
 
+exports.getSettleList = async function (startMonth, endMonth, docType, cIdx) {
+    let sql = "SELECT ss.*, ";
+    sql += " (SELECT itemNm FROM new_tb_code WHERE itemCd = ss.type AND cIdx = ? LIMIT 1) AS typeNm";
+    sql += " FROM new_tb_site_settlement ss ";
+    // 연도와 월을 합쳐서 'YYYYMM' 형태의 문자열로 만든 후 BETWEEN 검색
+    sql += " WHERE CONCAT(ss.year, LPAD(ss.month, 2, '0')) BETWEEN ? AND ? ";
+    sql += " AND ss.docType IN (?) AND ss.cIdx = ?";
+
+    let aParameter = [cIdx, startMonth, endMonth, docType, cIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+/** 20260416 수정
 exports.getSettleList = async function (year, month, docType, cIdx) {
     let sql = "SELECT ss.*, ";
     sql += " (SELECT itemNm FROM new_tb_code WHERE itemCd = ss.type AND cIdx = ? LIMIT 1) AS typeNm";
@@ -18,6 +38,7 @@ exports.getSettleList = async function (year, month, docType, cIdx) {
         return {'data': '-9999'}
     }
 }
+**/
 
 exports.setSettleData = async function (sIdx, cIdx, year, month, docNo, type, billingDt,
                                         subTotal, vatAmount, grandTotal,
