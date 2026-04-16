@@ -418,16 +418,19 @@ exports.getMemberLeave = async function (cIdx, year) {
             m.idx as \`mIdx\`,
             m.name,
             m.position,
-            (select itemNm from new_tb_code c where c.itemCd = m.position) as \`role\`,
+            -- 1. cIdx 조건 추가 및 LIMIT 1 적용
+            (select itemNm from new_tb_code c where c.itemCd = m.position and c.cIdx = m.cIdx limit 1) as \`role\`,
             mal.totalCount,
             mal.usedCount,
             mal.overCount,
             mal.payCount,
             mal.middleDt,
-            ma.sIdx, 
-            (select name from new_tb_site where idx = ma.sIdx) as \`siteName\`
+            ma.sIdx,
+        -- 2. LIMIT 1 적용
+        (select name from new_tb_site where idx = ma.sIdx limit 1) as \`siteName\`
         from new_tb_member m
-            left join new_tb_member_annual_leave mal on mal.mIdx = m.idx
+            left join new_tb_member_annual_leave mal
+        on mal.mIdx = m.idx
             left join new_tb_member_assignment ma on ma.mIdx = m.idx
         where m.cIdx in (?)
         `
