@@ -411,28 +411,30 @@ exports.getMemberLeave = async function (cIdx, year) {
 
      */
     let sql = `
-        select 
-            mal.idx as \`quotaIdx\`,
-            m.inDate,
-            m.type as \`mType\`,
-            m.idx as \`mIdx\`,
-            m.name,
-            m.position,
-            -- 1. cIdx 조건 추가 및 LIMIT 1 적용
-            (select itemNm from new_tb_code c where c.itemCd = m.position and c.cIdx = m.cIdx limit 1) as \`role\`,
-            mal.totalCount,
-            mal.usedCount,
-            mal.overCount,
-            mal.payCount,
-            mal.middleDt,
-            ma.sIdx,
-        -- 2. LIMIT 1 적용
-        (select name from new_tb_site where idx = ma.sIdx limit 1) as \`siteName\`
+        select mal.idx  as \`quotaIdx\`,
+               m.inDate,
+               m.type   as \`mType\`,
+               m.idx    as \`mIdx\`,
+               m.name,
+               m.position,
+               c.itemNm as \`role\`,
+               mal.totalCount,
+               mal.usedCount,
+               mal.overCount,
+               mal.payCount,
+               mal.middleDt,
+               ma.sIdx,
+               s.name   as \`siteName\`
         from new_tb_member m
-            left join new_tb_member_annual_leave mal
-        on mal.mIdx = m.idx
-            left join new_tb_member_assignment ma on ma.mIdx = m.idx
+                 left join new_tb_member_annual_leave mal on mal.mIdx = m.idx
+                 left join new_tb_member_assignment ma ON ma.idx = (
+                    SELECT idx FROM new_tb_member_assignment
+                    WHERE mIdx = m.idx ORDER BY idx DESC LIMIT 1)
+                 left join new_tb_code c on c.itemCd = m.position and c.cIdx = m.cIdx
+                 left join new_tb_site s on s.idx = ma.sIdx
         where m.cIdx in (?)
+        -- 추가된 정렬 조건
+        order by s.idx DESC, c.sort ASC, m.idx ASC;
         `
     let aParameter = [cIdx, year];
 

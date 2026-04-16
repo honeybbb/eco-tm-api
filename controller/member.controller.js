@@ -43,10 +43,13 @@ module.exports = function (app) {
     app.route('/v1/member/off/request/:mIdx').post(service.setMemberOff);
 
     //직원 연차 신청 현황
-    app.route('/v1/member/off/:cIdx').get(service.getMemberOff);
+    app.route('/v1/member/off').get(service.getMemberOff);
 
     //직원 연차 승인 or 반려
     app.route('/v1/member/off/status').post(service.updateOffStatus);
+
+    //연차 중간 정산
+    // app.route('/v1/member/annual/settle').post(service.)
 
     //배치 가능 직원 조회
     app.route('/v1/member/staffing/:sIdx').get(service.getMemberAvailable);
