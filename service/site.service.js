@@ -198,7 +198,7 @@ exports.updateSiteData = async function (req, res) {
 
 exports.DeleteSite = async function (req, res) {
     let cIdx = req.user.cIdx,
-        sIdx = req.body.idx;
+        sIdx = req.params.id;
 
     let result = await siteModel.DeleteSite(cIdx, sIdx);
 

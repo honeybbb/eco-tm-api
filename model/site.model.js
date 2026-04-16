@@ -418,7 +418,7 @@ exports.updateSiteData = async function (sIdx, name, address, phone, bigo, build
 }
 
 exports.DeleteSite = async function (cIdx, sIdx) {
-    let sql = "delete from new_tb_site where cIdx = ? and sIdx = ?"
+    let sql = "delete from new_tb_site where cIdx = ? and idx = ?"
     let aParameter = [cIdx, sIdx];
 
     try {
