@@ -304,7 +304,7 @@ exports.setMemberOff = async function (req, res) {
 }
 
 exports.getMemberOff = async function (req, res) {
-    let cIdx = req.params.cIdx,
+    let cIdx = req.user.cIdx,
         startDt = req.query.startDt,
         endDt = req.query.endDt;
 
