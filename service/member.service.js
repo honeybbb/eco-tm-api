@@ -291,14 +291,15 @@ exports.setAnnualSettlement = async function (req, res) {
 }
 
 exports.setMemberOff = async function (req, res) {
-    let mIdx = req.params.mIdx,
+    let cIdx = req.user.cIdx,
+        mIdx = req.params.mIdx,
         sIdx = req.body.sIdx,
         startDt = req.body.startDt,
         endDt = req.body.endDt,
         reason = req.body.reason;
 
-    console.log(mIdx, sIdx, startDt, endDt, reason);
-    let result = await memberModel.setMemberOff(mIdx, sIdx, startDt, endDt, reason);
+    console.log(cIdx, mIdx, sIdx, startDt, endDt, reason);
+    let result = await memberModel.setMemberOff(cIdx, mIdx, sIdx, startDt, endDt, reason);
 
     res.json({'result': true, 'data': result})
 }

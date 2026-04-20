@@ -501,10 +501,10 @@ exports.setAnnualSettlement = async function (mIdx, sIdx, year, payCount, settle
 }
 
 //직원 연차 신청
-exports.setMemberOff = async function (mIdx, sIdx, startDt, endDt, reason) {
-    let sql = "insert into new_tb_member_off (mIdx, sIdx, startDt, endDt, reason)"
-    sql += " values (?, ?, ?, ?, ?)"
-    let aParameter = [mIdx, sIdx, startDt, endDt, reason];
+exports.setMemberOff = async function (cIdx, mIdx, sIdx, startDt, endDt, reason) {
+    let sql = "insert into new_tb_member_off (cIdx, mIdx, sIdx, startDt, endDt, reason)"
+    sql += " values (?, ?, ?, ?, ?, ?)"
+    let aParameter = [cIdx, mIdx, sIdx, startDt, endDt, reason];
 
     try {
         let [res] = await pool.query(sql, aParameter);
