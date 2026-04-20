@@ -403,44 +403,26 @@ exports.getPayroll = async function (mIdx, year) {
 exports.getMemberLeave = async function (cIdx) {
     let sql = `
         SELECT
-            m.idx AS \`mIdx\`,
-            m.name,
+            mal.idx  AS \`quotaIdx\`,
             m.inDate,
-            m.type AS \`mType\`,
+            m.type   AS \`mType\`,
+            m.idx    AS \`mIdx\`,
+            m.name,
             m.position,
             c.itemNm AS \`role\`,
+            mal.totalCount,
+            mal.usedCount,
+            mal.overCount,
+            mal.payCount,
+            mal.middleDt,
+            mal.year,
             ma.sIdx,
-            s.name AS \`siteName\`,
-
-            -- 누적 합산 데이터
-            IFNULL(mal_agg.totalCountSum, 0) AS totalCountSum,
-            IFNULL(mal_agg.usedCountSum, 0)  AS usedCountSum,
-            IFNULL(mal_agg.overCountSum, 0)  AS overCountSum,
-            IFNULL(mal_agg.payCountSum, 0)   AS payCountSum,
-
-            -- 최종 잔여 연차: (총부여 + 총이월) - (총사용 + 총정산)
-            ((IFNULL(mal_agg.totalCountSum, 0) + IFNULL(mal_agg.overCountSum, 0)) -
-             (IFNULL(mal_agg.usedCountSum, 0)  + IFNULL(mal_agg.payCountSum, 0))) AS remainDays,
-
-            -- 연차 데이터 존재 여부 (모달에서 미부여자 필터링 시 사용)
-            IF(mal_agg.mIdx IS NOT NULL, 1, 0) AS hasQuota
-
+            s.name   AS \`siteName\`
         FROM new_tb_member m
 
-                 -- 핵심: 연차 테이블을 직원별로 미리 합산(SUM)하여 가상 테이블(Derived Table)로 만듦
-                 -- year 조건이 빠졌으므로 테이블 전체 데이터를 직원별로 합산합니다.
-                 LEFT JOIN (
-            SELECT
-                mIdx,
-                SUM(totalCount) AS totalCountSum,
-                SUM(usedCount)  AS usedCountSum,
-                SUM(overCount)  AS overCountSum,
-                SUM(payCount)   AS payCountSum
-            FROM new_tb_member_annual_leave
-            GROUP BY mIdx
-        ) mal_agg ON mal_agg.mIdx = m.idx
+                 -- ★ 핵심: 묶지 않고(GROUP BY 안 함) 모든 연도의 연차 데이터를 그대로 다 조인합니다.
+                 LEFT JOIN new_tb_member_annual_leave mal ON mal.mIdx = m.idx
 
-            -- 부서/현장 정보 조인 (가장 최근 발령 기준)
                  LEFT JOIN new_tb_member_assignment ma ON ma.idx = (
             SELECT idx FROM new_tb_member_assignment
             WHERE mIdx = m.idx ORDER BY idx DESC LIMIT 1
@@ -449,31 +431,18 @@ exports.getMemberLeave = async function (cIdx) {
             LEFT JOIN new_tb_site s ON s.idx = ma.sIdx
 
         WHERE m.cIdx = ?
-        -- AND m.status = 1 -- (필요 시 퇴사자 제외 로직 추가)
-
-        ORDER BY s.idx DESC, c.sort ASC, m.idx ASC;
+        -- AND m.status = 1 (필요하다면 퇴사자 제외)
+        ORDER BY s.idx DESC, c.sort ASC, m.idx ASC, mal.year DESC;
     `
 
-    // year 파라미터가 빠졌으므로 cIdx만 바인딩합니다.
     let aParameter = [cIdx];
 
     try {
         let [res] = await pool.query(sql, aParameter);
-
-        // 프론트에서 사용할 usageRate(사용률)을 백엔드에서 미리 계산해서 응답합니다.
-        res = res.map(row => {
-            const totalGranted = Number(row.totalCountSum) + Number(row.overCountSum);
-            const usageRate = totalGranted > 0 ? Math.round((Number(row.usedCountSum) / totalGranted) * 100) : 0;
-            return {
-                ...row,
-                usageRate
-            }
-        });
-
         return res;
     } catch (e) {
         console.log('db err', e);
-        return {'data': '-9999'}
+        return {'data': '-9999'};
     }
 }
 
