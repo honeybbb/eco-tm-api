@@ -1,5 +1,6 @@
 const memberModel = require("../model/member.model")
 const contractModel = require("../model/contract.model")
+const settleModel = require("../model/settle.model")
 const workModel = require("../model/work.model")
 const bcrypt  = require("bcrypt");
 const crypto = require("crypto");
@@ -201,13 +202,9 @@ exports.setMemberData = async function(req, res) {
 }
 
 exports.getMemberLeave = async function (req, res) {
-    let cIdx = req.query.cIdx,
-        // sIdx = req.query.sIdx,
-        year = req.query.year;
+    let cIdx = req.user.cIdx;
 
-    console.log(cIdx, year)
-
-    let result = await memberModel.getMemberLeave(cIdx, year)
+    let result = await memberModel.getMemberLeave(cIdx)
 
     res.json({'result': true, 'data': result})
 }
@@ -247,17 +244,50 @@ exports.updateMemberLeave = async function (req, res) {
 
 //연차 정산
 exports.setAnnualSettlement = async function (req, res) {
-    let mIdx = req.body.mIdx,
-        sIdx = req.body.sIdx,
-        payCount = req.body.payCount,
-        settleDt = req.query.settleDt,
-        bigo = req.body.bigo, //산출근거
-        amount = req.body.amount,
-        regDt = new Date();
+    try {
+        // 1. 프론트엔드(Vue)에서 보낸 데이터 변수 매핑
+        let mIdx = req.body.mIdx,
+            sIdx = req.body.sIdx,
+            year = req.body.year,             // ★ 연차 귀속 연도 추가
+            payCount = req.body.settleDays,   // 프론트의 settleDays (정산 일수)
+            settleDt = req.body.settleDate,   // 프론트의 settleDate (정산일)
+            amount = req.body.settleAmount;   // 프론트의 settleAmount (금액)
 
-    let result = await memberModel.setAnnualSettlement(mIdx, sIdx, payCount, settleDt, bigo, amount, regDt);
+        // 2. 연차 차감 로직 (new_tb_member_annual_leave)
+        let result = await memberModel.setAnnualSettlement(mIdx, sIdx, year, payCount, settleDt);
 
-    res.json({'result': true, 'data': result})
+        // 3. 바로 이어서 정산서(new_tb_site_settlement) 등록
+        const cIdx = req.body.cIdx;
+        const month = req.body.month;
+        const billingData = req.body.billingData || [];
+
+        const strBillingData = JSON.stringify(billingData);
+        const strPayrollData = JSON.stringify({});
+        const strViewConfig = JSON.stringify({});
+
+        let settleResult = await settleModel.setSettleData(
+            sIdx,
+            cIdx,
+            year,
+            month,
+            'RETIRE_ANNUAL',
+            null,
+            null,
+            settleDt,       // billingDt
+            amount,         // subTotal
+            0,     // vatAmount
+            amount,         // grandTotal
+            strBillingData,
+            strPayrollData,
+            strViewConfig
+        );
+
+        res.json({'result': true, 'data': result, 'settleId': settleResult.insertId});
+
+    } catch (err) {
+        console.error("연차 정산 에러:", err);
+        res.status(500).json({'result': false, 'msg': '연차 정산 처리 중 오류가 발생했습니다.'});
+    }
 }
 
 exports.setMemberOff = async function (req, res) {

@@ -49,7 +49,7 @@ module.exports = function (app) {
     app.route('/v1/member/off/status').post(service.updateOffStatus);
 
     //연차 중간 정산
-    // app.route('/v1/member/annual/settle').post(service.)
+    app.route('/v1/member/annual/settle').post(service.setAnnualSettlement)
 
     //배치 가능 직원 조회
     app.route('/v1/member/staffing/:sIdx').get(service.getMemberAvailable);

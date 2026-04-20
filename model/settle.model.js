@@ -40,18 +40,20 @@ exports.getSettleList = async function (year, month, docType, cIdx) {
 }
 **/
 
-exports.setSettleData = async function (sIdx, cIdx, year, month, docNo, type, billingDt,
+exports.setSettleData = async function (sIdx, cIdx, year, month, docType, docNo, type, billingDt,
                                         subTotal, vatAmount, grandTotal,
-                                        strBillingData, strPayrollData, strViewConfig) { // ★ 매개변수 추가
+                                        strBillingData, strPayrollData, strViewConfig) {
     let sql = `
         INSERT INTO new_tb_site_settlement
-        (sIdx, cIdx, year, month, docType, docNo, type, billingDt, subTotal, vatAmount, grandTotal, billingData, payrollData, viewConfig) -- ★ viewConfig 컬럼 추가
-        VALUES (?, ?, ?, ?, 'SERVICE', ?, ?, ?, ?, ?, ?, ?, ?, ?) -- ★ ? 개수 1개 추가
+        (
+         sIdx, cIdx, year, month, docType, docNo, type, billingDt, 
+         subTotal, vatAmount, grandTotal, billingData, payrollData, viewConfig)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     let aParameter = [
-        sIdx, cIdx, year, month, docNo, type, billingDt,
+        sIdx, cIdx, year, month, docType, docNo, type, billingDt,
         subTotal, vatAmount, grandTotal,
-        strBillingData, strPayrollData, strViewConfig // ★ 배열에 추가
+        strBillingData, strPayrollData, strViewConfig
     ];
 
     try {
@@ -162,5 +164,66 @@ exports.insertSettleHistory = async function (settleIdx, orgStatus, toStatus, ch
     } catch (e) {
         console.error('db err insertSettleHistory', e)
         return { data: '-9999' }
+    }
+}
+
+exports.setSettleMember = async function (sIdx, cIdx, year, month, docNo, type, billingDt,
+                                        subTotal, vatAmount, grandTotal,
+                                        strBillingData) {
+    let sql = `
+        INSERT INTO new_tb_site_settlement
+        (sIdx, cIdx, year, month, docType, docNo, type, billingDt, subTotal, vatAmount, grandTotal, billingData)
+        VALUES (?, ?, ?, ?, 'ANNUAL', ?, ?, ?, ?, ?, ?, ?)
+    `;
+    let aParameter = [
+        sIdx, cIdx, year, month, docNo, type, billingDt,
+        subTotal, vatAmount, grandTotal,
+        strBillingData
+    ];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.updateSettleMember = async function (
+    year, month, type, docNo, billingDt,
+    subTotal, vatAmount, grandTotal,
+    strBillingData,
+    idx, sIdx) {
+    let sql = `
+        UPDATE new_tb_site_settlement
+        SET
+            year = ?,
+            month = ?,
+            type = ?,
+            docNo = ?,
+            billingDt = ?,
+            subTotal = ?,
+            vatAmount = ?,
+            grandTotal = ?,
+            billingData = ?,
+            payrollData = ?,
+            viewConfig = ?,
+            modDt = CURRENT_TIMESTAMP
+        WHERE idx = ? AND sIdx = ? and mIdx = ?
+    `;
+    let aParameter = [
+        year, month, type, docNo, billingDt,
+        subTotal, vatAmount, grandTotal,
+        strBillingData,
+        idx, sIdx
+    ];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
     }
 }
