@@ -1,41 +1,39 @@
 const mysql = require("mysql2/promise");
 const pool = require("../config/mysql");
 
-exports.getNoticeList = async function () {
-    let sql = "select * from new_tb_notice";
-    let aParameter = [];
+exports.getMenus = async function (companyNo, isMaster, path) {
+    // 1. 기본 쿼리: 회사번호 일치 + 사용 여부 'Y'
+    // sort(순서)를 1순위, menuNo를 2순위로 정렬하여 일관성을 유지합니다.
+    let sql = "SELECT * FROM new_tb_menu WHERE companyNo = ?"
 
-    let query = mysql.format(sql, aParameter);
-    try {
-        let res = await pool.query(query);
-        return res;
-    }catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
+    if(path !== '/settings') {
+        sql += " AND useFl = 'Y'";
     }
-}
 
-exports.getNoticeData = async function (idx) {
-    let sql = "select * from new_tb_notice where idx = ?"
-    let aParameter = [idx];
-
-    let query = mysql.format(sql, aParameter);
-    try {
-        let res = await pool.query(query);
-        return res;
-    }catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
+    // 2. 마스터 권한 체크
+    if (!isMaster) {
+        sql += " AND masterOnly = 'N'";
     }
-}
 
-exports.setNotice = async function (title, content, createdBy, target){
-    let sql = "insert into new_tb_notice (title, content, createBy, target) values (?, ?, ?, ?)"
-    let aParameter = [title, content, createdBy, target];
+    // 3. 정렬 순서 적용 (중요!)
+    sql += " ORDER BY depth ASC, sort ASC, menuNo ASC";
 
-    let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, [companyNo]);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return { 'data': '-9999' };
+    }
+};
+
+exports.updateMenus = async function (companyNo, menuNo, menuNm, masterOnly, sort, useFl) {
+    let sql = "update new_tb_menu set menuNm=?, masterOnly = ?, sort = ?, useFl = ? where menuNo in (?) and companyNo in (?)";
+
+    let aParameter = [menuNm, masterOnly, sort, useFl, menuNo, companyNo];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -57,61 +55,62 @@ exports.getBaseCode1 = async function () {
     }
 }
 
-exports.getBaseCode = async function () {
-    /*
-    let sql ="SELECT\n" +
-        "    -- Level 1 (대분류: 그룹)\n" +
-        "    L1.itemCd   AS groupCode,\n" +
-        "    L1.itemNm   AS groupName,\n" +
-        "\n" +
-        "    -- Level 2 (중분류: 서브그룹 혹은 직접 코드)\n" +
-        "    L2.itemCd   AS subCode,\n" +
-        "    L2.itemNm   AS subName,\n" +
-        "\n" +
-        "    -- Level 3 (소분류: 실제 상세 코드)\n" +
-        "    L3.itemCd   AS detailCode,\n" +
-        "    L3.itemNm   AS detailName\n" +
-        "\n" +
-        "FROM (SELECT * FROM new_tb_code WHERE LENGTH(itemCd) = 2 AND useFl = 'Y') L1\n" +
-        "LEFT JOIN new_tb_code L2\n" +
-        "    ON L2.groupCd = L1.itemCd\n" +
-        "    AND LENGTH(L2.itemCd) = 5\n" +
-        "    AND L2.useFl = 'Y'\n" +
-        "LEFT JOIN new_tb_code L3\n" +
-        "    ON L3.groupCd = L2.itemCd\n" +
-        "    AND LENGTH(L3.itemCd) = 8\n" +
-        "    AND L3.useFl = 'Y'\n" +
-        "WHERE\n" +
-        "    L1.cIdx = 1  -- 특정 회사/현장 ID\n" +
-        "ORDER BY\n" +
-        "    L1.itemCd, L2.itemCd, L3.itemCd";
-
-     */
+exports.getBaseCode = async function (cIdx) {
     let sql ="SELECT"
     sql += " L1.itemCd   AS groupCode,"
     sql += " L1.itemNm   AS groupName," // Level 1 (대분류: 그룹)
+    sql += " L1.useFl, L1.deleteFl, L1.editFl, L1.option, L1.sort,"
     sql += " L2.itemCd   AS subCode,"
     sql += " L2.itemNm   AS subName,"   // Level 2 (중분류: 서브그룹 혹은 직접 코드)
+    sql += " L2.useFl, L2.deleteFl, L2.editFl, L2.option, L2.sort,"
     sql += " L3.itemCd   AS detailCode,"
-    sql += " L3.itemNm   AS detailName" // Level 3 (소분류: 실제 상세 코드)
-    sql += " FROM (SELECT * FROM new_tb_code WHERE LENGTH(itemCd) = 2 AND useFl = 'Y') L1"
+    sql += " L3.itemNm   AS detailName," // Level 3 (소분류: 실제 상세 코드)
+    sql += " L3.useFl, L3.deleteFl, L3.editFl, L3.option, L3.sort"
+
+    // 서브쿼리 대신 메인 쿼리에서 직접 테이블을 잡습니다.
+    sql += " FROM new_tb_code L1"
+
+    // ★ 수정포인트 1: L2 조인 시 cIdx도 일치해야 함
     sql += " LEFT JOIN new_tb_code L2"
-    sql += " ON L2.groupCd = L1.itemCd"
-    sql += " AND LENGTH(L2.itemCd) = 5"
-    sql += " AND L2.useFl = 'Y'"
+    sql += "        ON L2.groupCd = L1.itemCd"
+    sql += "       AND L2.cIdx = L1.cIdx"    // <--- 핵심: 같은 회사의 코드만 조인
+    sql += "       AND LENGTH(L2.itemCd) = 5"
+    // sql += "       AND L2.useFl = 'Y'"
+
+    // ★ 수정포인트 2: L3 조인 시 cIdx도 일치해야 함
     sql += " LEFT JOIN new_tb_code L3"
-    sql += " ON L3.groupCd = L2.itemCd"
-    sql += " AND LENGTH(L3.itemCd) = 8"
-    sql += " AND L3.useFl = 'Y'"
-    sql += " WHERE L1.cIdx = 1"  // 특정 회사/현장 ID
+    sql += "        ON L3.groupCd = L2.itemCd"
+    sql += "       AND L3.cIdx = L2.cIdx"    // <--- 핵심: 같은 회사의 코드만 조인
+    sql += "       AND LENGTH(L3.itemCd) = 8"
+    // sql += "       AND L3.useFl = 'Y'"
+
+    // ★ 메인 필터 조건: 요청한 cIdx와 대분류 길이(2) 필터링
+    sql += " WHERE L1.cIdx = ?"
+    sql += "   AND LENGTH(L1.itemCd) = 2"
+    // sql += "   AND L1.useFl = 'Y'"
+
     sql += " ORDER BY L1.itemCd, L2.itemCd, L3.itemCd";
-    let aParameter = [];
+
+    let aParameter = [cIdx];
+
+    try {
+        // console.log("2. 쿼리 실행 직전 (여기서 멈추면 DB 연결 풀 문제)");
+        let [res] = await pool.query(sql, aParameter);
+        // console.log('DB 조회 결과:', res);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.getGroupCode = async function (cIdx, groupCd) {
+    let sql = "select * from new_tb_code where groupCd in (?) and itemCd <> groupCd and cIdx in (?)"
+    let aParameter = [groupCd, cIdx];
 
     //let query = mysql.format(sql, aParameter);
     try {
-        console.log("2. 쿼리 실행 직전 (여기서 멈추면 DB 연결 풀 문제)");
         let [res] = await pool.query(sql, aParameter);
-        console.log('DB 조회 결과:', res); // 로그로 데이터가 찍히는지 확인
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -119,28 +118,14 @@ exports.getBaseCode = async function () {
     }
 }
 
-exports.getGroupCode = async function (groupCd) {
-    let sql = "select * from new_tb_code where groupCd in (?) and itemCd <> groupCd"
-    let aParameter = [groupCd];
-
-    //let query = mysql.format(sql, aParameter);
-    try {
-        let [res] = await pool.query(sql, aParameter);
-        return res;
-    }catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
-    }
-}
-
-exports.setWageCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl, taxFree, regDt) {
+exports.setWageCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt) {
     //console.log(cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt);
-    let sql = "insert into new_tb_code_wage (cIdx, groupCd, itemCd, itemNm, sort, useFl, tax_free, regDt)"
+    let sql = "insert into new_tb_code (cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt)"
     sql += " values (?, ?, ?, ?, ?, ?, ?, ?)"
-    sql += " ON DUPLICATE KEY UPDATE itemNm=?,sort=?,useFl=?,tax_free=?,modDt=?"
+    sql += " ON DUPLICATE KEY UPDATE itemNm=?,sort=?,useFl=?,option=?,modDt=?"
     let aParameter = [
-        cIdx, groupCd, itemCd, itemNm, sort, useFl, taxFree, regDt,
-        itemNm, sort, useFl, taxFree, regDt];
+        cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt,
+        itemNm, sort, useFl, option, regDt];
 
     //let query = mysql.format(sql, aParameter);
     try {
@@ -152,11 +137,34 @@ exports.setWageCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl
     }
 }
 
-exports.setBaseCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt) {
-    let sql = "insert into new_tb_code (cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt) values (?, ?, ?, ?, ?, ?, ?)"
-    let aParameter = [cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt];
+exports.setBaseCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt) {
+    // ON DUPLICATE KEY UPDATE 구문 추가
+    let sql = `
+        INSERT INTO new_tb_code (cIdx, groupCd, itemCd, itemNm, sort, useFl, \`option\`, regDt) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE 
+            itemNm = VALUES(itemNm),
+            sort = VALUES(sort),
+            useFl = VALUES(useFl),
+            \`option\` = VALUES(\`option\`)
+    `;
 
-    //let query = mysql.format(sql, aParameter);
+    let aParameter = [cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.updateBaseCode = async function (itemCd, itemNm, useFl, option, sort, modDt) {
+    let sql = "update new_tb_code set itemNm = ?, useFl=?, `option`=?, `sort`=?, modDt=?"
+    sql += " where itemCd in (?)"
+    let aParameter = [itemNm, useFl, option, sort, modDt, itemCd];
+
     try {
         let [res] = await pool.query(sql, aParameter);
         return res;
@@ -166,14 +174,14 @@ exports.setBaseCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl
     }
 }
 
-exports.getCompanyConfig = async function (cIdx) {
+exports.getCompanyData = async function (cIdx) {
     let sql = "select * from new_tb_config where idx in (?)"
     let aParameter = [cIdx];
 
-    let query = mysql.format(sql, aParameter);
+    //let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
-        return res;
+        let [res] = await pool.query(sql, aParameter);
+        return res[0];
     }catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
@@ -181,13 +189,15 @@ exports.getCompanyConfig = async function (cIdx) {
 }
 
 exports.getWageCode = async function (cIdx) {
-    let sql = "SELECT itemNm, itemCd,groupCd,tax_free,"
+    let sql = "SELECT itemNm, itemCd, groupCd,"
+    sql += " `option` as `tax_free`,useFl, deleteFl, editFl, sort,"
     sql += " CASE groupCd"
     sql += "    WHEN '04001' THEN '지급항목'"
     sql += "    WHEN '04002' THEN '공제항목'"
+    sql += "    WHEN '04003' THEN '정산항목'"
     sql += " END AS groupNm"
-    sql += " FROM new_tb_code_wage"
-    sql += " WHERE groupCd IN ('04001', '04002') and cIdx in (?)"
+    sql += " FROM new_tb_code"
+    sql += " WHERE groupCd IN ('04001', '04002','04003') and cIdx in (?)"
     sql += " ORDER BY sort";
     let aParameter = [cIdx];
 
@@ -201,8 +211,8 @@ exports.getWageCode = async function (cIdx) {
     }
 }
 
-exports.deleteWageCode = async function (itemCd) {console.log(itemCd,' itemCd')
-    let sql = "delete from new_tb_code_wage where itemCd = ?"
+exports.deleteWageCode = async function (itemCd) {
+    let sql = "delete from new_tb_code where itemCd = ?"
     let aParameter = [itemCd];
 
     //let query = mysql.format(sql, aParameter);
@@ -260,13 +270,13 @@ exports.getItemCode = async function (cIdx) {
     }
 }
 
-exports.setItemCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl, price, regDt) {
+exports.setItemCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt) {
     //console.log(cIdx, groupCd, itemCd, itemNm, sort, useFl, regDt);
-    let sql = "insert into new_tb_code_item (cIdx, groupCd, itemCd, itemNm, sort, useFl, price, regDt) values (?, ?, ?, ?, ?, ?, ?, ?)"
-    sql += " ON DUPLICATE KEY UPDATE itemNm=?,sort=?,useFl=?,price=?,modDt=?"
+    let sql = "insert into new_tb_code (cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt) values (?, ?, ?, ?, ?, ?, ?, ?)"
+    sql += " ON DUPLICATE KEY UPDATE itemNm=?,sort=?,useFl=?,option=?,modDt=?"
     let aParameter = [
-        cIdx, groupCd, itemCd, itemNm, sort, useFl, price, regDt,
-        itemNm, sort, useFl, price, regDt];
+        cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt,
+        itemNm, sort, useFl, option, regDt];
 
     //let query = mysql.format(sql, aParameter);
     try {
@@ -367,5 +377,113 @@ exports.getTaxRate = async function (year){
     }catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
+    }
+}
+
+exports.getTaxIncome = async function (year, salary, familyCnt) {
+    let sql = `
+        SELECT family_${Math.min(Number(familyCnt), 11)} AS tax_amt
+        FROM new_tb_tax_income
+        WHERE apply_year = ?
+          AND income_min <= ?
+          AND income_max > ?
+        LIMIT 1`;
+    let aParameter = [year, salary, salary];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.setOrders = async function (sIdx, orderList, mIdx) {
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+
+        const aParameter = orderList.map(item => [
+            sIdx,
+            item.detailCode,
+            item.qty,
+            new Date(),
+            mIdx
+        ]);
+
+
+        let sql = "INSERT INTO new_tb_orders (sIdx, itemCd, qty, regDt, mIdx) VALUES ?";
+        let [res] = await conn.query(sql, [aParameter]);
+
+        await conn.commit();
+        return res;
+    } catch (e) {
+        await conn.rollback();
+        console.log('db err', e);
+        return {'data': '-9999'}
+    } finally {
+        conn.release();
+    }
+};
+
+exports.getOrders = async function () {
+    let sql = `
+        SELECT
+            o.regDt,
+            o.sIdx,
+            o.mIdx,
+            o.status,
+            s.name AS siteName,
+            m.name AS applicant,
+            m.id as memberId,
+            -- 상세 품목들에 상위 카테고리 정보 추가
+            JSON_ARRAYAGG(
+                    JSON_OBJECT(
+                            'idx', o.idx,
+                            'categoryName', p.itemNm,      -- 상위 카테고리명 (예: 경비원 상의)
+                            'itemName', c.itemNm,          -- 상세 사이즈명 (예: M(90))
+                            'fullItemName', CONCAT(p.itemNm, ' - ', c.itemNm), -- 합쳐진 이름
+                            'qty', o.qty,
+                            'price', CAST(IFNULL(NULLIF(c.option, ''), 0) AS UNSIGNED),
+                            'itemCd', o.itemCd
+                    )
+            ) AS items,
+            SUM(o.qty * IFNULL(NULLIF(c.option, ''), 0)) AS totalAmount,
+            CONCAT(
+                    MAX(p.itemNm), ' (', MAX(c.itemNm), ')',
+                    IF(COUNT(o.idx) > 1, CONCAT(' 외 ', COUNT(o.idx) - 1, '건'), '')
+            ) AS summary
+        FROM new_tb_orders o
+                 LEFT JOIN new_tb_site s ON o.sIdx = s.idx
+                 LEFT JOIN new_tb_member m ON o.mIdx = m.idx
+                 LEFT JOIN new_tb_code c ON o.itemCd = c.itemCd
+            -- 상위 카테고리명을 가져오기 위한 Self Join
+            -- 이미지 구조상 사이즈 코드의 앞 5자리가 상위 카테고리 코드임
+                 LEFT JOIN new_tb_code p ON LEFT(c.itemCd, 5) = p.itemCd
+        GROUP BY o.regDt, o.mIdx, o.sIdx, o.status
+        ORDER BY o.regDt DESC
+    `;
+    let aParameter = [];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return { 'data': '-9999' };
+    }
+};
+
+exports.updateOrderStatus = async function (sIdx, oIdx, status, managerId) {
+    let sql = "update new_tb_orders set status = ?, modDt = NOW() WHERE sIdx = ? and idx = ? and managerId = ?";
+    let aParameter = [status, sIdx, oIdx, managerId];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return { 'data': '-9999' };
     }
 }

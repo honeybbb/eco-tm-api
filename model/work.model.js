@@ -2,12 +2,13 @@ const pool = require("../config/mysql");
 const mysql = require("mysql2/promise")
 
 exports.getWorkFl = async function (mIdx, sIdx, today) {
-    let sql = "select * from new_tb_work where mIdx = ? and sIdx = ? and Date(regDt) = ?"
+    let sql = "select * from new_tb_work"
+    sql += " where mIdx = ? and sIdx = ? and Date(regDt) = ?"
+    sql += " and workEndDt is null"
     let aParameter = [mIdx, sIdx, today];
 
-    let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -15,13 +16,72 @@ exports.getWorkFl = async function (mIdx, sIdx, today) {
     }
 }
 
-exports.workStart = async function (mIdx, sIdx, workStartDt, regDt) {
-    let sql = "insert into new_tb_work (mIdx, sIdx, workStartDt, regDt) values (?, ?, ? ,?)"
-    let aParameter = [mIdx, sIdx, workStartDt, regDt];
+// 특정 날짜 출근 기록 존재 여부 확인 (중복 방지용)
+exports.getWorkByDate = async function(mIdx, sIdx, date) {
+    const query = `
+        SELECT idx FROM new_tb_work
+        WHERE mIdx = ? AND sIdx = ?
+          AND DATE(workStartDt) = ?
+        LIMIT 1
+    `;
+    const [rows] = await pool.query(query, [mIdx, sIdx, date]);
+    return rows;
+};
 
-    let query = mysql.format(sql, aParameter);
+exports.getWorkScheduleBySite = async function(sIdx) {
+    let sql = `
+        SELECT wc.position, wc.workhours, wc.breaktime
+        FROM new_tb_work_contract wc
+                 INNER JOIN new_tb_site_contract sc ON sc.idx = wc.scIdx
+        WHERE wc.sIdx = ?
+          AND sc.idx = (
+            -- 최신 유효 계약 idx 1개만 서브쿼리로 특정
+            SELECT idx
+            FROM new_tb_site_contract
+            WHERE sIdx = ?
+              AND startDt <= CURDATE()
+              AND endDt >= CURDATE()
+            ORDER BY regDt DESC
+            LIMIT 1
+            )
+    `;
+
+    let aParameter = [sIdx, sIdx];
+
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+// 해당 월 현장 전체 근태 삭제
+exports.deleteWorkByMonth = async function(sIdx, month) {
+    let sql = `
+        DELETE FROM new_tb_work
+        WHERE sIdx = ?
+          AND DATE_FORMAT(workStartDt, '%Y-%m') = ?
+    `;
+    let aParameter = [sIdx, month];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
+
+exports.workStart = async function (mIdx, sIdx, workStartDt, workType, bigo, regDt) {
+    let sql = "insert into new_tb_work (mIdx, sIdx, workStartDt, workType, bigo, regDt)"
+    sql += " values (?, ?, ? , ?, ?, ?)"
+    let aParameter = [mIdx, sIdx, workStartDt, workType, bigo, regDt];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -33,9 +93,8 @@ exports.workEnd = async function (mIdx, sIdx, workEndDt, today) {
     let sql = "update new_tb_work set workEndDt=?, workFl='N' where mIdx = ? and sIdx = ? and Date(workStartDt) = ?"
     let aParameter = [workEndDt, mIdx, sIdx, today];
 
-    let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -109,35 +168,55 @@ exports.getWorkDaysAdmin = async function (sIdx, ym) {
     }
 }
 
-exports.getWorkDays = async function (mIdx, startDt, endDt) {
-    let sql = "select COUNT(*) as workdays from new_tb_work where mIdx = ? and LEFT(?, 7) = ?";
-    let aParameter = [mIdx, startDt, endDt];
+exports.getWorkDays = async function (targetMonthStr) {
+    // let sql = "select COUNT(*) as workdays from new_tb_work where mIdx = ? and LEFT(?, 7) = ?";
+    let sql = "SELECT mIdx, DATE_FORMAT(workStartDt, '%Y-%m-%d') as workDate"
+    sql += " FROM new_tb_work WHERE DATE_FORMAT(workStartDt, '%Y-%m') = ?"
+    let aParameter = [targetMonthStr];
 
-    let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
-        return res[0];
+        let [res] = await pool.query(sql, aParameter);
+        return res;
     }catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
     }
 }
 
+exports.excelUpload = async function (insertData) {
+    let sql = "INSERT INTO new_tb_work (sIdx, mIdx, workStartDt, workEndDt, workType, regDt) VALUES ?";
+    let query = mysql.format(sql, [insertData]);
+
+    try {
+        let [res] = await pool.query(query);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return { 'data': '-9999' }
+    }
+};
+
 exports.getWorkSheet = async function (mIdx, startDt, endDt) {
-    let sql = "select DATE_FORMAT(workStartDt, '%Y-%m-%d') AS `date`,"
-    sql += " IFNULL(TIMESTAMPDIFF(HOUR, workStartDt, workEndDt),0) AS `duration`,"
-    sql += " DATE_FORMAT(workStartDt, '%H:%i') as `workin`,"
-    sql += " DATE_FORMAT(workEndDt, '%H:%i') as `workout`"
-    sql += " from new_tb_work where mIdx = ? and regDt >= CONCAT(?, '-01') AND regDt <  DATE_ADD(CONCAT(?, '-01'), INTERVAL 1 MONTH)"
+    let sql = "SELECT DATE_FORMAT(workStartDt, '%Y-%m-%d') AS `date`,"
+    sql += " IFNULL(TIMESTAMPDIFF(HOUR, workStartDt, workEndDt), 0) AS `duration`,"
+    sql += " DATE_FORMAT(workStartDt, '%H:%i') AS `workin`,"
+    sql += " DATE_FORMAT(workEndDt, '%H:%i') AS `workout`,"
+    sql += " workType"
+    sql += " FROM new_tb_work"
+    sql += " WHERE mIdx = ?"
+    sql += " AND workStartDt >= ?"                          // regDt → workStartDt
+    sql += " AND workStartDt <= CONCAT(?, ' 23:59:59')"    // regDt → workStartDt
+    sql += " ORDER BY workStartDt ASC"                     // 날짜 정렬 추가
+
     let aParameter = [mIdx, startDt, endDt];
 
     let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(query);
         return res;
-    }catch (e) {
+    } catch (e) {
         console.log('db err', e);
-        return {'data': '-9999'}
+        return { 'data': '-9999' }
     }
 }
 
@@ -159,7 +238,7 @@ exports.getWorkDayCount = async function (date)  {
     let sql = "SELECT mIdx,COUNT(*) as workDays"
     sql += " FROM new_tb_work"
     sql += " WHERE workStartDt LIKE (?)" // 선택된 연월"
-    sql += " AND workFl = 'Y'"  // 유효 근무만
+    // sql += " AND workFl = 'Y'"  // 유효 근무만
     sql += " GROUP BY mIdx";
     let aParameter = [date];
 
@@ -173,9 +252,9 @@ exports.getWorkDayCount = async function (date)  {
     }
 }
 
-exports.getWorkList = async function (month) {
-    let sql = "select * from new_tb_work WHERE workStartDt LIKE CONCAT(?, '%') AND workFl = 'Y'";
-
+exports.getWorkList = async function (month, sIdx) {
+    let sql = "select * from new_tb_work"
+    sql += " WHERE workStartDt LIKE CONCAT(?, '%') AND sIdx in (?)";
     /*
     let sql = "SELECT mIdx,COUNT(*) as workDays"
     sql += " FROM new_tb_work"
@@ -184,7 +263,7 @@ exports.getWorkList = async function (month) {
     sql += " GROUP BY mIdx";
 
      */
-    let aParameter = [month];
+    let aParameter = [month, sIdx];
 
     //let query = mysql.format(sql, aParameter);
     try {
@@ -195,3 +274,92 @@ exports.getWorkList = async function (month) {
         return {'data': '-9999'}
     }
 }
+
+exports.getWorkOffList = async function (month, sIdx) {
+    let sql = "select * from new_tb_member_off"
+    sql += " WHERE startDt LIKE CONCAT(?, '%') AND endDt LIKE CONCAT(?, '%')"
+    sql += " AND sIdx in (?)";
+
+    let aParameter = [month, month, sIdx];
+
+    //let query = mysql.format(sql, aParameter);
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+// work.model.js
+
+// 특정 날짜 근태 조회 (수동 수정용)
+exports.getWorkByMemberDate = async function(mIdx, sIdx, date) {
+    let sql = `
+        SELECT idx, workType, bigo
+        FROM new_tb_work
+        WHERE mIdx = ? AND sIdx = ?
+          AND DATE(workStartDt) = ?
+        LIMIT 1
+    `;
+    let aParameter = [mIdx, sIdx, date];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res[0] || null;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
+
+// 근태 타입 UPDATE (수동 수정)
+exports.updateWorkType = async function(idx, workType, bigo) {
+    let sql = `
+        UPDATE new_tb_work
+        SET workType = ?, bigo = ?, modDt = NOW()
+        WHERE idx = ?
+    `;
+    let aParameter = [workType, bigo || '', idx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
+
+// 근태 삭제
+exports.deleteWork = async function(idx) {
+    let sql = `DELETE FROM new_tb_work WHERE idx = ?`;
+    let aParameter = [idx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
+
+// 해당 월 현장 전체 근태 삭제
+exports.deleteWorkByMonth = async function(sIdx, month) {
+    let sql = `
+        DELETE FROM new_tb_work
+        WHERE sIdx = ?
+          AND DATE_FORMAT(workStartDt, '%Y-%m') = ?
+    `;
+    let aParameter = [sIdx, month];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};

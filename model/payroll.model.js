@@ -17,11 +17,13 @@ exports.setBaseSalary = async function (mIdx, sIdx, year, paymentList, deduction
 }
 
 //직원급여조회
+/*
 exports.getBaseSalary = async function () {
     let sql = "select"
     sql += " m.idx,"    //idx
     sql += " m.id," //사번
     sql += " m.type,"   //직원구분
+    sql += " m.birthDt," //생년월일 가져와야 법정기준연령 계산가능함
     sql += " (select name from new_tb_site where ma.sIdx = idx) as siteName,"   //현장명
     sql += " (select idx from new_tb_site where ma.sIdx = idx) as sIdx,"    //현장idx
     sql += " (select itemNm from new_tb_code where m.position = itemCd) as role,"   //직책
@@ -62,6 +64,7 @@ exports.getPayrollMonth = async function (year, month) {
     sql += " m.idx,"
     sql += " m.id,"
     sql += " m.type,"
+    sql += " m.birthDt,";
     sql += " (select name from new_tb_site where ma.sIdx = idx) as siteName,"
     sql += " (select idx from new_tb_site where ma.sIdx = idx) as sIdx,"
     sql += " (select itemNm from new_tb_code where m.position = itemCd) as role,"
@@ -69,6 +72,7 @@ exports.getPayrollMonth = async function (year, month) {
     sql += " (select sort from new_tb_code where m.position = itemCd) as roleSort,"
     sql += " (select payment_day from new_tb_site where idx = ma.sIdx) as payment_day,"
     sql += " m.name as staff,"
+    sql += " m.status as mStatus,";
 
     // 1. [급여 내역]
     sql += " IFNULL(mbs.payItems, JSON_OBJECT()) as payItems,"
@@ -80,14 +84,15 @@ exports.getPayrollMonth = async function (year, month) {
     // 2. [체크박스 설정]
     sql += " IFNULL(bs.checkedItems, JSON_OBJECT()) as checkedItems"
 
-    sql += " from new_tb_member m";
+    // =================================================================================
+    // ★ 2. 기준 근무일수 (scheduledDays) - mpm 컬럼 대신 mc 테이블 값으로 무조건 계산
+    // =================================================================================
+    sql += " IF(IFNULL(mc.day_work_time, 0) > 0, ROUND(mc.month_work_time / mc.day_work_time, 1), 0) as scheduledDays,"
 
     // JOIN 1. 해당 연/월 급여 내역
     sql += " left join new_tb_member_payroll_month mbs ON mbs.idx = (";
     sql += "     SELECT idx FROM new_tb_member_payroll_month";
-    sql += "     WHERE mIdx = m.idx";
-    sql += "     AND year = ?";
-    sql += "     AND month = ?";
+    sql += "     WHERE mIdx = m.idx AND year = ? AND month = ?";
     sql += "     ORDER BY regDt DESC LIMIT 1";
     sql += " )";
 
@@ -108,7 +113,8 @@ exports.getPayrollMonth = async function (year, month) {
     // =================================================================================
     sql += " order by s.name ASC, roleSort ASC, m.regDt DESC, m.id ASC";
 
-    let aParameter = [year, month];
+    // 파라미터 매칭: absent(2) + scheduled(2) + worked(2) + mpm조인(2) = 총 8개
+    let aParameter = [year, month, year, month, year, month, year, month];
 
     try {
         let [res] = await pool.query(sql, aParameter);
@@ -119,11 +125,14 @@ exports.getPayrollMonth = async function (year, month) {
     }
 }
 
-exports.setPayrollMonth = async function (mIdx, sIdx, year, month, grossPay, workDays, deductions, netPay, payItems, deductionItems, total){
+exports.setPayrollMonth = async function (
+    mIdx, sIdx, year, month, workedDays, scheduledDays,
+    grossPay, deductions, netPay, payItems, deductionItems, total
+){
     let sql = "insert into new_tb_member_payroll_month ("
-    sql += "mIdx, sIdx, year, month, grossPay, workDays, deductions, netPay, payItems, deductionItems, total)"
-    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    let aParameter = [mIdx, sIdx, year, month, grossPay, workDays, deductions, netPay, payItems, deductionItems, total];
+    sql += "mIdx, sIdx, year, month, workedDays, scheduledDays, grossPay, deductions, netPay, payItems, deductionItems, total)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    let aParameter = [mIdx, sIdx, year, month, workedDays, scheduledDays, grossPay, deductions, netPay, payItems, deductionItems, total];
 
     let query = mysql.format(sql, aParameter);
     try {
@@ -234,6 +243,10 @@ exports.getWorkPayroll = async function (targetMonth) {
         console.log('db err', e);
         return {'data': '-9999'};
     }
+}
+
+exports.getPayrollHistory = async function (mIdx) {
+    // let sql = "select as `month`, grossPay from new_tb_member_payroll"
 }
 
 /*

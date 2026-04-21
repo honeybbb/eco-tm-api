@@ -1,9 +1,11 @@
 const pool = require("../config/mysql");
 const mysql = require("mysql2/promise")
 
+/*
 exports.getSiteList = async function (cIdx) {
     let sql = "select s.*, case when s.status = 'Y' then '운영 중' else '계약 종료' end as `status`,"
-    sql += " CONCAT(DATE_FORMAT(sc.startDt, '%Y-%m-%d'), ' ~ ', DATE_FORMAT(sc.endDt, '%Y-%m-%d')) AS contract"
+    sql += " CONCAT(DATE_FORMAT(sc.startDt, '%Y-%m-%d'), ' ~ ', DATE_FORMAT(sc.endDt, '%Y-%m-%d')) AS contract,"
+    sql += " sc.total_cost"
     sql += " from new_tb_site s"
     sql += " left join new_tb_site_contract sc on sc.sIdx = s.idx"
     sql += " where s.cIdx = ?";
@@ -15,6 +17,45 @@ exports.getSiteList = async function (cIdx) {
         let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+ */
+exports.getSiteList = async function (cIdx) {
+    let sql = `
+        SELECT s.*,
+               CASE WHEN s.status = 'Y' THEN '운영 중' ELSE '계약 종료' END AS status,
+               (
+                   SELECT JSON_ARRAYAGG(
+                       JSON_OBJECT(
+                           'type', sc.type,
+                           'contract_period', CONCAT(DATE_FORMAT(sc.startDt, '%Y-%m-%d'), ' ~ ', DATE_FORMAT(sc.endDt, '%Y-%m-%d')),
+                           'total_cost', sc.total_cost,
+                           'jsonData', sc.jsonData,
+                           'staffDetail', sc.staffDetail
+                       )
+                   )
+                   FROM new_tb_site_contract sc
+                   INNER JOIN (
+                       -- 각 현장(sIdx) 및 구분(type)별로 가장 최신(MAX idx) 계약을 찾음
+                       SELECT MAX(idx) AS max_idx
+                       FROM new_tb_site_contract
+                       GROUP BY sIdx, type
+                   ) latest ON sc.idx = latest.max_idx
+                   WHERE sc.sIdx = s.idx
+               ) AS contracts
+        FROM new_tb_site s
+        WHERE s.cIdx = ?
+    `;
+
+    let aParameter = [cIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
     }
@@ -33,9 +74,24 @@ exports.setSiteBigo = async function (sIdx, bigo, admin) {
     }
 }
 
+exports.setSiteOrderBudgets = async function (sIdx, value, admin) {
+    let sql = "insert into new_tb_site_budget (sIdx, value, admin, regDt) values (?, ?, ?, NOW())";
+    sql += " ON DUPLICATE KEY UPDATE value = ?, managerId = ?, modDt = NOW()";
+
+    let aParameter = [sIdx, value, admin, value, admin];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.setSiteData = async function (cIdx, name, address, phone, bigo, building_su, unit_su, area) {
-    let sql = "insert into new_tb_site (cIdx, name, address, phone, building_su, unit_su, area) values (?, ?, ?, ?, ?, ?, ?)"
-    let aParameter = [cIdx, name, address, phone, building_su, unit_su, area];
+    let sql = "insert into new_tb_site (cIdx, name, address, phone, bigo, building_su, unit_su, area) values (?, ?, ?, ?, ?, ?, ?, ?)"
+    let aParameter = [cIdx, name, address, phone, bigo, building_su, unit_su, area];
 
     let query = mysql.format(sql, aParameter);
     try {
@@ -56,25 +112,40 @@ exports.saveSite = async function (site) {
             // [UPDATE]
             let sql = `
                 UPDATE new_tb_site 
-                SET sType=?, name=?, address=?, phone=?, building_su=?, unit_su=?, area=?, director=?, director_phone=?, payment_day=?
+                SET sType=?, name=?, zipcode = ?, address=?, phone=?, building_su=?, unit_su=?, 
+                    area=?, areaUnder=?, areaOver=?, is_vat=?, manager=?,
+                    director=?, director_phone=?, payment_day=?,
+                    businessNumber=?, representative=?, businessType=?, businessItem=?, 
+                    email=?, viewConfig=?
                 WHERE idx = ?
             `;
             let params = [
-                site.sType, site.name, site.address, site.phone, site.building_su,
-                site.unit_su, site.area, site.director, site.director_phone, site.payment_day,
+                site.sType, site.name, site.zipcode, site.address, site.phone, site.building_su, site.unit_su,
+                site.area, site.areaUnder, site.areaOver, site.is_vat,site.manager,
+                site.director, site.director_phone, site.payment_day,
+                site.businessNumber, site.representative, site.businessType, site.businessItem,
+                site.email, site.viewConfig,
                 new_sIdx
             ];
             await connection.query(sql, params);
         } else {
             // [INSERT]
             let sql = `
-                INSERT INTO new_tb_site 
-                (cIdx, name, address, phone, building_su, unit_su, area, director, director_phone, payment_day) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO new_tb_site
+                (cIdx, sType, name, zipcode, address, phone,
+                 building_su, unit_su, area, areaUnder, areaOver, is_vat, manager,
+                 director, director_phone, payment_day,
+                 businessNumber, representative, businessType, businessItem,
+                 email, viewConfig)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             let params = [
-                site.cIdx, site.name, site.address, site.phone, site.building_su,
-                site.unit_su, site.area, site.director, site.director_phone, site.payment_day
+                site.cIdx, site.sType, site.name, site.zipcode, site.address,
+                site.phone, site.building_su, site.unit_su,
+                site.area, site.areaUnder, site.areaOver, site.is_vat, site.manager,
+                site.director, site.director_phone, site.payment_day,
+                site.businessNumber, site.representative, site.businessType, site.businessItem,
+                site.email, site.viewConfig
             ];
             let result = await connection.query(sql, params);
             new_sIdx = result[0].insertId;
@@ -94,16 +165,18 @@ exports.saveContract = async function (contract) {
     const connection = await pool.getConnection();
     try {
         // scIdx(계약 PK)가 있으면 UPDATE, 없으면 INSERT
-        if (contract.scIdx) {
+        let current_scIdx = contract.scIdx;
+        if (current_scIdx) {
             // [UPDATE]
             let sql = `
                 UPDATE new_tb_site_contract 
-                SET jsonData=?, total_cost=?, startDt=?, endDt=?, staffCount=?, staffDetail=?, 
+                SET type=?, jsonData=?, total_cost=?, startDt=?, endDt=?, staffCount=?, staffDetail=?, 
                     workSchedule=?, breaktime=?
-                WHERE scIdx = ? 
+                WHERE idx = ? 
             `;
             let params = [
-                contract.jsonData,
+                contract.type,
+                contract.costBreakdown,
                 contract.totalCost,
                 contract.startDt,
                 contract.endDt,
@@ -119,12 +192,13 @@ exports.saveContract = async function (contract) {
             // [INSERT]
             let sql = `
                 INSERT INTO new_tb_site_contract 
-                (sIdx, cIdx, workdays, total_cost, startDt, endDt, staffCount, staffDetail, workSchedule, breaktime) 
-                VALUES (?, ?, ?, ?, ?, ?, ? , ?, ?, ?)
+                (sIdx, cIdx, type, workdays, total_cost, startDt, endDt, staffCount, staffDetail, workSchedule, breaktime, jsonData) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ? , ?, ?, ?, ?)
             `;
             let params = [
                 contract.sIdx, // 현장 FK
                 contract.cIdx,
+                contract.type,
                 contract.workDays,
                 contract.totalCost,
                 contract.startDt,
@@ -132,15 +206,59 @@ exports.saveContract = async function (contract) {
                 contract.staffCount,
                 contract.staffDetail,
                 contract.workSchedule,
-                contract.breaktime
+                contract.breaktime,
+                contract.costBreakdown
             ];
-            await connection.query(sql, params);
+            let [result] = await connection.query(sql, params);
+            current_scIdx = result.insertId;
         }
 
-        return { success: true };
+        return { success: true, scIdx: current_scIdx };
 
     } catch (e) {
         console.error("Contract Save Error:", e);
+        return { success: false, error: e };
+    } finally {
+        connection.release();
+    }
+}
+
+exports.syncWorkContracts = async function (scIdx, sIdx, staffList) {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // 1. 해당 계약(scIdx)의 기존 스케줄 데이터 일괄 삭제
+        await connection.query(`DELETE FROM new_tb_work_contract WHERE scIdx = ?`, [scIdx]);
+
+        // 2. 넘어온 인원(직책) 리스트를 순회하며 새로 Insert
+        if (staffList && Array.isArray(staffList) && staffList.length > 0) {
+            let sql = `
+                INSERT INTO new_tb_work_contract 
+                (scIdx, sIdx, position, workhours, breaktime, regDt) 
+                VALUES (?, ?, ?, ?, ?, NOW())
+            `;
+
+            for (const staff of staffList) {
+                // 프론트에서 넘어온 객체를 JSON 문자열로 변환 (없으면 빈 객체)
+                const workhoursJson = staff.schedule ? JSON.stringify(staff.schedule) : '{}';
+
+                await connection.query(sql, [
+                    scIdx,
+                    sIdx,
+                    staff.code,       // position 컬럼 (직책 코드)
+                    workhoursJson,    // workhours json 컬럼
+                    null              // 휴게시간은 json 내부에 있으므로 공란(null) 처리 또는 기본값
+                ]);
+            }
+        }
+
+        await connection.commit();
+        return { success: true };
+
+    } catch (e) {
+        await connection.rollback();
+        console.error("Work Contract Sync Error:", e);
         return { success: false, error: e };
     } finally {
         connection.release();
@@ -259,6 +377,32 @@ exports.insertSiteAndContract = async function (site, contract) {
     }
 }
 
+exports.registerBudget = async function (sIdx, jsonData) {
+    let sql = "update new_tb_site_contract set jsonData=? where sIdx = ?"
+    let aParameter = [jsonData,sIdx];
+
+    try {
+        let res = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.getSiteBudget = async function (sIdx, type) {
+    let sql = "select * from new_tb_site_contract where sIdx = ? and type=? order by regDt desc limit 1"
+    let aParameter = [sIdx, type];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.updateSiteData = async function (sIdx, name, address, phone, bigo, building_su, unit_su, area) {
     let sql = "update new_tb_site set name=?,address=?,phone=?,bigo=?,building_su=?,unit_su=?,area=? where sIdx = ?";
     let aParameter = [name, address, phone, building_su, unit_su, area, sIdx];
@@ -266,6 +410,19 @@ exports.updateSiteData = async function (sIdx, name, address, phone, bigo, build
     let query = mysql.format(sql, aParameter);
     try {
         let res = await pool.query(query);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.DeleteSite = async function (cIdx, sIdx) {
+    let sql = "delete from new_tb_site where cIdx = ? and idx = ?"
+    let aParameter = [cIdx, sIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -305,24 +462,135 @@ exports.getSiteHeadCount = async function (sIdx) {
     }
 }
 
+exports.getAssignedStaff = async function (sIdx) {
+    let sql = `
+        SELECT
+            ma.mIdx,
+            ma.idx AS assignIdx,
+            DATE_FORMAT(ma.regDt, '%Y-%m-%d') AS assignDate,
+            m.type,
+            m.name,
+            m.phone,
+            m.position,
+            (SELECT itemNm FROM new_tb_code WHERE itemCd = m.position AND cIdx = m.cIdx LIMIT 1) AS positionName
+        FROM new_tb_member_assignment ma
+            LEFT JOIN new_tb_member m ON m.idx = ma.mIdx
+        WHERE ma.sIdx IN (?)
+          AND ma.idx = (
+            SELECT MAX(idx)
+            FROM new_tb_member_assignment
+            WHERE sIdx IN (?) AND mIdx = ma.mIdx AND isActive = 'Y'
+            )
+    `;
+    let aParameter = [sIdx, sIdx];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return [];
+    }
+}
+
 exports.getSiteData = async function (sIdx) {
-    let sql = "select s.*, sa.jsonData, sc.startDt, sc.endDt, sc.total_cost,"
-    sql += " CONCAT('[',GROUP_CONCAT(DISTINCT JSON_OBJECT('bigo', sb.bigo, 'regDt', sb.regDt)),']') as bigoList,"
-    sql += " CONCAT('[',GROUP_CONCAT(DISTINCT JSON_OBJECT('workDays', sc.workdays, 'startDt', sc.startDt,"
-    sql += " 'endDt', sc.endDt, 'workSchedule', sc.workSchedule, 'breaktime', sc.breaktime, 'category', (select itemNm from new_tb_code where itemCd = sc.type),"
-    sql += " 'staffList', sc.staffDetail, 'staffCount', sc.staffCount)),']') as `contractList`"
+    /*
+    let sql = "select s.*, sc.startDt, sc.endDt, sc.total_cost,"
+    sql += " CONCAT('[',GROUP_CONCAT(DISTINCT CASE WHEN sb.sIdx is not null THEN JSON_OBJECT('bigo', sb.bigo, 'regDt', sb.regDt) END),']') as bigoList,"
+    sql += " CONCAT('[',GROUP_CONCAT(DISTINCT CASE WHEN sc.sIdx is not null THEN JSON_OBJECT('workDays', sc.workdays, 'startDt', sc.startDt,"
+    sql += " 'endDt', sc.endDt, 'workSchedule', sc.workSchedule, 'breaktime', sc.breaktime,'budget', sc.jsonData, 'scIdx', sc.idx,"
+    sql += " 'category', (select itemNm from new_tb_code where itemCd = sc.type),"
+    sql += " 'type', (select itemCd from new_tb_code where itemCd = sc.type),"
+    sql += " 'staffList', sc.staffDetail, 'staffCount', sc.staffCount) END),']') as `contractList`"
     sql += " from new_tb_site s"
-    sql += " left join new_tb_site_assignment sa on sa.sIdx = s.idx"
     sql += " left join new_tb_site_contract sc on sc.sIdx = s.idx"
     sql += " left join new_tb_site_bigo sb on sb.sIdx = s.idx"
     sql += " where s.idx in (?)";
     // sql += " order by regDt desc limit 1"
+
+     */
+    let sql = `
+        SELECT
+            s.*,
+            -- type별 최신 계약 1건씩만 묶어서 반환
+            CONCAT('[', GROUP_CONCAT(
+                DISTINCT CASE 
+            WHEN latest_sc.sIdx IS NOT NULL 
+            THEN JSON_OBJECT(
+              'workDays',    latest_sc.workdays,
+              'startDt',     latest_sc.startDt,
+              'endDt',       latest_sc.endDt,
+              'workSchedule',latest_sc.workSchedule,
+              'breaktime',   latest_sc.breaktime,
+              'budget',      latest_sc.jsonData,
+              'totalCost',   latest_sc.total_cost,
+              'scIdx',       latest_sc.idx,
+              'staffList',   latest_sc.staffDetail,
+              'staffCount',  latest_sc.staffCount,
+              -- ★ 수정 1: cIdx 일치 조건 및 LIMIT 1 추가 (다중 행 에러 방지)
+              'category',    (SELECT itemNm FROM new_tb_code WHERE itemCd = latest_sc.type AND cIdx = latest_sc.cIdx LIMIT 1),
+              -- ★ 수정 2: 불필요한 서브쿼리 제거 (어차피 동일한 값이므로 그냥 컬럼 사용)
+              'type',        latest_sc.type
+            ) 
+          END
+        ), ']') AS contractList,
+
+            -- bigoList는 기존 그대로
+            CONCAT('[', GROUP_CONCAT(
+                DISTINCT CASE 
+            WHEN sb.sIdx IS NOT NULL 
+            THEN JSON_OBJECT('bigo', sb.bigo, 'regDt', sb.regDt) 
+          END
+        ), ']') AS bigoList
+
+        FROM new_tb_site s
+
+                 -- type별 최신 계약만 조인
+                 LEFT JOIN new_tb_site_contract latest_sc
+                           ON latest_sc.idx = (
+                               SELECT idx
+                               FROM new_tb_site_contract
+                               WHERE sIdx = s.idx
+                                 AND type = latest_sc.type   -- 같은 type 중에서
+                               ORDER BY startDt DESC, idx DESC  -- 가장 최근 계약
+            LIMIT 1
+            )
+            AND latest_sc.sIdx = s.idx
+
+            LEFT JOIN new_tb_site_bigo sb ON sb.sIdx = s.idx
+
+        WHERE s.idx IN (?)
+        GROUP BY s.idx
+    `;
     let aParameter = [sIdx];
 
     //let query = mysql.format(sql, aParameter);
     try {
         let [res] = await pool.query(sql, aParameter);
         return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.getWorkContracts = async function (sIdx) {
+    let sql = `SELECT scIdx, position, workhours FROM new_tb_work_contract WHERE sIdx = ?`;
+    try {
+        let [res] = await pool.query(sql, [sIdx]);
+        return res;
+    } catch (e) {
+        console.log('work contract db err', e);
+        return [];
+    }
+}
+
+exports.getSiteCoords = async function (sIdx) {
+    let sql = "select latitude, longitude from new_tb_site where idx = ?";
+    let aParameter = [sIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res[0];
     }catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
