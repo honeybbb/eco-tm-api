@@ -10,6 +10,12 @@ exports.getMemberList = async function () {
     sql += " left join new_tb_member_contract mc on mc.mIdx = m.idx"
     sql += " left join (select b.*, s.name from new_tb_member_assignment b left join new_tb_site s on s.idx = b.sIdx) as `ms` on ms.mIdx = m.idx"
     sql += " left join new_tb_code c on c.itemCd = m.type left join new_tb_code c2 on c2.itemCd = m.position";
+    // 정렬 조건 추가
+    // 1. 직위(c2) 혹은 구분(c)의 sort 값 (작은 숫자가 위로)
+    // 2. 등록일(regDt) 최신순 (최근 등록자가 위로)
+    // 3. 사번(id) 오름차순
+    sql += " ORDER BY c2.sort ASC, m.regDt DESC, m.id ASC";
+
     let aParameter = [];
 
     //let query = mysql.format(sql, aParameter);
