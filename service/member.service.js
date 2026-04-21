@@ -249,6 +249,8 @@ exports.registerFullMember = async function (req, res) {
             visa_date: body.visa_date,
             bank: body.bankName,
             accountNo: body.accountNumber,
+            four_ins: body.four_ins,
+            retire_pension: body.retire_pension,
             inDate: body.joinDate,
             outDate: body.endDate, // 혹은 body.outDate
             outReason: '', // 필요시 추가
@@ -261,8 +263,8 @@ exports.registerFullMember = async function (req, res) {
             sIdx: body.site,      // 현장 ID
             type: body.type,      // 계약 타입 (직원 구분 등)
             jsonData: JSON.stringify(body.wageInputs || {}), // 급여 정보 JSON화
-            startDt: body.joinDate,
-            endDt: body.endDate,
+            startDt: body.contractData?.contractStartDt || null,
+            endDt: body.contractData?.contractEndDt || null,
             bigo: body.bigo
         };
 

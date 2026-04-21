@@ -324,14 +324,15 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
             INSERT INTO new_tb_member 
             (type, name, id, password, birthDt, phone, position, gender, email,
              disability, disability_date, disability_grade, defector, patriot, intern, beneficiary, foreigner, nationality, visa_code, visa_date,
-             bank, accountNo, inDate, outDate, outReason, addr, bigo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             bank, accountNo, four_ins, retire_pension, inDate, outDate, outReason, addr, bigo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         let paramMember = [
             member.type, member.name, member.id, member.password, member.birthDt, member.phone, member.position, member.gender, member.email,
             member.disability, member.disability_date, member.disability_grade, member.defector, member.patriot, member.intern, member.beneficiary, member.foreigner, member.nationality, member.visa_code, member.visa_date,
-            member.bank, member.accountNo, member.inDate, member.outDate, member.outReason, member.addr, member.bigo
+            member.bank, member.accountNo,member.four_ins, member.retire_pension,
+            member.inDate, member.outDate, member.outReason, member.addr, member.bigo
         ];
 
         let resMember = await connection.query(sqlMember, paramMember);
