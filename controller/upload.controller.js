@@ -31,6 +31,9 @@ module.exports = function (app) {
     //출근 등록 - 엑셀 업로드
     app.route('/v1/upload/work').post(upload.single('file'), workService.uploadExcel);
 
+    //출근 등록 - 엑셀 다운로드
+    app.route('/v1/download/work/template').get(workService.downloadTemplate);
+
     //계약서 파일 업로드
     app.route('/v1/upload/file/:sIdx').post(upload.single('file'), contractService.uploadContractFile);
 
