@@ -420,6 +420,8 @@ exports.registerFullMember = async function (req, res) {
             etc_value_3: body.etc_value_3,
             bank: body.bankName,
             accountNumber: body.accountNumber,
+            four_ins: body.four_ins,
+            retire_pension: body.retire_pension,
             inDate: body.joinDate || null,
             outDate: body.outDate || null,
             outReason: body.endReason, // 필요시 추가
@@ -433,8 +435,8 @@ exports.registerFullMember = async function (req, res) {
             sIdx: body.site,      // 현장 ID
             type: body.type,      // 계약 타입 (직원 구분 등)
             jsonData: JSON.stringify(body.wageInputs || {}), // 급여 정보 JSON화
-            contractStartDt: body.contractData.contractStartDt || null,
-            contractEndDt: body.contractData.contractEndDt || null,
+            startDt: body.contractData?.contractStartDt || null,
+            endDt: body.contractData?.contractEndDt || null,
             bigo: body.bigo
         };
 
