@@ -23,10 +23,11 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 // const upload = multer({ storage: multer.memoryStorage() });
+const uploadMemory = multer({ storage: multer.memoryStorage() });
 
 module.exports = function (app) {
     //직원 등록 - 엑셀 업로드
-    app.route('/v1/upload/member').post(upload.single('file'), memberService.uploadExcel);
+    app.route('/v1/upload/member').post(uploadMemory.single('file'), memberService.uploadExcel);
 
     //출근 등록 - 엑셀 업로드
     app.route('/v1/upload/work').post(upload.single('file'), workService.uploadExcel);

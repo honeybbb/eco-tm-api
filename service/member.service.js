@@ -540,6 +540,7 @@ exports.updateMemberData = async function (req, res) {
 
 exports.uploadExcel = async function (req, res) {
     try {
+        const cIdx = req.user.cIdx;
         const { sIdx } = req.body; // 프론트에서 선택한 현장 idx
         const file = req.file;
 
@@ -557,18 +558,22 @@ exports.uploadExcel = async function (req, res) {
         for (const row of rows) {
             try {
                 const memberId = String(row['사번'] || '').trim();
+                const BirthDt = String(row['생년월일']).trim();
+                const rrn = encryptRRN(row['주민번호']);
                 // if (!memberId) continue; // 사번 없으면 스킵
 
-                // 1. 비밀번호 해시화 (초기 비밀번호는 사번으로 설정)
-                const hash = await bcrypt.hash(memberId, 10);
+                // 1. 비밀번호 해시화 (초기 비밀번호는 주민번호 앞자리로 설정)
+                const hash = await bcrypt.hash(BirthDt, 10);
 
                 // 2. 데이터 구조화 (엑셀 한글 헤더 매핑)
                 const memberData = {
+                    cIdx: cIdx,
                     type: row['구분(경비/미화)'] === '경비' ? 'S' : 'C',
                     name: row['이름'],
                     id: memberId,
                     password: hash,
-                    birthDt: row['생년월일'],
+                    birthDt: BirthDt,
+                    rrn: rrn,
                     phone: row['연락처'],
                     position: row['직위'],
                     gender: row['성별'] === '남' ? 'M' : 'F',
@@ -589,8 +594,11 @@ exports.uploadExcel = async function (req, res) {
                     inDate: row['입사일'],
                     outDate: row['퇴사일'],
                     outReason: row['사직사유'],
-                    addr: row['주소'],
-                    bigo: row['비고']
+                    address: row['주소'] || '',
+                    bigo: row['비고'] || '',
+                    four_ins: row['4대보험(Y/N)'] || 'Y',   // 기본값 Y
+                    retire_pension: row['퇴직연금(Y/N)'] || 'N',  // 기본값 N
+                    status: row['상태'] || 0,
                 };
 
                 // 계약 데이터 최소화 (엑셀에 없는 정보는 기본값 처리)

@@ -414,7 +414,7 @@ exports.getMemberLeave = async function (cIdx) {
             mal.usedCount,
             mal.overCount,
             mal.payCount,
-            mal.middleDt,
+--             mal.middleDt,
             mal.year,
             ma.sIdx,
             s.name   AS \`siteName\`
@@ -447,11 +447,11 @@ exports.getMemberLeave = async function (cIdx) {
 }
 
 //직원 연차 저장
-exports.setMemberLeave = async function (mIdx, sIdx, name, type, year, middleDt, count, over_count, used_count, bigo, regDt) {
-    let sql = "insert into new_tb_member_annual_leave (mIdx, sIdx, mName, mType, year, middleDt, totalCount, overCount, usedCount, bigo, regDt)"
-    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+exports.setMemberLeave = async function (mIdx, sIdx, type, year, middleDt, count, over_count, used_count, bigo, regDt) {
+    let sql = "insert into new_tb_member_annual_leave (mIdx, sIdx, mType, year, middleDt, totalCount, overCount, usedCount, bigo, regDt)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     // sql += " ON DUPLICATE KEY UPDATE "
-    let aParameter = [mIdx, sIdx, name, type, year, middleDt, count, over_count, used_count, bigo, regDt];
+    let aParameter = [mIdx, sIdx, type, year, middleDt, count, over_count, used_count, bigo, regDt];
 
     try {
         let [res] = await pool.query(sql, aParameter);
@@ -684,7 +684,7 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
                     ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         let paramMember = [
