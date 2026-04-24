@@ -430,11 +430,25 @@ exports.registerFullMember = async function (req, res) {
             bigo: body.bigo
         };
 
+        const wageInputs = body.contractData?.wageInputs || {};
+        const payItems = {};
+        const deductionItems = {};
+
+        Object.keys(wageInputs).forEach(key => {
+            if (key.startsWith('04001')) {
+                payItems[key] = wageInputs[key];
+            } else if (key.startsWith('04002')) {
+                deductionItems[key] = wageInputs[key];
+            }
+        });
+
         // (2) Contract 데이터
         const contractData = {
             sIdx: body.site,      // 현장 ID
             type: body.type,      // 계약 타입 (직원 구분 등)
-            jsonData: JSON.stringify(body.contractData.wageInputs || {}), // 급여 정보 JSON화
+            // jsonData: JSON.stringify(body.contractData.wageInputs || {}), // 급여 정보 JSON화
+            payItems: JSON.stringify(payItems),         // 지급 항목 분리
+            deductionItems: JSON.stringify(deductionItems), // 공제 항목 분리
             workSchedule: JSON.stringify(body.contractData.workSchedule || {}), //근무 스케줄 JSON화
             startDt: body.contractData?.contractStartDt || null,
             endDt: body.contractData?.contractEndDt || null,
@@ -476,12 +490,18 @@ exports.updateMemberData = async function (req, res) {
             hashedPassword = await bcrypt.hash(body.password, 10);
         }
 
+        let encryptedRrn = '';
+        if (body.rrn && !body.rrn.includes('***')) { // 마스킹된 데이터가 아닐 때만 암호화
+            encryptedRrn = encryptRRN(body.rrn);
+        }
+
         const memberData = {
             type: body.typeCd || body.type,
             name: body.name,
             id: body.id,
             password: hashedPassword,
             birthDt: body.birthDt,
+            rrn: encryptedRrn,
             phone: body.phone,
             position: body.position,
             gender: body.gender,
@@ -509,10 +529,25 @@ exports.updateMemberData = async function (req, res) {
             fourInsurance: body.four_ins,
         };
 
+        const payItems = {};
+        const deductionItems = {};
+
+        if (body.contractData?.wageInputs) {
+            Object.keys(body.contractData?.wageInputs).forEach(key => {
+                if (key.startsWith('04001')) {
+                    payItems[key] = body.contractData?.wageInputs[key];
+                } else if (key.startsWith('04002')) {
+                    deductionItems[key] = body.contractData?.wageInputs[key];
+                }
+            });
+        }
+
         const contractData = {
             sIdx: body.sIdx,
             type: body.typeCd || body.type,
-            jsonData: JSON.stringify(body.contractData?.wageInputs || {}),
+            // jsonData: JSON.stringify(body.contractData?.wageInputs || {}),
+            payItems: JSON.stringify(payItems),         // 분리 저장
+            deductionItems: JSON.stringify(deductionItems), // 분리 저장
             workSchedule: JSON.stringify(body.contractData?.workSchedule || {}),
             startDt: body.contractStartDt,
             endDt: body.contractEndDt,

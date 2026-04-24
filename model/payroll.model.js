@@ -66,8 +66,8 @@ exports.getBaseSalary = async function (cIdx) {
     sql += " m.name as staff,";
 
     // 1. 급여 항목 데이터 매핑
-    sql += " IFNULL(mbs.payItems, mc.jsonData) as payItems,";
-    sql += " IFNULL(mbs.deductionItems, JSON_OBJECT()) as deductionItems,";
+    sql += " IFNULL(mbs.payItems, mc.payItems) as payItems,";
+    sql += " IFNULL(mbs.deductionItems, mc.deductionItems) as deductionItems,";
     sql += " IFNULL(mbs.checkedItems, JSON_OBJECT()) as checkedItems,";
 
     // 2. 상태값(status) 처리: mbs 데이터가 없으면(NULL이면) 0, 있으면 1(또는 mbs의 기존 상태값)

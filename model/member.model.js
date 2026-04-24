@@ -173,7 +173,8 @@ exports.getMemberData = async function (id) {
                 GROUP_CONCAT(DISTINCT
                     CASE WHEN mc.idx IS NOT NULL THEN
                         JSON_OBJECT(
-                            'contractData', mc.jsonData,
+                            'contractData', mc.payItems,
+                            'contractData', mc.deductionItems,
                             'contractStartDt', mc.contractStartDt,
                             'contractEndDt', mc.contractEndDt,
                             'workSchedule', mc.workSchedule,
@@ -712,14 +713,16 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
         // contract 데이터에 위에서 만든 new_mIdx를 사용합니다.
         let sqlContract = `
             INSERT INTO new_tb_member_contract 
-            (mIdx, sIdx, type, jsonData, workSchedule, contractStartDt, contractEndDt, bigo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (mIdx, sIdx, type, payItems, deductionItems, workSchedule, contractStartDt, contractEndDt, bigo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         let paramContract = [
             new_mIdx,
             contract.sIdx,
             contract.type,
-            contract.jsonData, // JSON 문자열 상태
+            // contract.jsonData, // JSON 문자열 상태
+            contract.payItems,
+            contract.deductionItems,
             contract.workSchedule,
             contract.startDt,
             contract.endDt,
@@ -763,7 +766,7 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
 
         let sqlMember, paramMember;
         const commonFields = `
-            type = ?, name = ?, id = ?, birthDt = ?, phone = ?, position = ?, 
+            type = ?, name = ?, id = ?, birthDt = ?, rrn=?, phone = ?, position = ?, 
             gender = ?, email = ?, disability = ?, disability_date = ?, 
             disability_grade = ?, defector = ?, patriot = ?, intern = ?, 
             beneficiary = ?, foreigner = ?, nationality = ?, visa_code = ?, 
@@ -775,7 +778,7 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
         if (member.password) {
             sqlMember = `UPDATE new_tb_member SET ${commonFields}, password = ? WHERE idx = ?`;
             paramMember = [
-                member.type, member.name, member.id, member.birthDt, member.phone, member.position,
+                member.type, member.name, member.id, member.birthDt, member.rrn, member.phone, member.position,
                 member.gender, member.email, member.disability, member.disability_date,
                 member.disability_grade, member.defector, member.patriot, member.intern,
                 member.beneficiary, member.foreigner, member.nationality, member.visa_code,
@@ -786,7 +789,7 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
         } else {
             sqlMember = `UPDATE new_tb_member SET ${commonFields} WHERE idx = ?`;
             paramMember = [
-                member.type, member.name, member.id, member.birthDt, member.phone, member.position,
+                member.type, member.name, member.id, member.birthDt, member.rrn, member.phone, member.position,
                 member.gender, member.email, member.disability, member.disability_date,
                 member.disability_grade, member.defector, member.patriot, member.intern,
                 member.beneficiary, member.foreigner, member.nationality, member.visa_code,
@@ -797,8 +800,6 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
         }
         await connection.query(sqlMember, paramMember);
 
-        // ... (나머지 계약/배치 업데이트 코드는 기존과 동일하게 유지)
-
         // 2. Contract 업데이트
         const sqlContractCheck = `SELECT idx FROM new_tb_member_contract WHERE mIdx = ? ORDER BY idx DESC LIMIT 1`;
         const [contractRows] = await connection.query(sqlContractCheck, [mIdx]);
@@ -806,22 +807,22 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
         if (contractRows.length > 0) {
             const sqlContract = `
                 UPDATE new_tb_member_contract SET
-                    sIdx = ?, type = ?, jsonData = ?, workSchedule = ?,
+                    sIdx = ?, type = ?, payItems = ?, deductionItems = ?, workSchedule = ?,
                     contractStartDt = ?, contractEndDt = ?, bigo = ?
                 WHERE idx = ?
             `;
             await connection.query(sqlContract, [
-                contract.sIdx, contract.type, contract.jsonData, contract.workSchedule,
+                contract.sIdx, contract.type, contract.payItems, contract.deductionItems, contract.workSchedule,
                 contract.startDt, contract.endDt, contract.bigo, contractRows[0].idx
             ]);
         } else {
             const sqlContract = `
                 INSERT INTO new_tb_member_contract
-                    (mIdx, sIdx, type, jsonData, workSchedule, contractStartDt, contractEndDt, bigo)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (mIdx, sIdx, type, payItems, deductionItems, workSchedule, contractStartDt, contractEndDt, bigo)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             await connection.query(sqlContract, [
-                mIdx, contract.sIdx, contract.type, contract.jsonData, contract.workSchedule,
+                mIdx, contract.sIdx, contract.type, contract.payItems, contract.deductionItems, contract.workSchedule,
                 contract.startDt, contract.endDt, contract.bigo
             ]);
         }

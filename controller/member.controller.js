@@ -22,7 +22,6 @@ module.exports = function (app) {
     app.route('/v1/member/data/:id').get(service.getMemberData);
 
     //직원 등록
-    // app.route('/v1/member/register').post(service.setMemberData);
     app.route('/v1/member/register').post(service.registerFullMember);
 
     app.route('/v1/member/data/:idx').put(service.updateMemberData);
