@@ -881,126 +881,111 @@ exports.bulkRegisterWork = async function (req, res) {
 };
  */
 exports.bulkRegisterWork = async function (req, res) {
-    console.log("\n===================================================");
-    console.log("🚀 [월 출근 일괄 등록] 시작");
-    console.log("===================================================\n");
-
     try {
         const cIdx = req.user.cIdx;
-        const { sIdx, month } = req.body;
+        const { sIdx, month, type } = req.body;
 
-        if (!sIdx) return res.status(400).json({ result: false, message: 'sIdx가 없습니다.' });
-        if (!month || !/^\d{4}-\d{2}$/.test(month)) {
-            return res.status(400).json({ result: false, message: 'month 형식이 올바르지 않습니다. (예: 2026-04)' });
+        if (!sIdx || !month || !type) {
+            return res.status(400).json({ result: false, message: '필수 파라미터가 누락되었습니다.' });
         }
 
-        // ── 1. 현장 직원 목록 조회
-        const staffList = await memberModel.getStaffBySite(sIdx, cIdx);
-        if (!staffList || staffList.length === 0) {
-            return res.status(400).json({ result: false, message: '해당 현장에 등록된 직원이 없습니다.' });
+        const toYMD = (val) => {
+            if (!val) return null;
+            const d = new Date(val);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
+
+        // ── 1. 현장 직원 목록 조회 및 필터링
+        const allStaff = await memberModel.getStaffBySite(sIdx, cIdx);
+        const staffList = allStaff.filter(m => m.type === type);
+
+        if (staffList.length === 0) {
+            return res.status(400).json({ result: false, message: '해당 직종의 직원이 없습니다.' });
         }
-        console.log(`👥 직원 ${staffList.length}명 조회 완료`);
 
-        // ── 2. 현장 근로계약 스케줄 조회 (최신 계약 기준, 직책별 전체)
-        const contractList = await workModel.getWorkScheduleBySite(sIdx);
-        if (!contractList || contractList.length === 0) {
-            return res.status(400).json({ result: false, message: '등록된 근로계약이 없습니다.' });
+        // ── 2. 최신 계약의 staffDetail(JSON 스케줄) 로드
+        const rawStaffDetail = await workModel.getSiteContractDetail(sIdx, type);
+        if (!rawStaffDetail) {
+            return res.status(400).json({ result: false, message: '해당 현장에 등록된 계약 스케줄이 없습니다.' });
         }
 
-        // position → workhours 매핑
-        const contractMap = {};
-        for (const c of contractList) {
-            contractMap[c.position] = typeof c.workhours === 'string'
-                ? JSON.parse(c.workhours)
-                : c.workhours;
-        }
-        console.log('🗺️ contractMap keys:', Object.keys(contractMap));
+        // JSON 파싱 (이미 객체면 그대로 사용)
+        const staffDetail = typeof rawStaffDetail === 'string' ? JSON.parse(rawStaffDetail) : rawStaffDetail;
 
-        const deleted = await workModel.deleteWorkByMonth(sIdx, month);
-        const deletedCount = deleted?.affectedRows || deleted?.[0]?.affectedRows || 0;
-        console.log(`🗑️ 기존 데이터 삭제: ${deletedCount.affectedRows}건`);
+        // 직책(position code)을 키로 하는 스케줄 맵 생성
+        const scheduleMap = {};
+        staffDetail.forEach(item => {
+            scheduleMap[item.code] = item.schedule;
+        });
 
-        // ── 3. 해당 월 전체 날짜 생성
-        const allDates = getAllDatesOfMonth(month); // ['YYYY-MM-DD', ...] 형태로 반환한다고 가정
+        // ── 3. 기존 일반 근무 데이터 삭제
+        const mIdxList = staffList.map(s => s.idx);
+        await workModel.deleteWorkByStaffList(sIdx, month, mIdxList);
+
+        // ── 4. 날짜 생성 및 등록 루프
+        const allDates = getAllDatesOfMonth(month);
         const currentTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
         let successCount = 0;
-        let skippedCount = 0;
-        let noContractCount = 0;
+        let skipLeaveCount = 0;
 
-        // ★ 날짜 비교를 위한 안전한 YYYY-MM-DD 변환 헬퍼 함수 (시차 버그 방지)
-        const toYMD = (val) => {
-            if (!val) return null;
-            if (val instanceof Date) {
-                const y = val.getFullYear();
-                const m = String(val.getMonth() + 1).padStart(2, '0');
-                const d = String(val.getDate()).padStart(2, '0');
-                return `${y}-${m}-${d}`;
-            }
-            return String(val).substring(0, 10); // 문자열인 경우 앞 10자리 자르기
-        };
-
-        // ── 4. 직원별 계약 근무일만 등록
         for (const staff of staffList) {
-            const workhours = contractMap[staff.position];
+            const schedule = scheduleMap[staff.position]; // 해당 직원의 직책 스케줄
+            if (!schedule) continue;
 
-            if (!workhours) {
-                console.warn(`⚠️ [${staff.name}] position(${staff.position}) 계약 없음 → 스킵`);
-                noContractCount++;
-                continue;
-            }
-
-            // ── 입퇴사일 추출 및 변환 ──
             const inDate = toYMD(staff.inDate);
-            // 퇴사자(status === 1)이거나 outDate 값이 명시적으로 있는 경우
             const outDate = (staff.status === 1 || staff.outDate) ? toYMD(staff.outDate) : null;
 
             for (const date of allDates) {
-                // ★ 1. 입사일 이전이면 스킵
+                // 입퇴사일 필터링
                 if (inDate && date < inDate) continue;
-
-                // ★ 2. 퇴사일 이후면 스킵
                 if (outDate && date > outDate) continue;
 
-                // 3. 계약상 근무일(스케줄)이 아니면 스킵
-                if (!isContractWorkDay(date, workhours)) continue;
+                // 요일 계산 (0: 일, 1: 월, ... 6: 토)
+                const dayOfWeek = new Date(date).getDay();
+                const daySchedule = schedule[dayOfWeek];
 
-                // 이미 등록된 날짜면 스킵 (중복 방지)
+                // 스케줄상 근무일(isActive)이 아니면 패스
+                if (!daySchedule || !daySchedule.isActive) continue;
+
+                // 🌟 이미 등록된 휴가(연차, 반차, 휴무)가 있는지 확인
                 const existing = await workModel.getWorkByDate(staff.idx, sIdx, date);
-                if (existing && existing.length > 0) {
-                    skippedCount++;
+                const hasLeave = existing.some(r => ['annual', 'half', 'leave'].includes(r.workType));
+
+                if (hasLeave) {
+                    skipLeaveCount++;
                     continue;
                 }
+
+                // 🌟 계약서에 명시된 시간으로 등록
+                // workStartDt는 'YYYY-MM-DD HH:mm' 형식으로 조합 (필요시 모델 수정)
+                const startTime = `${date} ${daySchedule.startTime || '09:00'}:00`;
+                const endTime = `${date} ${daySchedule.endTime || '18:00'}:00`;
 
                 const result = await workModel.workStart(
                     staff.idx,
                     Number(sIdx),
-                    date,
+                    startTime, // 시작시간 적용
                     'work',
                     '',
-                    currentTime
+                    currentTime,
+                    endTime    // 종료시간 적용 (모델에서 받도록 구현되어 있다면)
                 );
 
-                if (result && result.data !== '-9999') {
-                    successCount++;
-                } else {
-                    console.warn(`⚠️ workStart 실패: mIdx=${staff.idx}, date=${date}`);
-                }
+                if (result && result.data !== '-9999') successCount++;
             }
         }
-
-        console.log(`✅ 완료 - 등록: ${successCount}건, 중복스킵: ${skippedCount}건, 계약없음: ${noContractCount}명`);
 
         res.status(200).json({
             result: true,
             success: successCount,
-            skipped: skippedCount,
-            message: `${successCount}건 등록 완료 (중복 ${skippedCount}건 스킵)`
+            skippedByLeave: skipLeaveCount,
+            message: `일괄 등록 완료: ${successCount}건 (연차/반차 ${skipLeaveCount}건 보존)`
         });
 
     } catch (error) {
         console.error('❌ 일괄 등록 오류:', error);
-        res.status(500).json({ result: false, message: error.message || '서버 오류' });
+        res.status(500).json({ result: false, message: '서버 오류가 발생했습니다.' });
     }
 };
 

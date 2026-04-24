@@ -18,14 +18,61 @@ exports.getWorkFl = async function (mIdx, sIdx, today) {
 
 // 특정 날짜 출근 기록 존재 여부 확인 (중복 방지용)
 exports.getWorkByDate = async function(mIdx, sIdx, date) {
-    const query = `
+    let sql = `
         SELECT idx FROM new_tb_work
         WHERE mIdx = ? AND sIdx = ?
           AND DATE(workStartDt) = ?
         LIMIT 1
     `;
-    const [rows] = await pool.query(query, [mIdx, sIdx, date]);
-    return rows;
+    let aPrameter = [mIdx, sIdx, date];
+
+    try {
+        const [res] = await pool.query(sql, aPrameter);
+        return res;
+    } catch (e) {
+        console.error('DB Error [getSiteContractDetail]:', e);
+        throw e;
+    }
+};
+
+// workModel.js 또는 siteModel.js
+exports.getSiteContractDetail = async function(sIdx, type) {
+    let sql = `
+        SELECT staffDetail
+        FROM new_tb_site_contract
+        WHERE sIdx = ? AND type = ?
+        ORDER BY startDt DESC, regDt DESC
+        LIMIT 1
+    `;
+    let aParameter = [sIdx, type];
+    try {
+        const [res] = await pool.query(sql, aParameter);
+        return res[0] ? res[0].staffDetail : null;
+    } catch (e) {
+        console.error('DB Error [getSiteContractDetail]:', e);
+        throw e;
+    }
+};
+
+// 기존 근로 데이터 삭제 (선택된 직종의 일반 근무/특근만 삭제)
+exports.deleteWorkByStaffList = async function (sIdx, month, mIdxList) {
+    if (!mIdxList || mIdxList.length === 0) return;
+    let sql = `
+        DELETE FROM new_tb_work 
+        WHERE sIdx = ? 
+          AND DATE_FORMAT(workStartDt, '%Y-%m') = ?
+          AND mIdx IN (?)
+          AND workType IN ('work', 'holiday', 'absent') -- 연차(annual), 반차(half)는 보존
+    `;
+
+    let aParameter = [sIdx, month, mIdxList];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
 };
 
 exports.getWorkScheduleBySite = async function(sIdx) {
