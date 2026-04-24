@@ -512,8 +512,8 @@ exports.updateMemberData = async function (req, res) {
         const contractData = {
             sIdx: body.sIdx,
             type: body.typeCd || body.type,
-            jsonData: JSON.stringify(body.contractData.wageInputs || {}),
-            workSchedule: JSON.stringify(body.contractData.workSchedule || {}),
+            jsonData: JSON.stringify(body.contractData?.wageInputs || {}),
+            workSchedule: JSON.stringify(body.contractData?.workSchedule || {}),
             startDt: body.contractStartDt,
             endDt: body.contractEndDt,
             bigo: body.bigo
