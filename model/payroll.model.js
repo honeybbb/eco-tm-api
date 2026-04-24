@@ -272,7 +272,7 @@ exports.getPayrollMonth = async function (year, month, cIdx) {
         return {'data': '-9999'}
     }
 }
-
+/*
 exports.getPayrollCalculate = async function (year, month, cIdx) {
     let sql = "select"
     sql += " m.idx,"
@@ -361,6 +361,138 @@ exports.getPayrollCalculate = async function (year, month, cIdx) {
         return {'data': '-9999'}
     }
 }
+
+ */
+exports.getPayrollCalculate = async function (year, month, cIdx) {
+
+    const sql = `
+    SELECT
+      m.idx,
+      m.id,
+      m.type,
+      (SELECT name        FROM new_tb_site WHERE idx = ma.sIdx) AS siteName,
+      (SELECT idx         FROM new_tb_site WHERE idx = ma.sIdx) AS sIdx,
+      (SELECT itemNm      FROM new_tb_code WHERE itemCd = m.position AND cIdx = m.cIdx LIMIT 1) AS role,
+      (SELECT payment_day FROM new_tb_site WHERE idx = ma.sIdx) AS payment_day,
+      m.name AS staff,
+
+      /* ── 1. 해당 월 달력 기준 일수 ── */
+      DAY(LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))) AS scheduledDays,
+
+      /* ── 2. 재직 기간 내 해당 월 유효 일수 ──
+              입사일/퇴사일을 고려해 실제 근무 가능한 일수 */
+      (
+        DATEDIFF(
+          /* 종료일: 퇴사일 vs 해당 월 말일 중 이른 쪽 */
+          LEAST(
+            IFNULL(
+              CASE WHEN m.outDate IS NOT NULL AND m.outDate != '0000-00-00'
+                   THEN m.outDate
+              END,
+              LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))
+            ),
+            LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))
+          ),
+          /* 시작일: 입사일 vs 해당 월 1일 중 늦은 쪽 */
+          GREATEST(
+            DATE(m.inDate),
+            CONCAT(?, '-', LPAD(?, 2, '0'), '-01')
+          )
+        ) + 1
+      ) AS eligibleDays,
+
+      /* ── 3. 결근 일수 ── */
+      (
+        SELECT COUNT(DISTINCT DATE(workStartDt))
+        FROM new_tb_work
+        WHERE mIdx = m.idx
+          AND YEAR(workStartDt) = ? AND MONTH(workStartDt) = ?
+          AND workType = 'absent'
+      ) AS absentDays,
+
+      /* ── 4. 실제 일한 날 = 재직 유효일수 - 결근일수 ──
+              (프론트에서 계산해도 되지만 편의상 같이 제공) */
+      (
+        (
+          DATEDIFF(
+            LEAST(
+              IFNULL(
+                CASE WHEN m.outDate IS NOT NULL AND m.outDate != '0000-00-00'
+                     THEN m.outDate
+                END,
+                LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))
+              ),
+              LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))
+            ),
+            GREATEST(
+              DATE(m.inDate),
+              CONCAT(?, '-', LPAD(?, 2, '0'), '-01')
+            )
+          ) + 1
+        )
+        -
+        (
+          SELECT COUNT(DISTINCT DATE(workStartDt))
+          FROM new_tb_work
+          WHERE mIdx = m.idx
+            AND YEAR(workStartDt) = ? AND MONTH(workStartDt) = ?
+            AND workType = 'absent'
+        )
+      ) AS workedDays,
+
+      /* ── 5. 급여 및 공제 내역 ── */
+      IFNULL(mpm.payItems,       bs.payItems)       AS payItems,
+      IFNULL(mpm.deductionItems, bs.deductionItems) AS deductionItems,
+      IFNULL(mpm.grossPay,       bs.grossPay)       AS grossPay,
+      IFNULL(mpm.checkedItems,   bs.checkedItems)   AS checkedItems,
+      IFNULL(mpm.deductions, 0)                     AS totalDeduction,
+      IFNULL(mpm.netPay,     0)                     AS netPay,
+      IF(mpm.idx IS NOT NULL, 1, 0)                 AS status
+
+    FROM new_tb_member m
+
+    LEFT JOIN new_tb_member_payroll_month mpm ON mpm.idx = (
+      SELECT idx FROM new_tb_member_payroll_month
+      WHERE mIdx = m.idx AND year = ? AND month = ?
+      ORDER BY regDt DESC LIMIT 1
+    )
+    LEFT JOIN new_tb_member_base_salary bs ON bs.idx = (
+      SELECT idx FROM new_tb_member_base_salary
+      WHERE mIdx = m.idx ORDER BY regDt DESC LIMIT 1
+    )
+    LEFT JOIN new_tb_member_contract mc ON mc.idx = (
+      SELECT idx FROM new_tb_member_contract
+      WHERE mIdx = m.idx ORDER BY regDt DESC LIMIT 1
+    )
+    LEFT JOIN new_tb_member_assignment ma ON ma.mIdx = m.idx
+    LEFT JOIN new_tb_site s ON s.idx = ma.sIdx
+    WHERE m.cIdx = ?
+    ORDER BY s.name, m.name
+  `;
+
+    // 파라미터 순서대로
+    const params = [
+        year, month,           // scheduledDays: LAST_DAY
+        year, month,           // eligibleDays: LEAST(outDate, 월말)
+        year, month,           // eligibleDays: LAST_DAY
+        year, month,           // eligibleDays: GREATEST(inDate, 월초)
+        year, month,           // absentDays
+        year, month,           // workedDays: LEAST(outDate, 월말)
+        year, month,           // workedDays: LAST_DAY
+        year, month,           // workedDays: GREATEST(inDate, 월초)
+        year, month,           // workedDays: absentDays 서브쿼리
+        year, month,           // mpm JOIN
+        cIdx,                  // WHERE
+    ];
+
+    try {
+        const [res] = await pool.query(sql, params);
+        return res;
+    } catch (e) {
+        console.error('db err', e);
+        return { data: '-9999' };
+    }
+};
 
 // 특정 직원의 전체 급여 이력 조회
 exports.getMemberPayrollHistory = async function (mIdx) {
