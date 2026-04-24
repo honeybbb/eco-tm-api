@@ -434,7 +434,8 @@ exports.registerFullMember = async function (req, res) {
         const contractData = {
             sIdx: body.site,      // 현장 ID
             type: body.type,      // 계약 타입 (직원 구분 등)
-            jsonData: JSON.stringify(body.wageInputs || {}), // 급여 정보 JSON화
+            jsonData: JSON.stringify(body.contractData.wageInputs || {}), // 급여 정보 JSON화
+            workSchedule: JSON.stringify(body.contractData.workSchedule || {}), //근무 스케줄 JSON화
             startDt: body.contractData?.contractStartDt || null,
             endDt: body.contractData?.contractEndDt || null,
             bigo: body.bigo
@@ -468,6 +469,7 @@ exports.updateMemberData = async function (req, res) {
     try {
         const mIdx = req.params.idx;
         const body = req.body;
+        console.log('전체 등록 요청 데이터:', body);
 
         let hashedPassword = null;
         if (body.password) {
@@ -510,7 +512,8 @@ exports.updateMemberData = async function (req, res) {
         const contractData = {
             sIdx: body.sIdx,
             type: body.typeCd || body.type,
-            jsonData: JSON.stringify(body.wageInputs || {}),
+            jsonData: JSON.stringify(body.contractData.wageInputs || {}),
+            workSchedule: JSON.stringify(body.contractData.workSchedule || {}),
             startDt: body.contractStartDt,
             endDt: body.contractEndDt,
             bigo: body.bigo

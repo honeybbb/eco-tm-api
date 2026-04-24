@@ -162,6 +162,7 @@ exports.getMemberData = async function (id) {
             cd.itemNm AS \`positionName\`,
             cd2.itemNm AS \`type\`,
             cd2.itemCd AS \`typeCd\`,
+            cd3.itemCd AS \`disabilityCd\`,
             CONCAT('[',
                 GROUP_CONCAT(DISTINCT
                     CASE WHEN ms.mIdx IS NOT NULL THEN
@@ -175,6 +176,7 @@ exports.getMemberData = async function (id) {
                             'contractData', mc.jsonData,
                             'contractStartDt', mc.contractStartDt,
                             'contractEndDt', mc.contractEndDt,
+                            'workSchedule', mc.workSchedule,
                             'monthWorkTime', mc.month_work_time,
                             'dayWorkTime', mc.day_work_time
                         )
@@ -183,6 +185,7 @@ exports.getMemberData = async function (id) {
         FROM new_tb_member m
         LEFT JOIN new_tb_code cd ON cd.itemCd = m.position
         LEFT JOIN new_tb_code cd2 ON cd2.itemCd = m.type
+        LEFT JOIN new_tb_code cd3 ON cd3.itemCd = m.disability_grade
         LEFT JOIN new_tb_member_assignment ms ON m.idx = ms.mIdx
         LEFT JOIN new_tb_site s ON s.idx = ms.sIdx
         LEFT JOIN (
@@ -709,14 +712,15 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
         // contract 데이터에 위에서 만든 new_mIdx를 사용합니다.
         let sqlContract = `
             INSERT INTO new_tb_member_contract 
-            (mIdx, sIdx, type, jsonData, contractStartDt, contractEndDt, bigo)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (mIdx, sIdx, type, jsonData, workSchedule, contractStartDt, contractEndDt, bigo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `;
         let paramContract = [
             new_mIdx,
             contract.sIdx,
             contract.type,
             contract.jsonData, // JSON 문자열 상태
+            contract.workSchedule,
             contract.startDt,
             contract.endDt,
             contract.bigo
@@ -802,22 +806,22 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
         if (contractRows.length > 0) {
             const sqlContract = `
                 UPDATE new_tb_member_contract SET
-                    sIdx = ?, type = ?, jsonData = ?,
+                    sIdx = ?, type = ?, jsonData = ?, workSchedule = ?,
                     contractStartDt = ?, contractEndDt = ?, bigo = ?
                 WHERE idx = ?
             `;
             await connection.query(sqlContract, [
-                contract.sIdx, contract.type, contract.jsonData,
+                contract.sIdx, contract.type, contract.jsonData, contract.workSchedule,
                 contract.startDt, contract.endDt, contract.bigo, contractRows[0].idx
             ]);
         } else {
             const sqlContract = `
                 INSERT INTO new_tb_member_contract
-                    (mIdx, sIdx, type, jsonData, contractStartDt, contractEndDt, bigo)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (mIdx, sIdx, type, jsonData, workSchedule, contractStartDt, contractEndDt, bigo)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             `;
             await connection.query(sqlContract, [
-                mIdx, contract.sIdx, contract.type, contract.jsonData,
+                mIdx, contract.sIdx, contract.type, contract.jsonData, contract.workSchedule,
                 contract.startDt, contract.endDt, contract.bigo
             ]);
         }
