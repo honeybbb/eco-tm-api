@@ -36,7 +36,7 @@ module.exports = function (app) {
     app.route('/v1/download/work/template').get(workService.downloadTemplate);
 
     //계약서 파일 업로드
-    app.route('/v1/upload/file/:sIdx').post(upload.single('file'), contractService.uploadContractFile);
+    app.route('/v1/upload/file/:sIdx').post(upload.array('file', 10), contractService.uploadContractFile);
 
     //계약서 파일 다운로드
     app.route('/v1/download/file/:sIdx').get(contractService.downLoadContractFile);

@@ -96,15 +96,16 @@ exports.setSiteContract = async function (sIdx, cIdx, contract, totalCost, start
     }
 }
 
-exports.updateFilePath = async function (originalName, fileUrl, sIdx){
+exports.updateFilePath = async function (originalNamesStr, fileUrlsStr, sIdx){
+    // 쿼리는 기존과 동일
     let sql = "update new_tb_site set contractFileOriginal = ?, contractFileSaved = ? where idx = ?"
-    let aParameter = [originalName, fileUrl, sIdx];
+    let aParameter = [originalNamesStr, fileUrlsStr, sIdx];
 
     let query = mysql.format(sql, aParameter);
     try {
         let res = await pool.query(query);
         return res;
-    }catch (e) {
+    } catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
     }

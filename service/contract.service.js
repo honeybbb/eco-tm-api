@@ -42,19 +42,32 @@ exports.setSiteContract = async function (req, res) {
 }
 
 exports.uploadContractFile = async function (req, res) {
-    let file = req.file,
-        sIdx = req.params.sIdx;
+    // 1. req.file 대신 req.files (배열)로 받습니다.
+    let files = req.files;
+    let sIdx = req.params.sIdx;
 
-    if (!file) return res.json({'result': false, 'msg':'파일이 전달되지 않았습니다.'});
+    if (!files || files.length === 0) {
+        return res.json({'result': false, 'msg':'파일이 전달되지 않았습니다.'});
+    }
 
-    const originalName = file.originalname; // 사용자가 올린 원래 파일명 (예: 계약서.pdf)
-    const savedFileName = file.filename;    // 서버에 저장된 난수화된 파일명 (예: 17099238123.pdf)
-    const fileSize = file.size;             // 파일 용량
-    const fileUrl = `/uploads/${savedFileName}`;
+    let originalNames = [];
+    let fileUrls = [];
 
-    let result = await contractModel.updateFilePath(originalName, fileUrl, sIdx);
+    // 2. 전달받은 여러 파일 정보를 각각의 배열에 담습니다.
+    for (const file of files) {
+        originalNames.push(file.originalname);
+        fileUrls.push(`/uploads/${file.filename}`);
+    }
 
-    res.json({'result': true, 'data': result})
+    // 3. 배열을 문자열 형태로 변환합니다. (DB 컬럼 구조 유지용)
+    // 예: '["계약서1.pdf", "계약서2.pdf"]'
+    const originalNamesStr = JSON.stringify(originalNames);
+    const fileUrlsStr = JSON.stringify(fileUrls);
+
+    // 4. 모델로 변환된 문자열 전달
+    let result = await contractModel.updateFilePath(originalNamesStr, fileUrlsStr, sIdx);
+
+    res.json({'result': true, 'data': result});
 }
 
 exports.downLoadContractFile = async function (req, res) {
