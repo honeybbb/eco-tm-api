@@ -1,10 +1,13 @@
 const pool = require("../config/mysql");
 const mysql = require("mysql2/promise")
 
-exports.setBaseSalary = async function (mIdx, sIdx, year, paymentList, deductionList, checkedList, grossPay, deductions, netPay,total) {
-    let sql = "insert into new_tb_member_base_salary (mIdx, sIdx, year, payItems, deductionItems, checkedItems, grossPay, deductions, netPay, total)"
-    sql += " values (?, ?, ?, ?, ? ,? ,? ,?, ?,?)"
-    let aParameter = [mIdx, sIdx, year, paymentList, deductionList, checkedList, grossPay, deductions, netPay,total];
+exports.setBaseSalary = async function (
+    mIdx, sIdx, year, paymentList, deductionList, isAutoCalc,
+    checkedList, grossPay, deductions, netPay,total
+) {
+    let sql = "insert into new_tb_member_base_salary (mIdx, sIdx, year, payItems, deductionItems, isAutoCalc, checkedItems, grossPay, deductions, netPay, total)"
+    sql += " values (?, ?, ?, ?, ? ,? ,? ,?, ?, ?, ?)"
+    let aParameter = [mIdx, sIdx, year, paymentList, deductionList, isAutoCalc, checkedList, grossPay, deductions, netPay,total];
 
     //let query = mysql.format(sql, aParameter);
     try {
@@ -64,6 +67,8 @@ exports.getBaseSalary = async function (cIdx) {
     sql += " c.itemNm as role,";
     sql += " c.sort,";
     sql += " m.name as staff,";
+    //자동 계산 여부
+    sql += " IFNULL(mbs.isAutoCalc, IFNULL(mc.isAutoCalc, 'Y')) as isAutoCalc,";
 
     // 1. 급여 항목 데이터 매핑
     sql += " IFNULL(mbs.payItems, mc.payItems) as payItems,";

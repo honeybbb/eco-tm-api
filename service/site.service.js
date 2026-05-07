@@ -135,7 +135,8 @@ exports.registerSiteWithContract = async function (req, res) {
                     staffDetail: JSON.stringify(contractItem.staffList),
                     workSchedule: contractItem.workSchedule,
                     breaktime: contractItem.breakTime,
-                    costBreakdown: JSON.stringify(contractItem.costBreakdown)
+                    costBreakdown: JSON.stringify(contractItem.costBreakdown),
+                    isAutoCalc: contractItem.isAutoCalc === 'N' ? 'N' : 'Y'
                 };
 
                 // 개별 계약 저장
