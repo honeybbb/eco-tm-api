@@ -447,6 +447,8 @@ exports.registerFullMember = async function (req, res) {
             sIdx: body.site,      // 현장 ID
             type: body.type,      // 계약 타입 (직원 구분 등)
             // jsonData: JSON.stringify(body.contractData.wageInputs || {}), // 급여 정보 JSON화
+            dayWorkTime: body.dayWorkTime,
+            monthWorkTime: body.monthWorkTime,
             payItems: JSON.stringify(payItems),         // 지급 항목 분리
             deductionItems: JSON.stringify(deductionItems), // 공제 항목 분리
             workSchedule: JSON.stringify(body.contractData.workSchedule || {}), //근무 스케줄 JSON화
@@ -546,6 +548,8 @@ exports.updateMemberData = async function (req, res) {
             sIdx: body.sIdx,
             type: body.typeCd || body.type,
             // jsonData: JSON.stringify(body.contractData?.wageInputs || {}),
+            dayWorkTime: body.dayWorkTime,
+            monthWorkTime: body.monthWorkTime,
             payItems: JSON.stringify(payItems),         // 분리 저장
             deductionItems: JSON.stringify(deductionItems), // 분리 저장
             workSchedule: JSON.stringify(body.contractData?.workSchedule || {}),
