@@ -451,11 +451,14 @@ exports.getMemberLeave = async function (cIdx) {
 }
 
 //직원 연차 저장
-exports.setMemberLeave = async function (mIdx, sIdx, type, year, middleDt, count, over_count, used_count, bigo, regDt) {
-    let sql = "insert into new_tb_member_annual_leave (mIdx, sIdx, mType, year, middleDt, totalCount, overCount, usedCount, bigo, regDt)"
-    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    // sql += " ON DUPLICATE KEY UPDATE "
-    let aParameter = [mIdx, sIdx, type, year, middleDt, count, over_count, used_count, bigo, regDt];
+exports.setMemberLeave = async function (mIdx, sIdx, type, year, middleDt, count, over_count, used_count, payCount, bigo, regDt) {
+    let sql = "insert into new_tb_member_annual_leave (mIdx, sIdx, mType, year, middleDt, totalCount, overCount, usedCount, payCount, bigo, regDt)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    sql += " ON DUPLICATE KEY UPDATE totalCount=?, overCount=?, usedCount=?, payCount=?, bigo=?, modDt=?"
+    let aParameter = [
+        mIdx, sIdx, type, year, middleDt, count, over_count, used_count, payCount, bigo, regDt,
+        count, over_count, used_count, payCount, bigo, regDt
+    ];
 
     try {
         let [res] = await pool.query(sql, aParameter);
