@@ -264,11 +264,13 @@ exports.getPayrollMonth = async function (year, month, cIdx) {
             ) p2 ON p1.idx = p2.max_idx
         ) mpm ON mpm.mIdx = m.idx
         WHERE m.cIdx = ?
+          AND m.inDate <= LAST_DAY(STR_TO_DATE(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'), '%Y-%m-%d'))
+          AND (m.outDate IS NULL OR m.outDate >= STR_TO_DATE(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'), '%Y-%m-%d'))
         ORDER BY s.idx, c.sort, m.idx
     `;
 
     // 파라미터 매칭: 근태 조인(2) + 급여 조인(2) = 총 4개
-    let aParameter = [year, month, year, month, cIdx];
+    let aParameter = [year, month, year, month, cIdx, year, month, year, month];
 
     try {
         let [res] = await pool.query(sql, aParameter);
