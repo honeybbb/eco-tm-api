@@ -213,17 +213,20 @@ exports.getMemberLeave = async function (req, res) {
 exports.setMemberLeave = async function (req, res) {
     let mIdx = req.body.mIdx,
         sIdx = req.body.sIdx,
-        name = req.body.name,
-        type = req.body.type,
+        // name = req.body.name,
+        type = req.body.mType,
         year = req.body.year,
         middleDt = req.body.middleDt,
         totalCount = req.body.totalCount,
         overCount = req.body.overCount,
         usedCount = req.body.usedCount,
+        payCount = req.body.payCount,
         bigo = req.body.bigo,
         regDt = new Date();
 
-    let result = await memberModel.setMemberLeave(mIdx, sIdx, name, type, year, middleDt, totalCount, overCount, usedCount, bigo, regDt);
+    console.log(mIdx, sIdx, type, year, middleDt, totalCount, overCount, usedCount, bigo, regDt)
+
+    let result = await memberModel.setMemberLeave(mIdx, sIdx, type, year, middleDt, totalCount, overCount, usedCount, payCount, bigo, regDt);
 
     res.json({'result': true, 'data': result})
 }
@@ -447,6 +450,8 @@ exports.registerFullMember = async function (req, res) {
             sIdx: body.site,      // 현장 ID
             type: body.type,      // 계약 타입 (직원 구분 등)
             // jsonData: JSON.stringify(body.contractData.wageInputs || {}), // 급여 정보 JSON화
+            dayWorkTime: body.dayWorkTime,
+            monthWorkTime: body.monthWorkTime,
             payItems: JSON.stringify(payItems),         // 지급 항목 분리
             deductionItems: JSON.stringify(deductionItems), // 공제 항목 분리
             workSchedule: JSON.stringify(body.contractData.workSchedule || {}), //근무 스케줄 JSON화
@@ -546,6 +551,8 @@ exports.updateMemberData = async function (req, res) {
             sIdx: body.sIdx,
             type: body.typeCd || body.type,
             // jsonData: JSON.stringify(body.contractData?.wageInputs || {}),
+            dayWorkTime: body.dayWorkTime,
+            monthWorkTime: body.monthWorkTime,
             payItems: JSON.stringify(payItems),         // 분리 저장
             deductionItems: JSON.stringify(deductionItems), // 분리 저장
             workSchedule: JSON.stringify(body.contractData?.workSchedule || {}),

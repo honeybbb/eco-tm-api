@@ -212,6 +212,7 @@ exports.getPayrollMonth = async function (year, month, cIdx) {
             c.itemNm AS role,
             c.sort,
             m.inDate, m.outDate,
+            m.bank, m.accountNumber,
             
             /* 1. 결근 일수는 사실상 확정 정보이므로 무조건 보여줌 (없으면 0) */
             IFNULL(w.absentDays, 0) AS absentDays,
@@ -380,6 +381,7 @@ exports.getPayrollCalculate = async function (year, month, cIdx) {
       (SELECT itemNm      FROM new_tb_code WHERE itemCd = m.position AND cIdx = m.cIdx LIMIT 1) AS role,
       (SELECT payment_day FROM new_tb_site WHERE idx = ma.sIdx) AS payment_day,
       m.name AS staff,
+      m.bank, m. accountNumber,
 
       /* ── 1. 해당 월 달력 기준 일수 ── */
       DAY(LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))) AS scheduledDays,

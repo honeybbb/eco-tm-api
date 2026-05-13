@@ -451,11 +451,14 @@ exports.getMemberLeave = async function (cIdx) {
 }
 
 //직원 연차 저장
-exports.setMemberLeave = async function (mIdx, sIdx, type, year, middleDt, count, over_count, used_count, bigo, regDt) {
-    let sql = "insert into new_tb_member_annual_leave (mIdx, sIdx, mType, year, middleDt, totalCount, overCount, usedCount, bigo, regDt)"
-    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    // sql += " ON DUPLICATE KEY UPDATE "
-    let aParameter = [mIdx, sIdx, type, year, middleDt, count, over_count, used_count, bigo, regDt];
+exports.setMemberLeave = async function (mIdx, sIdx, type, year, middleDt, count, over_count, used_count, payCount, bigo, regDt) {
+    let sql = "insert into new_tb_member_annual_leave (mIdx, sIdx, mType, year, middleDt, totalCount, overCount, usedCount, payCount, bigo, regDt)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    sql += " ON DUPLICATE KEY UPDATE totalCount=?, overCount=?, usedCount=?, payCount=?, bigo=?, modDt=?"
+    let aParameter = [
+        mIdx, sIdx, type, year, middleDt, count, over_count, used_count, payCount, bigo, regDt,
+        count, over_count, used_count, payCount, bigo, regDt
+    ];
 
     try {
         let [res] = await pool.query(sql, aParameter);
@@ -713,14 +716,18 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
         // contract 데이터에 위에서 만든 new_mIdx를 사용합니다.
         let sqlContract = `
             INSERT INTO new_tb_member_contract 
-            (mIdx, sIdx, type, payItems, deductionItems, workSchedule, contractStartDt, contractEndDt, bigo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (mIdx, sIdx, type, day_work_time, month_work_time, 
+             payItems, deductionItems, workSchedule, 
+             contractStartDt, contractEndDt, bigo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         let paramContract = [
             new_mIdx,
             contract.sIdx,
             contract.type,
             // contract.jsonData, // JSON 문자열 상태
+            contract.dayWorkTime,
+            contract.monthWorkTime,
             contract.payItems,
             contract.deductionItems,
             contract.workSchedule,
@@ -807,22 +814,30 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
         if (contractRows.length > 0) {
             const sqlContract = `
                 UPDATE new_tb_member_contract SET
-                    sIdx = ?, type = ?, payItems = ?, deductionItems = ?, workSchedule = ?,
+                    sIdx = ?, type = ?, 
+                    day_work_time = ?, month_work_time = ?, 
+                    payItems = ?, deductionItems = ?, workSchedule = ?,
                     contractStartDt = ?, contractEndDt = ?, bigo = ?
                 WHERE idx = ?
             `;
             await connection.query(sqlContract, [
-                contract.sIdx, contract.type, contract.payItems, contract.deductionItems, contract.workSchedule,
+                contract.sIdx, contract.type,
+                contract.dayWorkTime, contract.monthWorkTime,
+                contract.payItems, contract.deductionItems, contract.workSchedule,
                 contract.startDt, contract.endDt, contract.bigo, contractRows[0].idx
             ]);
         } else {
             const sqlContract = `
                 INSERT INTO new_tb_member_contract
-                    (mIdx, sIdx, type, payItems, deductionItems, workSchedule, contractStartDt, contractEndDt, bigo)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (mIdx, sIdx, type, day_work_time, month_work_time, 
+                     payItems, deductionItems,
+                     workSchedule, contractStartDt, contractEndDt, bigo)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             await connection.query(sqlContract, [
-                mIdx, contract.sIdx, contract.type, contract.payItems, contract.deductionItems, contract.workSchedule,
+                mIdx, contract.sIdx, contract.type,
+                contract.dayWorkTime, contract.monthWorkTime,
+                contract.payItems, contract.deductionItems, contract.workSchedule,
                 contract.startDt, contract.endDt, contract.bigo
             ]);
         }
