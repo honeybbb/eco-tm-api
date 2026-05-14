@@ -74,10 +74,10 @@ exports.setBaseCode = async function (req, res) {
         sort = req.body.sort,
         useFl = req.body.useFl,
         option = req.body.option,
-        logicFl = req.body.logicFl,
+        // logicFl = req.body.logicFl,
         regDt = new Date();
 
-    let result = await etcModel.setBaseCode(cIdx, groupCd, itemCd, itemNm, sort, useFl, option, logicFl, regDt);
+    let result = await etcModel.setBaseCode(cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt);
 
     res.json({'result': true, 'data': result})
 }
