@@ -88,7 +88,34 @@ exports.getMemberData = async function (req, res) {
     let id = req.params.id;
 
     let result = await memberModel.getMemberData(id);
-    if(result.length > 0) delete result?.[0].password;
+    if (result.length > 0) {
+        let member = result[0];
+
+        // 2. 비밀번호 제거
+        delete member.password;
+
+        // 3. 주민번호 복호화 및 앞/뒷자리 분리
+        member.firstNumber = '';
+        member.lastNumber = '';
+
+        if (member.rrn) {
+            try {
+                // 이전에 만드신 복호화 함수를 사용해 평문으로 변환
+                let decryptedRrn = decryptRRN(member.rrn);
+
+                // 혹시 모를 하이픈(-)이나 특수문자 제거 후 숫자만 남기기
+                let cleanRrn = decryptedRrn.replace(/[^0-9]/g, '');
+
+                // 총 13자리가 맞다면 6자리, 7자리로 쪼개서 담아주기
+                if (cleanRrn.length === 13) {
+                    member.firstNumber = cleanRrn.substring(0, 6);
+                    member.lastNumber = cleanRrn.substring(6, 13);
+                }
+            } catch (err) {
+                console.error('주민번호 복호화 중 에러 발생:', err);
+            }
+        }
+    }
 
     res.json({'result': true, 'data': result})
 }
