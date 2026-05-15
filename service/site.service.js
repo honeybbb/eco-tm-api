@@ -79,6 +79,8 @@ exports.registerSiteWithContract = async function (req, res) {
             manager: req.body.manager || '',
             director: req.body.director,
             director_phone: req.body.directorContact,
+            billingManager: req.body.billingManager,
+            payrollManager: req.body.payrollManager,
             bigo: req.body.bigo || '',
 
             viewConfig: req.body.viewConfig || null,
