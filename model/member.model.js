@@ -686,12 +686,14 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
              disability, disability_date, disability_grade, defector, patriot, intern, beneficiary,
              foreigner, nationality, visa_code, visa_date,
              etc_name_1, etc_value_1, etc_name_2, etc_value_2, etc_name_3, etc_value_3,
-             bank, accountNumber, four_ins, retire_pension, inDate, outDate, outReason, status, address, bigo)
+             bank, accountNm, accountNumber, four_ins, retire_pension, 
+             inDate, outDate, outReason, status, address, bigo)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ?, ?, ?, ?, ?, 
+                    ?, ?, ?, ?, ?, ?)
         `;
 
         let paramMember = [
@@ -702,7 +704,7 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
             member.etc_name_1, member.etc_value_1,
             member.etc_name_2, member.etc_value_2,
             member.etc_name_3, member.etc_value_3,
-            member.bank, member.accountNumber,
+            member.bank, member.accountNm, member.accountNumber,
             member.four_ins, member.retire_pension,
             member.inDate, member.outDate, member.outReason, member.status, member.address, member.bigo
         ];

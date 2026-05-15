@@ -449,6 +449,7 @@ exports.registerFullMember = async function (req, res) {
             etc_name_3: body.etc_name_3,
             etc_value_3: body.etc_value_3,
             bank: body.bankName,
+            accountNm: body.accountNm,
             accountNumber: body.accountNumber,
             four_ins: body.four_ins,
             retire_pension: body.retire_pension,
