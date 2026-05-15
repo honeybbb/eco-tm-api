@@ -779,8 +779,8 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
             gender = ?, email = ?, disability = ?, disability_date = ?, 
             disability_grade = ?, defector = ?, patriot = ?, intern = ?, 
             beneficiary = ?, foreigner = ?, nationality = ?, visa_code = ?, 
-            visa_date = ?, bank = ?, accountNumber = ?, inDate = ?, 
-            outDate = ?, outReason = ?, address = ?, bigo = ?, status = ?,
+            visa_date = ?, bank = ?, accountNm = ?, accountNumber = ?,
+            inDate = ?, outDate = ?, outReason = ?, address = ?, bigo = ?, status = ?,
             four_ins = ?, retire_pension = ?
         `;
 
@@ -791,8 +791,8 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
                 member.gender, member.email, member.disability, member.disability_date,
                 member.disability_grade, member.defector, member.patriot, member.intern,
                 member.beneficiary, member.foreigner, member.nationality, member.visa_code,
-                member.visa_date, member.bank, member.accountNumber, member.inDate,
-                member.outDate, member.outReason, member.addr, member.bigo, member.status,
+                member.visa_date, member.bank, member.accountNm, member.accountNumber,
+                member.inDate, member.outDate, member.outReason, member.addr, member.bigo, member.status,
                 member.fourInsurance, member.retirePension, member.password, mIdx
             ];
         } else {
@@ -802,8 +802,8 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
                 member.gender, member.email, member.disability, member.disability_date,
                 member.disability_grade, member.defector, member.patriot, member.intern,
                 member.beneficiary, member.foreigner, member.nationality, member.visa_code,
-                member.visa_date, member.bank, member.accountNumber, member.inDate,
-                member.outDate, member.outReason, member.addr, member.bigo, member.status,
+                member.visa_date, member.bank, member.accountNm, member.accountNumber,
+                member.inDate, member.outDate, member.outReason, member.addr, member.bigo, member.status,
                 member.fourInsurance, member.retirePension, mIdx
             ];
         }

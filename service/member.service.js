@@ -551,6 +551,7 @@ exports.updateMemberData = async function (req, res) {
             visa_code: body.visa_code || null,
             visa_date: body.visa_date || null,
             bank: body.bankName,
+            accountNm: body.accountNm,
             accountNumber: body.accountNumber,
             inDate: body.joinDate,
             outDate: body.status == '1' ? body.endDate : null,
