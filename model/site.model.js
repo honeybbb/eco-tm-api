@@ -175,7 +175,7 @@ exports.saveContract = async function (contract) {
             let sql = `
                 UPDATE new_tb_site_contract 
                 SET type=?, jsonData=?, total_cost=?, startDt=?, endDt=?, staffCount=?, staffDetail=?, 
-                    workSchedule=?, breaktime=?, isAutoCalc=?
+                    workSchedule=?, breaktime=?, isAutoCalc=?, meltOptions=?
                 WHERE idx = ? 
             `;
             let params = [
@@ -189,6 +189,7 @@ exports.saveContract = async function (contract) {
                 contract.workSchedule,
                 contract.breaktime,
                 contract.isAutoCalc,
+                contract.meltOptions,
                 contract.scIdx // WHERE 조건
             ];
             await connection.query(sql, params);
@@ -199,8 +200,8 @@ exports.saveContract = async function (contract) {
                 INSERT INTO new_tb_site_contract 
                 (sIdx, cIdx, type, workdays, total_cost,
                  startDt, endDt, staffCount, staffDetail, workSchedule, breaktime,
-                 jsonData, isAutoCalc) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ? , ?, ?, ?, ?, ?)
+                 jsonData, isAutoCalc, meltOptions) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ? , ?, ?, ?, ?, ?, ?)
             `;
             let params = [
                 contract.sIdx, // 현장 FK
@@ -215,7 +216,8 @@ exports.saveContract = async function (contract) {
                 contract.workSchedule,
                 contract.breaktime,
                 contract.costBreakdown,
-                contract.isAutoCalc
+                contract.isAutoCalc,
+                contract.meltOptions
             ];
             let [result] = await connection.query(sql, params);
             current_scIdx = result.insertId;

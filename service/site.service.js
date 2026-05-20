@@ -82,7 +82,6 @@ exports.registerSiteWithContract = async function (req, res) {
             billingManager: req.body.billingManager,
             payrollManager: req.body.payrollManager,
             bigo: req.body.bigo || '',
-
             viewConfig: req.body.viewConfig || null,
         };
 
@@ -138,7 +137,8 @@ exports.registerSiteWithContract = async function (req, res) {
                     workSchedule: contractItem.workSchedule,
                     breaktime: contractItem.breakTime,
                     costBreakdown: JSON.stringify(contractItem.costBreakdown),
-                    isAutoCalc: contractItem.isAutoCalc === 'N' ? 'N' : 'Y'
+                    isAutoCalc: contractItem.isAutoCalc === 'N' ? 'N' : 'Y',
+                    meltOptions: contractItem.meltOptions ? JSON.stringify(contractItem.meltOptions) : null
                 };
 
                 // 개별 계약 저장
