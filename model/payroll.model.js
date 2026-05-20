@@ -213,6 +213,7 @@ exports.getPayrollMonth = async function (year, month, cIdx) {
             c.sort,
             m.inDate, m.outDate,
             m.bank, m.accountNumber,
+            s.billingManager, /*청구담당*/
             
             /* 1. 결근 일수는 사실상 확정 정보이므로 무조건 보여줌 (없으면 0) */
             IFNULL(w.absentDays, 0) AS absentDays,
