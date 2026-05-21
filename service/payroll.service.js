@@ -306,6 +306,7 @@ exports.setPayrollMonth = async function (req, res) {
         sIdx = req.body.sIdx,
         year = req.body.year,
         month = req.body.month,
+        payDt = req.body.payDt,
         workedDays = req.body.workedDays,
         scheduledDays = req.body.scheduledDays,
         grossPay = req.body.grossPay,
@@ -316,7 +317,7 @@ exports.setPayrollMonth = async function (req, res) {
         total = req.body.total;
 
     let result = await payrollModel.setPayrollMonth(
-        mIdx, sIdx, year, month, workedDays, scheduledDays,
+        mIdx, sIdx, year, month, payDt, workedDays, scheduledDays,
         grossPay, deductions, netPay, payItems, deductionItems, total
     );
 

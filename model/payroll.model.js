@@ -67,6 +67,7 @@ exports.getBaseSalary = async function (cIdx) {
     sql += " c.itemNm as role,";
     sql += " c.sort,";
     sql += " m.name as staff,";
+    sql += " m.disability,"
     //자동 계산 여부
     sql += " IFNULL(mbs.isAutoCalc, IFNULL(mc.isAutoCalc, 'Y')) as isAutoCalc,";
 
@@ -639,13 +640,16 @@ exports.getPayrollCalculateTemp = async function (year, month) {
 }
 
 exports.setPayrollMonth = async function (
-    mIdx, sIdx, year, month, workedDays, scheduledDays,
+    mIdx, sIdx, year, month, payDt, workedDays, scheduledDays,
     grossPay, deductions, netPay, payItems, deductionItems, total
 ){
     let sql = "insert into new_tb_member_payroll_month ("
-    sql += "mIdx, sIdx, year, month, workedDays, scheduledDays, grossPay, deductions, netPay, payItems, deductionItems, total)"
-    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    let aParameter = [mIdx, sIdx, year, month, workedDays, scheduledDays, grossPay, deductions, netPay, payItems, deductionItems, total];
+    sql += "mIdx, sIdx, year, month, payDt, workedDays, scheduledDays, grossPay, deductions, netPay, payItems, deductionItems, total)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    let aParameter = [
+        mIdx, sIdx, year, month, payDt, workedDays, scheduledDays,
+        grossPay, deductions, netPay, payItems, deductionItems, total
+    ];
 
     let query = mysql.format(sql, aParameter);
     try {

@@ -138,7 +138,8 @@ exports.registerSiteWithContract = async function (req, res) {
                     breaktime: contractItem.breakTime,
                     costBreakdown: JSON.stringify(contractItem.costBreakdown),
                     isAutoCalc: contractItem.isAutoCalc === 'N' ? 'N' : 'Y',
-                    meltOptions: contractItem.meltOptions ? JSON.stringify(contractItem.meltOptions) : null
+                    meltOptions: contractItem.meltOptions ? JSON.stringify(contractItem.meltOptions) : null,
+                    viewConfig: siteData.viewConfig || null,
                 };
 
                 // 개별 계약 저장

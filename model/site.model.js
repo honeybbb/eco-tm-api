@@ -175,7 +175,7 @@ exports.saveContract = async function (contract) {
             let sql = `
                 UPDATE new_tb_site_contract 
                 SET type=?, jsonData=?, total_cost=?, startDt=?, endDt=?, staffCount=?, staffDetail=?, 
-                    workSchedule=?, breaktime=?, isAutoCalc=?, meltOptions=?
+                    workSchedule=?, breaktime=?, isAutoCalc=?, meltOptions=?, viewConfig=?
                 WHERE idx = ? 
             `;
             let params = [
@@ -190,6 +190,7 @@ exports.saveContract = async function (contract) {
                 contract.breaktime,
                 contract.isAutoCalc,
                 contract.meltOptions,
+                contract.viewConfig,
                 contract.scIdx // WHERE 조건
             ];
             await connection.query(sql, params);
@@ -200,8 +201,8 @@ exports.saveContract = async function (contract) {
                 INSERT INTO new_tb_site_contract 
                 (sIdx, cIdx, type, workdays, total_cost,
                  startDt, endDt, staffCount, staffDetail, workSchedule, breaktime,
-                 jsonData, isAutoCalc, meltOptions) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ? , ?, ?, ?, ?, ?, ?)
+                 jsonData, isAutoCalc, meltOptions, viewConfig) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ? , ?, ?, ?, ?, ?, ?, ?)
             `;
             let params = [
                 contract.sIdx, // 현장 FK
@@ -217,7 +218,8 @@ exports.saveContract = async function (contract) {
                 contract.breaktime,
                 contract.costBreakdown,
                 contract.isAutoCalc,
-                contract.meltOptions
+                contract.meltOptions,
+                contract.viewConfig
             ];
             let [result] = await connection.query(sql, params);
             current_scIdx = result.insertId;
@@ -537,6 +539,8 @@ exports.getSiteData = async function (sIdx) {
               'staffList',   latest_sc.staffDetail,
               'staffCount',  latest_sc.staffCount,
               'isAutoCalc',   latest_sc.isAutoCalc,
+                'meltOptions', latest_sc.meltOptions,
+                'viewConfig', latest_sc.viewConfig,
               -- ★ 수정 1: cIdx 일치 조건 및 LIMIT 1 추가 (다중 행 에러 방지)
               'category',    (SELECT itemNm FROM new_tb_code WHERE itemCd = latest_sc.type AND cIdx = latest_sc.cIdx LIMIT 1),
               -- ★ 수정 2: 불필요한 서브쿼리 제거 (어차피 동일한 값이므로 그냥 컬럼 사용)
