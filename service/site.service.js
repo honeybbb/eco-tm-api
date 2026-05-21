@@ -140,6 +140,7 @@ exports.registerSiteWithContract = async function (req, res) {
                     isAutoCalc: contractItem.isAutoCalc === 'N' ? 'N' : 'Y',
                     meltOptions: contractItem.meltOptions ? JSON.stringify(contractItem.meltOptions) : null,
                     viewConfig: siteData.viewConfig || null,
+                    salarySource: contractItem.salarySource || 'employee',
                 };
 
                 // 개별 계약 저장
