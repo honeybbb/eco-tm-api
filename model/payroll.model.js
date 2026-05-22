@@ -67,7 +67,7 @@ exports.getBaseSalary = async function (cIdx) {
     sql += " c.itemNm as role,";
     sql += " c.sort,";
     sql += " m.name as staff,";
-    sql += " m.disability,"
+    sql += " m.disability,m.disability_grade, m.disability_date,"
     //자동 계산 여부
     sql += " IFNULL(mbs.isAutoCalc, IFNULL(mc.isAutoCalc, 'Y')) as isAutoCalc,";
 
