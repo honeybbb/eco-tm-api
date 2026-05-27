@@ -212,14 +212,29 @@ exports.DeleteSite = async function (req, res) {
 
 exports.updateSiteManager = async function (req, res) {
     let cIdx = req.user.cIdx,
-        siteIdxs = req.body.siteIdxs,
-        manager = req.body.manager,
-        billingManager = req.body.billingManager,
-        payrollManager = req.body.payrollManager;
+        siteIds = req.body.siteIds,         // 프론트엔드: selectedSiteIds.value
+        targetField = req.body.targetField, // 프론트엔드: selectedManagerType.value
+        managerName = req.body.managerName; // 프론트엔드: newManagerName.value
 
-    let result = await siteModel.updateSiteManager(cIdx, siteIdxs, manager, billingManager, payrollManager);
+    // [보안] 허용된 컬럼명인지 검증 (SQL Injection 방지)
+    const allowedFields = ['manager', 'billingManager', 'payrollManager'];
+    if (!allowedFields.includes(targetField)) {
+        return res.json({'result': false, 'msg': '유효하지 않은 담당자 구분입니다.'});
+    }
 
-    res.json({'result': true, 'data': result})
+    if (!siteIds || siteIds.length === 0) {
+        return res.json({'result': false, 'msg': '선택된 현장이 없습니다.'});
+    }
+
+    // 모델로 targetField와 managerName을 넘겨줌
+    let result = await siteModel.updateSiteManager(cIdx, siteIds, targetField, managerName);
+
+    // 에러 발생 시 처리
+    if (result.data === '-9999') {
+        return res.json({'result': false, 'msg': '서버 DB 에러가 발생했습니다.'});
+    }
+
+    res.json({'result': true, 'data': result});
 }
 
 //현장 배치 정보 저장

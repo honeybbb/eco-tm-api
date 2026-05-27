@@ -445,19 +445,22 @@ exports.DeleteSite = async function (cIdx, sIdx) {
     }
 }
 
-exports.updateSiteManager = async function (cIdx, siteIdxs, manager, billingManager, payrollManager) {
-    let sql = "update new_tb_site set manager = ?, billingManager = ?, payrollManager = ?"
-    sql += " WHERE sIdx IN (?) AND cIdx = ?"
+exports.updateSiteManager = async function (cIdx, siteIds, targetField, managerName) {
+    // ?? 는 컬럼명(식별자), ? 는 데이터(값)로 매핑됩니다.
+    // 기존에 sIdx를 사용하셨으므로 WHERE 절은 sIdx IN (?) 으로 유지합니다.
+    let sql = "UPDATE new_tb_site SET ?? = ? WHERE sIdx IN (?) AND cIdx = ?";
 
-    let aParameter = [manager, billingManager, payrollManager, siteIdxs, cIdx];
+    // 순서대로 targetField(컬럼명), managerName(이름), siteIds(배열), cIdx 매핑
+    let aParameter = [targetField, managerName, siteIds, cIdx];
 
     let query = mysql.format(sql, aParameter);
+
     try {
         let res = await pool.query(query);
         return res;
-    }catch (e) {
+    } catch (e) {
         console.log('db err', e);
-        return {'data': '-9999'}
+        return {'data': '-9999'};
     }
 }
 
