@@ -29,19 +29,24 @@ exports.getSiteList = async function (cIdx) {
                CASE WHEN s.status = 'Y' THEN '운영 중' ELSE '계약 종료' END AS status,
                (
                    SELECT JSON_ARRAYAGG(
-                       JSON_OBJECT(
-                           'type', sc.type,
-                           'contract_period', CONCAT(DATE_FORMAT(sc.startDt, '%Y-%m-%d'), ' ~ ', DATE_FORMAT(sc.endDt, '%Y-%m-%d')),
-                           'total_cost', sc.total_cost,
-                           'jsonData', sc.jsonData,
-                           'staffDetail', sc.staffDetail,
-                           'salarySource', sc.salarySource
-                       )
-                   )
+                                  JSON_OBJECT(
+                                          'type', sc.type,
+                                          'typeNm', IFNULL((SELECT itemNm FROM new_tb_code WHERE itemCd = sc.type LIMIT 1), sc.type),
+                                          'contract_period', CONCAT(DATE_FORMAT(latest.first_start_dt, '%Y-%m-%d'), ' ~ ', DATE_FORMAT(sc.endDt, '%Y-%m-%d')),
+                                          'total_cost', sc.total_cost,
+                                          'jsonData', sc.jsonData,
+                                          'staffDetail', sc.staffDetail,
+                                          'salarySource', sc.salarySource
+                                  )
+                          )
                    FROM new_tb_site_contract sc
-                   INNER JOIN (
-                       -- 각 현장(sIdx) 및 구분(type)별로 가장 최신(MAX idx) 계약을 찾음
-                       SELECT MAX(idx) AS max_idx
+                            INNER JOIN (
+                       -- 각 현장(sIdx) 및 구분(type)별로 최신 계약(max_idx)과 최초 시작일(first_start_dt)만 1건씩 추출
+                       SELECT
+                           sIdx,
+                           type,
+                           MAX(idx) AS max_idx,
+                           MIN(startDt) AS first_start_dt
                        FROM new_tb_site_contract
                        GROUP BY sIdx, type
                    ) latest ON sc.idx = latest.max_idx
