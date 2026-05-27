@@ -37,6 +37,9 @@ module.exports = function (app) {
 
     app.route('/v1/site/:id').delete(service.DeleteSite);
 
+    //청구담당/급여담당 수정
+    app.route('/v1/site/manager').put(service.updateSiteManager);
+
     //현장 배치 정보 저장
     /*
     app.route('/v1/site/headcount').post(service.setSiteHeadCount);

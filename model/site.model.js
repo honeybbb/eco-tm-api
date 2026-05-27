@@ -445,6 +445,22 @@ exports.DeleteSite = async function (cIdx, sIdx) {
     }
 }
 
+exports.updateSiteManager = async function (cIdx, siteIdxs, manager, billingManager, payrollManager) {
+    let sql = "update new_tb_site set manager = ?, billingManager = ?, payrollManager = ?"
+    sql += " WHERE sIdx IN (?) AND cIdx = ?"
+
+    let aParameter = [manager, billingManager, payrollManager, siteIdxs, cIdx];
+
+    let query = mysql.format(sql, aParameter);
+    try {
+        let res = await pool.query(query);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.setSiteHeadCount = async function (cIdx, sIdx, jsonData) {
     let sql = "insert into new_tb_site_assignment (cIdx, sIdx, jsonData) values (?, ?, ?)";
     let aParameter = [cIdx, sIdx, jsonData];

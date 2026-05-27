@@ -210,6 +210,18 @@ exports.DeleteSite = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
+exports.updateSiteManager = async function (req, res) {
+    let cIdx = req.user.cIdx,
+        siteIdxs = req.body.siteIdxs,
+        manager = req.body.manager,
+        billingManager = req.body.billingManager,
+        payrollManager = req.body.payrollManager;
+
+    let result = await siteModel.updateSiteManager(cIdx, siteIdxs, manager, billingManager, payrollManager);
+
+    res.json({'result': true, 'data': result})
+}
+
 //현장 배치 정보 저장
 exports.setSiteHeadCount = async function (req, res) {
     let cIdx = req.params.cIdx,
