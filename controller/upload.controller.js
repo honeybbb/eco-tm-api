@@ -41,4 +41,29 @@ module.exports = function (app) {
     //계약서 파일 다운로드
     app.route('/v1/download/file/:sIdx').get(contractService.downLoadContractFile);
 
+    //이미지 업로드
+    app.route('/v1/upload/image').post(upload.single('image'), uploadImage);
+}
+
+function uploadImage(req, res) {
+    try {
+        // multer가 이미지를 받지 못한 경우 예외 처리
+        if (!req.file) {
+            return res.status(400).json({ 'result': false, 'msg': '업로드된 이미지 파일이 없습니다.' });
+        }
+
+        // 프론트엔드 에디터에서 필요한 이미지 주소(URL) 생성
+        // 위에서 uniqueSuffix + ext 구조로 저장한 파일명이 req.file.filename에 담깁니다.
+        const imageUrl = `/uploads/${req.file.filename}`;
+
+        // 프론트엔드 axios 요청 응답 구조(response.data.url)에 맞춰 리턴
+        return res.json({
+            'result': true,
+            'url': imageUrl
+        });
+
+    } catch (error) {
+        console.error('이미지 업로드 에러:', error);
+        return res.status(500).json({ 'result': false, 'msg': '서버 오류가 발생했습니다.' });
+    }
 }

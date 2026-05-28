@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const { verifyToken } = require('./middleware/auth');
 const app = express()
 const port = 3001
@@ -21,6 +22,8 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // 로그인 라우트는 토큰 검증 제외
 app.use((req, res, next) => {
