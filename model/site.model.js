@@ -180,7 +180,7 @@ exports.saveContract = async function (contract) {
             // [UPDATE]
             let sql = `
                 UPDATE new_tb_site_contract 
-                SET type=?, jsonData=?, total_cost=?, startDt=?, endDt=?, staffCount=?, staffDetail=?, 
+                SET type=?, jsonData=?, total_cost=?, firstContractDt=?, startDt=?, endDt=?, staffCount=?, staffDetail=?, 
                     workSchedule=?, breaktime=?, isAutoCalc=?, meltOptions=?, viewConfig=?, salarySource=?
                 WHERE idx = ? 
             `;
@@ -188,6 +188,7 @@ exports.saveContract = async function (contract) {
                 contract.type,
                 contract.costBreakdown,
                 contract.totalCost,
+                contract.firstContractDt,
                 contract.startDt,
                 contract.endDt,
                 contract.staffCount,
@@ -207,9 +208,9 @@ exports.saveContract = async function (contract) {
             let sql = `
                 INSERT INTO new_tb_site_contract 
                 (sIdx, cIdx, type, workdays, total_cost,
-                 startDt, endDt, staffCount, staffDetail, workSchedule, breaktime,
+                 firstContractDt, startDt, endDt, staffCount, staffDetail, workSchedule, breaktime,
                  jsonData, isAutoCalc, meltOptions, viewConfig, salarySource) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ? , ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ? , ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             let params = [
                 contract.sIdx, // 현장 FK
@@ -217,6 +218,7 @@ exports.saveContract = async function (contract) {
                 contract.type,
                 contract.workDays,
                 contract.totalCost,
+                contract.firstContractDt,
                 contract.startDt,
                 contract.endDt,
                 contract.staffCount,
@@ -572,7 +574,11 @@ exports.getSiteData = async function (sIdx) {
               -- ★ 수정 1: cIdx 일치 조건 및 LIMIT 1 추가 (다중 행 에러 방지)
               'category',    (SELECT itemNm FROM new_tb_code WHERE itemCd = latest_sc.type AND cIdx = latest_sc.cIdx LIMIT 1),
               -- ★ 수정 2: 불필요한 서브쿼리 제거 (어차피 동일한 값이므로 그냥 컬럼 사용)
-              'type',        latest_sc.type
+              'type',        latest_sc.type,
+              'firstContractDt', IFNULL(
+                  (SELECT MIN(startDt) FROM new_tb_site_contract WHERE sIdx = s.idx AND type = latest_sc.type), 
+                  latest_sc.startDt
+              )
             ) 
           END
         ), ']') AS contractList,

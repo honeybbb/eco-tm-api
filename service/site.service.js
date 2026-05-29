@@ -130,6 +130,7 @@ exports.registerSiteWithContract = async function (req, res) {
                     // 상세 데이터
                     workDays: contractItem.workDays,
                     totalCost: contractItem.totalCost || 0,
+                    firstContractDt: contractItem.firstContractDt,
                     startDt: contractItem.contractStart,
                     endDt: contractItem.contractEnd,
                     staffCount: currentStaffCount,
