@@ -612,6 +612,27 @@ exports.updateMemberData = async function (req, res) {
     }
 };
 
+exports.updateMemberFourInsStatus = async function (req, res) {
+    let cIdx = req.user.cIdx,
+        mIdx = req.params.idx,
+        colName = req.body.colName, // 프론트에서 넘긴 'inYn' 또는 'outYn'
+        status = req.body.status;   // 프론트에서 넘긴 'Y' 또는 'N'
+
+    // [보안] SQL 인젝션을 막기 위해 허용된 컬럼명인지 엄격하게 검증합니다.
+    const allowedColumns = ['inYn', 'outYn'];
+    if (!allowedColumns.includes(colName)) {
+        return res.json({'result': false, 'message': '잘못된 컬럼명입니다.'});
+    }
+
+    let result = await memberModel.updateMemberFourInsStatus(cIdx, mIdx, colName, status);
+
+    if (result && result.data !== '-9999') {
+        res.json({'result': true, 'data': result});
+    } else {
+        res.json({'result': false, 'message': 'DB 업데이트 실패'});
+    }
+}
+
 exports.uploadExcel = async function (req, res) {
     try {
         const cIdx = req.user.cIdx;

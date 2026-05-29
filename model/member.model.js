@@ -863,6 +863,21 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
     }
 };
 
+exports.updateMemberFourInsStatus = async function (cIdx, mIdx, colName, status) {
+    // 1. 기존 `four_ins_status`를 동적 변수 ${colName}으로 변경
+    // 2. WHERE 절에 누락되었던 AND 추가
+    let sql = `UPDATE new_tb_member SET ${colName} = ? WHERE cIdx = ? AND idx = ?`;
+    let aParameter = [status, cIdx, mIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'};
+    }
+}
+
 exports.deleteMember = async function (mId) {
     let sql = "delete from new_tb_member where id = ?"
     let aParameter = [mId];
