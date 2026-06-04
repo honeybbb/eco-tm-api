@@ -79,7 +79,7 @@ exports.getMemberList = async function (cIdx) {
     let sql = "select m.*, c2.sort,"
     // sql += " case when status = 0 then '재직' when status = 1 then '퇴사' else '-' end as `status`,"
     // sql += " mc.jsonData as wage,"
-    sql += " ms.sIdx, ms.name as `siteName`, mc.contractEndDt as `contract`,"
+    sql += " ms.sIdx, ms.name as `siteName`, ms.payment_day, mc.contractEndDt as `contract`,"
     sql += " c.itemNm as `type`, c2.itemNm as `position`, c3.option as `badgeColor`, c3.itemNm as `disability_grade`"
     sql += " from new_tb_member m"
 
@@ -93,7 +93,7 @@ exports.getMemberList = async function (cIdx) {
 
     // 직원별로 가장 최근(idx가 제일 큰) 배정 내역 딱 1건만 찾아내서 조인
     sql += " left join ("
-    sql += "    select a1.*, s.name from new_tb_member_assignment a1"
+    sql += "    select a1.*, s.name, s.payment_day from new_tb_member_assignment a1"
     sql += "    inner join ("
     sql += "      select mIdx, max(idx) as max_idx from new_tb_member_assignment group by mIdx"
     sql += "    ) a2 on a1.idx = a2.max_idx"
