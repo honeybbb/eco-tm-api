@@ -20,6 +20,97 @@ exports.getSettleList = async function (startMonth, endMonth, docType, cIdx) {
     }
 }
 
+exports.getSettleSummary = async function (year, month) {
+    // 단지명, 계약인원, 현재인원(status=0), 여(gender=F), 남(gender=M), 입사(inDate), 퇴사(outDate), 공백(급여작업인원-계약인원),
+    // 단지청구액, 급여지급액
+    // let sql = "select (select a.name new_tb_site a where a.idx = ss.sIdx) as `sName`, ss.docType, ss.type, ss.grandTotal, ss.billingData from new_tb_site_settlement ss"
+    // sql += " where ss.year = ? and ss.month = ?"
+    let sql = `
+        SELECT s.name AS siteName,
+           ss.docType,
+           ss.type,
+           ss.grandTotal AS billingAmt, /* 청구액 (총용역비) */
+
+        /* 1. 단지 계약 테이블의 배정 직원수 */
+           IFNULL(sc.staffCount, 0)   AS contractCnt,
+
+        /* 2. 인원 통계 (서브쿼리 m_stats) */
+           IFNULL(ma.currentCnt, 0)   AS currentCnt,
+           IFNULL(ma.female, 0)       AS female,
+           IFNULL(ma.male, 0)         AS male,
+           IFNULL(ma.joinCnt, 0)      AS \`join\`,
+           IFNULL(ma.outCnt, 0)       AS resign,
+
+        /* 3. 급여지급액 합계 (서브쿼리 mpm) */
+           IFNULL(mpm.netPayTotal, 0) AS netPay,
+           IFNULL(mpm.payrollCnt, 0) AS payrollCnt
+
+        FROM new_tb_site_settlement ss
+
+         /* [청구 데이터] 최신 청구 데이터만 추출 */
+         INNER JOIN (SELECT MAX(idx) AS max_idx
+                     FROM new_tb_site_settlement
+                     WHERE year = ? AND month = ?
+                     GROUP BY sIdx) latest ON ss.idx = latest.max_idx
+
+         INNER JOIN new_tb_site s ON s.idx = ss.sIdx
+
+         /* [계약 인원] 현장 및 타입별 최신 계약 인원 가져오기 */
+         LEFT JOIN (SELECT sc1.sIdx, sc1.type, sc1.staffCount
+                    FROM new_tb_site_contract sc1
+                             INNER JOIN (SELECT sIdx, type, MAX(idx) AS max_idx
+                                         FROM new_tb_site_contract
+                                         GROUP BY sIdx, type) sc2 ON sc1.idx = sc2.max_idx) sc
+                   ON sc.sIdx = ss.sIdx AND sc.type = ss.type
+
+         /* [인원 통계] new_tb_member_assignment를 통해 직원의 최신 현장 매핑 */
+         LEFT JOIN (SELECT ma.sIdx, /* 배정 테이블의 현장 idx 기준 */
+                   SUM(CASE WHEN m.status = 0 THEN 1 ELSE 0 END)                                AS currentCnt,
+                   SUM(CASE WHEN m.status = 0 AND m.gender = 'F' THEN 1 ELSE 0 END)             AS female,
+                   SUM(CASE WHEN m.status = 0 AND m.gender = 'M' THEN 1 ELSE 0 END)             AS male,
+                   SUM(CASE WHEN YEAR (m.inDate) = ? AND MONTH(m.inDate) = ? THEN 1 ELSE 0 END) AS joinCnt,
+                   SUM(CASE WHEN YEAR (m.outDate) = ? AND MONTH(outDate) = ? THEN 1 ELSE 0 END) AS outCnt
+            FROM new_tb_member m
+             /* 직원의 가장 최근 배정 내역(assignment) 조인 */
+             INNER JOIN (SELECT a1.mIdx, a1.sIdx
+                         FROM new_tb_member_assignment a1
+                              INNER JOIN (SELECT mIdx, MAX(idx) AS max_idx
+                                  FROM new_tb_member_assignment
+                                  GROUP BY mIdx) a2 ON a1.idx = a2.max_idx) ma
+                                        ON m.idx = ma.mIdx
+                    GROUP BY ma.sIdx) ma ON ma.sIdx = ss.sIdx
+
+        /* [급여 합계] 해당 연/월 실수령액 총합 */
+         LEFT JOIN (
+            SELECT 
+                sIdx,
+                SUM(netPay) AS netPayTotal,
+                count(*) as \`payrollCnt\`
+            FROM new_tb_member_payroll_month
+            WHERE year = ? AND month = ?
+            GROUP BY sIdx
+        ) mpm ON mpm.sIdx = ss.sIdx
+        
+        ORDER BY s.name ASC
+    `;
+
+        // 파라미터 순서 매핑
+    let aParameter = [
+        year, month,           // latest 청구 데이터 서브쿼리용
+        year, month,           // ma 입사자 카운트용
+        year, month,           // ma 퇴사자 카운트용
+        year, month            // mpm 급여 합계용
+    ];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 /** 20260416 수정
 exports.getSettleList = async function (year, month, docType, cIdx) {
     let sql = "SELECT ss.*, ";

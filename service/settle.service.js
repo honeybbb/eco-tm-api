@@ -15,6 +15,17 @@ exports.getSettleList = async function (req, res) {
     res.json({"result": true, "data": result});
 }
 
+exports.getSettleSummary = async function (req, res) {
+    let
+        // cIdx = req.user.cIdx,
+        year = req.query.year,
+        month = req.query.month;
+
+    let result = await settleModel.getSettleSummary(year, month);
+
+    res.json({'result': true, 'data': result})
+}
+
 exports.setSettleData = async function (req, res) {
     const sIdx = req.params.sIdx;
     const {
