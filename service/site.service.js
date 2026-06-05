@@ -82,6 +82,8 @@ exports.registerSiteWithContract = async function (req, res) {
             billingManager: req.body.billingManager,
             payrollManager: req.body.payrollManager,
             bigo: req.body.bigo || '',
+            bankName: req.body.bankName,
+            accountNumber: req.body.accountNumber,
             viewConfig: req.body.viewConfig || null,
         };
 
