@@ -16,6 +16,9 @@ module.exports = function (app) {
     //직원 급여 계산
     app.route('/v1/member/payroll/calculate').get(service.getPayrollCalculate)
 
+    //직원 급여 계산(기간별)
+    app.route('/v1/member/payroll/calculate/range').get(service.getPayrollCalculateRange);
+
     // 특정 직원의 전체 급여 이력 조회
     app.route('/v1/member/payroll/history/:mIdx').get(service.getMemberPayrollHistory);
 

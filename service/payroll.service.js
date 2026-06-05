@@ -62,6 +62,19 @@ exports.getPayrollCalculate = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
+exports.getPayrollCalculateRange = async function (req, res) {
+    const { startYear, startMonth, endYear, endMonth } = req.query;
+    const cIdx = req.user?.cIdx;
+
+    if (!startYear || !startMonth || !endYear || !endMonth) {
+        return res.status(400).json({ result: false, message: '기간을 입력해주세요.' });
+    }
+
+    let result = await payrollModel.getPayrollCalculateRange(startYear, startMonth, endYear, endMonth, cIdx)
+
+    res.json({'result': true, 'data': result})
+}
+
 exports.getMemberPayrollHistory = async function (req, res) {
     let { mIdx } = req.params;
 

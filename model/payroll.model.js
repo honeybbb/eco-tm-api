@@ -505,6 +505,126 @@ exports.getPayrollCalculate = async function (year, month, cIdx) {
     }
 };
 
+// 기존 getPayrollCalculate와 같은 파일에 추가
+exports.getPayrollCalculateRange = async function (startYear, startMonth, endYear, endMonth, cIdx) {
+    let sql = `
+    SELECT
+      m.idx,
+      m.id,
+      m.type,
+      (SELECT name        FROM new_tb_site WHERE idx = ma.sIdx) AS siteName,
+      (SELECT idx         FROM new_tb_site WHERE idx = ma.sIdx) AS sIdx,
+      (SELECT itemNm      FROM new_tb_code WHERE itemCd = m.position AND cIdx = m.cIdx LIMIT 1) AS role,
+      (SELECT payment_day FROM new_tb_site WHERE idx = ma.sIdx) AS payment_day,
+      m.name AS staff,
+      m.bank, m.accountNumber,
+
+      /* 기간 내 총 근무 가능 일수 합산 */
+      SUM(
+        DATEDIFF(
+          LEAST(
+            IFNULL(
+              CASE WHEN m.outDate IS NOT NULL AND m.outDate != '0000-00-00' THEN m.outDate END,
+              LAST_DAY(CONCAT(ym.y, '-', LPAD(ym.m, 2, '0'), '-01'))
+            ),
+            LAST_DAY(CONCAT(ym.y, '-', LPAD(ym.m, 2, '0'), '-01'))
+          ),
+          GREATEST(
+            DATE(m.inDate),
+            CONCAT(ym.y, '-', LPAD(ym.m, 2, '0'), '-01')
+          )
+        ) + 1
+      ) AS workedDays,
+
+      /* 기간 내 지급총액 합산 */
+      SUM(IFNULL(mpm.grossPay,    bs.grossPay))    AS grossPay,
+      SUM(IFNULL(mpm.deductions,  0))              AS totalDeduction,
+      SUM(IFNULL(mpm.netPay,      0))              AS netPay,
+
+      /* 최신 급여 항목 구조는 마지막 월 기준으로 노출 */
+      (
+        SELECT payItems FROM new_tb_member_payroll_month
+        WHERE mIdx = m.idx
+          AND CONCAT(year, '-', LPAD(month, 2, '0')) <= CONCAT(?, '-', LPAD(?, 2, '0'))
+        ORDER BY year DESC, month DESC LIMIT 1
+      ) AS payItems,
+      (
+        SELECT deductionItems FROM new_tb_member_payroll_month
+        WHERE mIdx = m.idx
+          AND CONCAT(year, '-', LPAD(month, 2, '0')) <= CONCAT(?, '-', LPAD(?, 2, '0'))
+        ORDER BY year DESC, month DESC LIMIT 1
+      ) AS deductionItems
+
+    FROM new_tb_member m
+
+    /* 조회 기간 내 년/월 목록을 인라인 뷰로 생성 */
+    JOIN (
+      SELECT
+        YEAR(cal_date)  AS y,
+        MONTH(cal_date) AS m
+      FROM (
+        SELECT DATE_ADD(
+          CONCAT(?, '-', LPAD(?, 2, '0'), '-01'),
+          INTERVAL seq MONTH
+        ) AS cal_date
+        FROM (
+          SELECT 0 AS seq UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL
+          SELECT 3      UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL
+          SELECT 6      UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL
+          SELECT 9      UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL
+          SELECT 12     UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL
+          SELECT 15     UNION ALL SELECT 16 UNION ALL SELECT 17 UNION ALL
+          SELECT 18     UNION ALL SELECT 19 UNION ALL SELECT 20 UNION ALL
+          SELECT 21     UNION ALL SELECT 22 UNION ALL SELECT 23
+        ) seq_tbl
+        WHERE DATE_ADD(
+          CONCAT(?, '-', LPAD(?, 2, '0'), '-01'),
+          INTERVAL seq MONTH
+        ) <= CONCAT(?, '-', LPAD(?, 2, '0'), '-01')
+      ) cal
+    ) ym ON 1=1
+
+    LEFT JOIN new_tb_member_payroll_month mpm
+      ON mpm.mIdx = m.idx AND mpm.year = ym.y AND mpm.month = ym.m
+    LEFT JOIN new_tb_member_base_salary bs ON bs.idx = (
+      SELECT idx FROM new_tb_member_base_salary
+      WHERE mIdx = m.idx ORDER BY regDt DESC LIMIT 1
+    )
+    LEFT JOIN new_tb_member_assignment ma ON ma.mIdx = m.idx
+    LEFT JOIN new_tb_site s ON s.idx = ma.sIdx
+
+    WHERE m.cIdx = ?
+      /* 기간 내 재직 중이었던 직원만 포함 */
+      AND DATE(m.inDate) <= CONCAT(?, '-', LPAD(?, 2, '0'), '-01')
+      AND (
+        m.outDate IS NULL OR m.outDate = '0000-00-00'
+        OR m.outDate >= CONCAT(?, '-', LPAD(?, 2, '0'), '-01')
+      )
+
+    GROUP BY m.idx
+    ORDER BY s.name, m.name
+  `;
+
+    let params = [
+        endYear, endMonth,           // payItems 서브쿼리 기준월
+        endYear, endMonth,           // deductionItems 서브쿼리 기준월
+        startYear, startMonth,       // cal_date 시작
+        startYear, startMonth,       // WHERE cal_date <= 종료월 (1)
+        endYear, endMonth,           // WHERE cal_date <= 종료월 (2)
+        cIdx,                        // WHERE m.cIdx
+        endYear, endMonth,           // inDate <= 종료월
+        startYear, startMonth,       // outDate >= 시작월
+    ];
+
+    try {
+        const [res] = await pool.query(sql, params);
+        return res;
+    } catch (e) {
+        console.error('db err', e);
+        return { data: '-9999' };
+    }
+};
+
 // 특정 직원의 전체 급여 이력 조회
 exports.getMemberPayrollHistory = async function (mIdx) {
     let sql = `
