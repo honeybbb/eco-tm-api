@@ -294,6 +294,22 @@ exports.syncWorkContracts = async function (scIdx, sIdx, staffList) {
     }
 }
 
+// saveSite, saveContract 아래에 추가
+exports.saveSiteBigo = async function (sIdx, bigo, type, adminId) {
+    if (!bigo || !bigo.trim()) return; // 빈 값이면 저장 안 함
+    const connection = await pool.getConnection();
+    try {
+        await connection.query(
+            `INSERT INTO new_tb_site_bigo (sIdx, bigo, type, admin_id) VALUES (?, ?, ?, ?)`,
+            [sIdx, bigo.trim(), type, adminId || null]
+        );
+    } catch (e) {
+        console.error('saveSiteBigo Error:', e);
+    } finally {
+        connection.release();
+    }
+};
+
 exports.insertSiteAndContract = async function (site, contract) {
     const connection = await pool.getConnection();
 

@@ -47,6 +47,7 @@ exports.setSiteData = async function (req, res) {
 exports.registerSiteWithContract = async function (req, res) {
     try {
         console.log(req.body);
+        let adminId = req.user?.id || null;
         // ====================================================
         // Step 1. 현장(Site) 데이터 준비
         // ====================================================
@@ -81,7 +82,8 @@ exports.registerSiteWithContract = async function (req, res) {
             director_phone: req.body.directorContact,
             billingManager: req.body.billingManager,
             payrollManager: req.body.payrollManager,
-            bigo: req.body.bigo || '',
+            bigo: req.body.bigo || '', //현장특이사항
+            settlementBigo: req.body.settlementBigo || '', //정산특이사항
             bankName: req.body.bankName,
             accountNumber: req.body.accountNumber,
             viewConfig: req.body.viewConfig || null,
@@ -96,6 +98,15 @@ exports.registerSiteWithContract = async function (req, res) {
         }
 
         const targetSIdx = siteResult.sIdx; // 저장/수정된 현장 ID
+
+        //현장특이사항저장
+        if (req.body.bigo?.trim()) {
+            await siteModel.saveSiteBigo(targetSIdx, req.body.bigo, '1', adminId); // 1: 현장
+        }
+        //정산특이사항저장
+        if (req.body.settlementBigo?.trim()) {
+            await siteModel.saveSiteBigo(targetSIdx, req.body.settlementBigo, '2', adminId); // 2: 정산
+        }
 
         // ====================================================
         // Step 2. 계약(Contract) 데이터 반복 처리
@@ -151,7 +162,7 @@ exports.registerSiteWithContract = async function (req, res) {
                 let contractResult = await siteModel.saveContract(contractData);
 
                 if (contractResult.success) {
-                    // ★ 2. 방금 저장된 계약의 PK(scIdx)를 받아와서 직책별 근무 스케줄(workhours) 저장
+                    // 2. 방금 저장된 계약의 PK(scIdx)를 받아와서 직책별 근무 스케줄(workhours) 저장
                     const savedCtIdx = contractResult.scIdx;
 
                     // 프론트에서 받은 staffList 원본 (JSON 변환 안 된 상태) 그대로 넘김
