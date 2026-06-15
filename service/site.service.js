@@ -86,6 +86,7 @@ exports.registerSiteWithContract = async function (req, res) {
             settlementBigo: req.body.settlementBigo || '', //정산특이사항
             bankName: req.body.bankName,
             accountNumber: req.body.accountNumber,
+            accountName: req.body.accountName,
             viewConfig: req.body.viewConfig || null,
         };
 
