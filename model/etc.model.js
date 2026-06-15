@@ -211,6 +211,24 @@ exports.getWageCode = async function (cIdx) {
     }
 }
 
+exports.getWageCode2 = async function (cIdx) {
+    const sql = `
+        SELECT itemNm, itemCd, groupCd,
+               \`option\` AS tax_free,
+               useFl, deleteFl, editFl, sort
+        FROM   new_tb_code
+        WHERE groupCd LIKE '04%' and cIdx in (?)
+        ORDER  BY sort, itemCd
+    `;
+    try {
+        const [res] = await pool.query(sql, [cIdx]);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return { data: '-9999' };
+    }
+};
+
 exports.deleteWageCode = async function (itemCd) {
     let sql = "delete from new_tb_code where itemCd = ?"
     let aParameter = [itemCd];

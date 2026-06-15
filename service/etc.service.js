@@ -111,6 +111,14 @@ exports.getWageCode = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
+exports.getWageCode2 = async function (req, res) {
+    let cIdx = req.params.cIdx;
+
+    let result = await etcModel.getWageCode2(cIdx);
+
+    res.json({'result': true, 'data': result})
+}
+
 exports.deleteWageCode = async function (req, res) {
     let itemCd = req.params.itemCd;
     //console.log('deleteBaseCode', groupCd);

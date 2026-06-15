@@ -30,6 +30,9 @@ module.exports = function (app) {
     //급여항목 조회
     app.route('/v1/config/code/wage/:cIdx').get(service.getWageCode);
 
+    //급여항목 조회2
+    app.route('/v1/config/code/wage/new/:cIdx').get(service.getWageCode2);
+
     //당해년도 세율 저장
     app.route('/v1/config/tax/rate').post(service.setTaxRate);
 
