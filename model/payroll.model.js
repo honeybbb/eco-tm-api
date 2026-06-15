@@ -1,5 +1,6 @@
 const pool = require("../config/mysql");
 const mysql = require("mysql2/promise")
+const {deletePayrollCalculate} = require("../service/payroll.service");
 
 exports.setBaseSalary = async function (
     mIdx, sIdx, year, paymentList, deductionList, isAutoCalc,
@@ -374,7 +375,6 @@ exports.getPayrollCalculate = async function (year, month, cIdx) {
 
  */
 exports.getPayrollCalculate = async function (year, month, cIdx) {
-
     const sql = `
     SELECT
       m.idx,
@@ -505,6 +505,21 @@ exports.getPayrollCalculate = async function (year, month, cIdx) {
     }
 };
 
+exports.deletePayrollCalculate = async function (year, month, idxList) {
+    let sql = `
+        DELETE FROM new_tb_member_payroll_month
+        WHERE year in (?) and month in (?) and mIdx IN (?)
+    `;
+    let aParameter = [year, month, idxList];
+
+    try {
+        const [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return { data: '-9999' };
+    }
+};
 // 기존 getPayrollCalculate와 같은 파일에 추가
 exports.getPayrollCalculateRange = async function (startYear, startMonth, endYear, endMonth, cIdx) {
     let sql = `

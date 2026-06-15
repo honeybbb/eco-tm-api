@@ -62,6 +62,16 @@ exports.getPayrollCalculate = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
+exports.deletePayrollCalculate = async function (req, res) {
+    let year = req.body.year,
+        month = req.body.month,
+        idxList = req.body.idxList;
+
+    let result = await payrollModel.deletePayrollCalculate(year, month, idxList);
+
+    res.json({'result': true, 'data': result})
+}
+
 exports.getPayrollCalculateRange = async function (req, res) {
     const { startYear, startMonth, endYear, endMonth } = req.query;
     const cIdx = req.user?.cIdx;

@@ -16,6 +16,9 @@ module.exports = function (app) {
     //직원 급여 계산
     app.route('/v1/member/payroll/calculate').get(service.getPayrollCalculate)
 
+    //직원 급여 계산 삭제
+    app.route('/v1/member/payroll/calculate').delete(service.deletePayrollCalculate);
+
     //직원 급여 계산(기간별)
     app.route('/v1/member/payroll/calculate/range').get(service.getPayrollCalculateRange);
 
