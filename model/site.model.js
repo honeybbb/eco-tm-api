@@ -581,6 +581,7 @@ exports.getSiteData = async function (sIdx) {
             WHEN latest_sc.sIdx IS NOT NULL 
             THEN JSON_OBJECT(
               'workDays',    latest_sc.workdays,
+              'firstContractDt', latest_sc.firstContractDt,
               'startDt',     latest_sc.startDt,
               'endDt',       latest_sc.endDt,
               'workSchedule',latest_sc.workSchedule,
@@ -597,11 +598,7 @@ exports.getSiteData = async function (sIdx) {
               -- ★ 수정 1: cIdx 일치 조건 및 LIMIT 1 추가 (다중 행 에러 방지)
               'category',    (SELECT itemNm FROM new_tb_code WHERE itemCd = latest_sc.type AND cIdx = latest_sc.cIdx LIMIT 1),
               -- ★ 수정 2: 불필요한 서브쿼리 제거 (어차피 동일한 값이므로 그냥 컬럼 사용)
-              'type',        latest_sc.type,
-              'firstContractDt', IFNULL(
-                  (SELECT MIN(startDt) FROM new_tb_site_contract WHERE sIdx = s.idx AND type = latest_sc.type), 
-                  latest_sc.startDt
-              )
+              'type',        latest_sc.type
             ) 
           END
         ), ']') AS contractList,
