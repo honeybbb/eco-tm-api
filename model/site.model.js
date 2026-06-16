@@ -32,7 +32,14 @@ exports.getSiteList = async function (cIdx) {
                                   JSON_OBJECT(
                                           'type', sc.type,
                                           'typeNm', IFNULL((SELECT itemNm FROM new_tb_code WHERE itemCd = sc.type LIMIT 1), sc.type),
-                                          'contract_period', CONCAT(DATE_FORMAT(latest.first_start_dt, '%Y-%m-%d'), ' ~ ', DATE_FORMAT(sc.endDt, '%Y-%m-%d')),
+                                            -- 최초계약일(firstContractDt)부터 계약종료일(endDt)까지 포맷팅하여 연결
+                                          'contract_period', CONCAT(
+                                                  IFNULL(DATE_FORMAT(sc.firstContractDt, '%Y-%m-%d'), '-'),
+                                                  ' ~ ',
+                                                  IFNULL(DATE_FORMAT(sc.endDt, '%Y-%m-%d'), '-')
+                                                             ),
+                                          'startDt', DATE_FORMAT(sc.startDt, '%Y-%m-%d'),
+                                          'endDt', DATE_FORMAT(sc.endDt, '%Y-%m-%d'),
                                           'total_cost', sc.total_cost,
                                           'jsonData', sc.jsonData,
                                           'staffDetail', sc.staffDetail,
