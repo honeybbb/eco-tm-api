@@ -156,6 +156,7 @@ exports.registerSiteWithContract = async function (req, res) {
                     meltOptions: contractItem.meltOptions ? JSON.stringify(contractItem.meltOptions) : null,
                     viewConfig: siteData.viewConfig || null,
                     salarySource: contractItem.salarySource || 'employee',
+                    cleaningConfig: JSON.stringify(contractItem.cleaningTasks) //청소계약
                 };
 
                 // 개별 계약 저장

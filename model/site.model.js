@@ -123,7 +123,7 @@ exports.saveSite = async function (site) {
                     director=?, director_phone=?, billingManager = ?, payrollManager = ?,
                     bankName=?, accountNumber=?, accountName=?, payment_day=?,
                     businessNumber=?, representative=?, businessType=?, businessItem=?, 
-                    email=?, viewConfig=?
+                    email=?
                 WHERE idx = ?
             `;
             let params = [
@@ -132,7 +132,7 @@ exports.saveSite = async function (site) {
                 site.director, site.director_phone, site.billingManager, site.payrollManager,
                 site.bankName, site.accountNumber, site.accountName, site.payment_day,
                 site.businessNumber, site.representative, site.businessType, site.businessItem,
-                site.email, site.viewConfig,
+                site.email,
                 new_sIdx
             ];
             await connection.query(sql, params);
@@ -145,14 +145,14 @@ exports.saveSite = async function (site) {
                  director, director_phone, billingManager, payrollManager, 
                  bankName, accountNumber, accountName, payment_day,
                  businessNumber, representative, businessType, businessItem,
-                 email, viewConfig)
+                 email)
                 VALUES (
                         ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, 
                         ?, ?, ?, ?,
                         ?, ?, ?, ?,
-                        ?, ?
+                        ?
                        )
             `;
             let params = [
@@ -162,7 +162,7 @@ exports.saveSite = async function (site) {
                 site.director, site.director_phone, site.billingManager, site.payrollManager,
                 site.bankName, site.accountNumber, site.accountName, site.payment_day,
                 site.businessNumber, site.representative, site.businessType, site.businessItem,
-                site.email, site.viewConfig
+                site.email
             ];
             let result = await connection.query(sql, params);
             new_sIdx = result[0].insertId;
@@ -188,7 +188,7 @@ exports.saveContract = async function (contract) {
             let sql = `
                 UPDATE new_tb_site_contract 
                 SET type=?, jsonData=?, total_cost=?, firstContractDt=?, startDt=?, endDt=?, staffCount=?, staffDetail=?, 
-                    workSchedule=?, breaktime=?, isAutoCalc=?, meltOptions=?, viewConfig=?, salarySource=?
+                    workSchedule=?, breaktime=?, isAutoCalc=?, meltOptions=?, viewConfig=?, salarySource=?, cleaningConfig=?,
                 WHERE idx = ? 
             `;
             let params = [
@@ -206,6 +206,7 @@ exports.saveContract = async function (contract) {
                 contract.meltOptions,
                 contract.viewConfig,
                 contract.salarySource,
+                contract.cleaningConfig,
                 contract.scIdx // WHERE 조건
             ];
             await connection.query(sql, params);
@@ -216,8 +217,11 @@ exports.saveContract = async function (contract) {
                 INSERT INTO new_tb_site_contract 
                 (sIdx, cIdx, type, workdays, total_cost,
                  firstContractDt, startDt, endDt, staffCount, staffDetail, workSchedule, breaktime,
-                 jsonData, isAutoCalc, meltOptions, viewConfig, salarySource) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ? , ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 jsonData, isAutoCalc, meltOptions, viewConfig, salarySource, cleaningConfig) 
+                VALUES (
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ? , ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?)
             `;
             let params = [
                 contract.sIdx, // 현장 FK
@@ -236,7 +240,8 @@ exports.saveContract = async function (contract) {
                 contract.isAutoCalc,
                 contract.meltOptions,
                 contract.viewConfig,
-                contract.salarySource
+                contract.salarySource,
+                contract.cleaningConfig,
             ];
             let [result] = await connection.query(sql, params);
             current_scIdx = result.insertId;
@@ -598,7 +603,8 @@ exports.getSiteData = async function (sIdx) {
               -- ★ 수정 1: cIdx 일치 조건 및 LIMIT 1 추가 (다중 행 에러 방지)
               'category',    (SELECT itemNm FROM new_tb_code WHERE itemCd = latest_sc.type AND cIdx = latest_sc.cIdx LIMIT 1),
               -- ★ 수정 2: 불필요한 서브쿼리 제거 (어차피 동일한 값이므로 그냥 컬럼 사용)
-              'type',        latest_sc.type
+              'type',        latest_sc.type,
+              'cleaningConfig',latest_sc.cleaningConfig
             ) 
           END
         ), ']') AS contractList,
