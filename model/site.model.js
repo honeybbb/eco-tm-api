@@ -43,7 +43,8 @@ exports.getSiteList = async function (cIdx) {
                                           'total_cost', sc.total_cost,
                                           'jsonData', sc.jsonData,
                                           'staffDetail', sc.staffDetail,
-                                          'salarySource', sc.salarySource
+                                          'salarySource', sc.salarySource,
+                                          'cleaningConfig', sc.cleaningConfig
                                   )
                           )
                    FROM new_tb_site_contract sc
@@ -457,6 +458,33 @@ exports.getSiteBudget = async function (sIdx, type) {
     }catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
+    }
+}
+
+// siteModel.js
+
+exports.getSiteCleaningSchedule = async function (cIdx) {
+    let query = `
+        SELECT 
+            scs.idx,
+            scs.sIdx,
+            ss.name AS siteName,
+            scs.itemCd,
+            scs.cleaningDt,
+            scs.regDt
+            -- sc.status -- 만약 상태 컬럼을 추가하셨다면 주석을 해제하세요.
+        FROM new_tb_site_cleaning_schedule scs
+        JOIN new_tb_site s ON scs.sIdx = s.idx
+        WHERE s.cIdx = ?
+        ORDER BY sc.cleaningDt ASC
+    `;
+    let aParameter = [cIdx];
+    try {
+        const [res] = await pool.query(query, aParameter);
+        return res;
+    } catch (err) {
+        console.error("대청소 일정 조회 에러:", err);
+        throw err;
     }
 }
 

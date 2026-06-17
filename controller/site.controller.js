@@ -33,6 +33,9 @@ module.exports = function (app) {
     //산출내역서 조회
     app.route('/v1/site/contract/budget').get(service.getSiteBudget);
 
+    //대청소 스케줄 조회
+    app.route('/v1/site/cleaning/schedule').get(service.getSiteCleaningSchedule);
+
     app.route('/v1/site/modify').post(service.updateSiteData);
 
     app.route('/v1/site/:id').delete(service.DeleteSite);

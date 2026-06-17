@@ -202,6 +202,14 @@ exports.getSiteBudget = async function (req, res) {
     res.json({ 'result': true, 'data': result });
 }
 
+exports.getSiteCleaningSchedule = async function (req, res) {
+    let cIdx = req.user.cIdx;
+
+    let result = await siteModel.getSiteCleaningSchedule(cIdx);
+
+    res.json({ 'result': true, 'data': result });
+}
+
 exports.updateSiteData = async function (req, res) {
     let sIdx = req.body.sIdx,
         name = req.body.name,
