@@ -111,6 +111,41 @@ exports.updateFilePath = async function (originalNamesStr, fileUrlsStr, sIdx){
     }
 }
 
+// 1. 현장 PK(sIdx)에 속한 계약 리스트를 등록 순서(idx ASC)대로 조회하는 메서드
+exports.getContractsBySite = async function (sIdx) {
+    let sql = "select idx, type from new_tb_site_contract where sIdx = ? order by idx asc";
+    let query = mysql.format(sql, [sIdx]);
+
+    try {
+        let [rows] = await pool.query(query);
+        return rows;
+    } catch (e) {
+        console.log('db err (getContractsBySite)', e);
+        throw e;
+    }
+};
+
+// 2. 계약 고유 PK(contractIdx)를 기준으로 파일 경로를 업데이트하는 메서드
+exports.updateContractFilePath = async function (originalNamesStr, fileUrlsStr, contractIdx) {
+    // 설계해주신 new_tb_site_contract 테이블의 파일 컬럼명을 정확히 타겟팅합니다.
+    let sql = `
+        update new_tb_site_contract 
+        set contractFileOriginal = ?, 
+            contractFileSaved = ? 
+        where idx = ?
+    `;
+    let aParameter = [originalNamesStr, fileUrlsStr, contractIdx];
+
+    let query = mysql.format(sql, aParameter);
+    try {
+        let [res] = await pool.query(query);
+        return res;
+    } catch (e) {
+        console.log('db err (updateContractFilePath)', e);
+        throw e;
+    }
+};
+
 exports.downloadFilePath = async function (sIdx) {
     let sql = "SELECT contractFileOriginal, contractFileSaved FROM new_tb_site WHERE idx in (?)"
     let aParameter = [sIdx];

@@ -361,6 +361,29 @@ exports.getSiteData = async function (req, res) {
                         // 변경된 객체 배열로 덮어씌우기
                         contract.staffList = staffArr;
                     }
+
+                    contract.files = [];
+                    if (contract.contractFileOriginal && contract.contractFileSaved) {
+                        try {
+                            const originals = typeof contract.contractFileOriginal === 'string'
+                                ? JSON.parse(contract.contractFileOriginal)
+                                : contract.contractFileOriginal;
+                            const saveds = typeof contract.contractFileSaved === 'string'
+                                ? JSON.parse(contract.contractFileSaved)
+                                : contract.contractFileSaved;
+
+                            if (Array.isArray(originals) && Array.isArray(saveds)) {
+                                // 대칭되는 인덱스끼리 묶어서 오브젝트 배열 생성
+                                contract.files = originals.map((name, i) => ({
+                                    name: name,
+                                    url: saveds[i] || '',
+                                    size: null // DB 문자열 구조상 size 저장이 누락되어 있으므로 프론트 예외처리를 위해 null 또는 가상값 세팅
+                                }));
+                            }
+                        } catch (fileErr) {
+                            console.error("계약별 파일 목록 파싱 에러:", fileErr);
+                        }
+                    }
                 });
 
                 // 프론트엔드가 `JSON.parse(result.contractList)`를 기대하므로, 다시 문자열로 만들어서 덮어씌움

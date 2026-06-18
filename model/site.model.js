@@ -635,6 +635,8 @@ exports.getSiteData = async function (sIdx) {
                 'meltOptions', latest_sc.meltOptions,
                 'viewConfig', latest_sc.viewConfig,
                 'salarySource', latest_sc.salarySource,
+                'contractFileOriginal', latest_sc.contractFileOriginal,
+              'contractFileSaved',    latest_sc.contractFileSaved,
               -- ★ 수정 1: cIdx 일치 조건 및 LIMIT 1 추가 (다중 행 에러 방지)
               'category',    (SELECT itemNm FROM new_tb_code WHERE itemCd = latest_sc.type AND cIdx = latest_sc.cIdx LIMIT 1),
               -- ★ 수정 2: 불필요한 서브쿼리 제거 (어차피 동일한 값이므로 그냥 컬럼 사용)

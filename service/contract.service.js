@@ -42,32 +42,65 @@ exports.setSiteContract = async function (req, res) {
 }
 
 exports.uploadContractFile = async function (req, res) {
-    // 1. req.file 대신 req.files (배열)로 받습니다.
-    let files = req.files;
-    let sIdx = req.params.sIdx;
+    let files = req.files; // upload.any()로 수집된 모든 파일 배열
+    let sIdx = req.params.sIdx; // 현장 PK
 
     if (!files || files.length === 0) {
-        return res.json({'result': false, 'msg':'파일이 전달되지 않았습니다.'});
+        return res.json({'result': false, 'msg': '파일이 전달되지 않았습니다.'});
     }
 
-    let originalNames = [];
-    let fileUrls = [];
+    try {
+        // 1. 해당 현장(sIdx)에 등록된 계약 노무 그룹들을 순서대로(idx 정렬) 가져옵니다.
+        // /site/register 단계에서 이미 계약 로우들이 생성되어 있어야 매핑이 가능합니다.
+        let contracts = await contractModel.getContractsBySite(sIdx);
 
-    // 2. 전달받은 여러 파일 정보를 각각의 배열에 담습니다.
-    for (const file of files) {
-        originalNames.push(file.originalname);
-        fileUrls.push(`/uploads/${file.filename}`);
+        if (!contracts || contracts.length === 0) {
+            return res.json({'result': false, 'msg': '해당 현장에 등록된 계약 정보가 존재하지 않습니다.'});
+        }
+
+        // 2. 프론트엔드에서 전송한 contract 인덱스별로 파일들을 그룹화합니다.
+        // 구조 예시: { '0': [file1, file2], '1': [file3] }
+        let fileGroups = {};
+        files.forEach(file => {
+            let match = file.fieldname.match(/file_contract_(\d+)/);
+            if (match) {
+                let contractIndex = match[1];
+                if (!fileGroups[contractIndex]) {
+                    fileGroups[contractIndex] = [];
+                }
+                fileGroups[contractIndex].push(file);
+            }
+        });
+
+        // 3. 그룹화된 파일들을 순회하며 해당하는 계약 row의 파일 컬럼을 업데이트합니다.
+        for (const [contractIndexStr, groupFiles] of Object.entries(fileGroups)) {
+            let contractIndex = parseInt(contractIndexStr, 10);
+
+            // DB에서 가져온 계약 로우 중 프론트 인덱스와 매핑되는 계약 데이터 선택
+            let targetContract = contracts[contractIndex];
+            if (!targetContract) continue; // 해당 인덱스에 매칭되는 DB 계약 row가 없으면 패스
+
+            let originalNames = [];
+            let fileUrls = [];
+
+            groupFiles.forEach(file => {
+                originalNames.push(file.originalname);
+                fileUrls.push(`/uploads/${file.filename}`);
+            });
+
+            // 파일 매핑 저장 방식 규칙에 맞춰 문자열화 (Varchar(255) 구조 고려)
+            const originalNamesStr = JSON.stringify(originalNames);
+            const fileUrlsStr = JSON.stringify(fileUrls);
+
+            // 4. 계약 테이블(new_tb_site_contract)의 PK(idx)를 타겟으로 파일 경로 업데이트
+            await contractModel.updateContractFilePath(originalNamesStr, fileUrlsStr, targetContract.idx);
+        }
+
+        res.json({'result': true, 'msg': '계약별 파일 업로드가 완료되었습니다.'});
+    } catch (err) {
+        console.error('계약서 파일 업로드 중 서버 에러:', err);
+        res.json({'result': false, 'msg': '파일 저장 중 서버 오류가 발생했습니다.'});
     }
-
-    // 3. 배열을 문자열 형태로 변환합니다. (DB 컬럼 구조 유지용)
-    // 예: '["계약서1.pdf", "계약서2.pdf"]'
-    const originalNamesStr = JSON.stringify(originalNames);
-    const fileUrlsStr = JSON.stringify(fileUrls);
-
-    // 4. 모델로 변환된 문자열 전달
-    let result = await contractModel.updateFilePath(originalNamesStr, fileUrlsStr, sIdx);
-
-    res.json({'result': true, 'data': result});
 }
 
 exports.downLoadContractFile = async function (req, res) {
