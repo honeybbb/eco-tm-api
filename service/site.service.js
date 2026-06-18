@@ -1,4 +1,5 @@
 const siteModel = require("../model/site.model");
+const { decodeLatin1ToUtf8 } = require("../utils/password");
 
 exports.getSiteList = async function (req, res) {
     let cIdx = req.user.cIdx;
@@ -375,7 +376,7 @@ exports.getSiteData = async function (req, res) {
                             if (Array.isArray(originals) && Array.isArray(saveds)) {
                                 // 대칭되는 인덱스끼리 묶어서 오브젝트 배열 생성
                                 contract.files = originals.map((name, i) => ({
-                                    name: name,
+                                    name: decodeLatin1ToUtf8(name),
                                     url: saveds[i] || '',
                                     size: null // DB 문자열 구조상 size 저장이 누락되어 있으므로 프론트 예외처리를 위해 null 또는 가상값 세팅
                                 }));

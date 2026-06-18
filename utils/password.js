@@ -42,3 +42,22 @@ exports.decryptRRN = function(text) {
     decrypted = Buffer.concat([decrypted, decipher.final()]);
     return decrypted.toString();
 };
+
+// 깨진 문자열(ISO-8859-1)을 정상 한글(UTF-8)로 복구하는 헬퍼 함수
+exports.decodeLatin1ToUtf8 = (str) => {
+    if (!str) return '';
+
+    // 깨진 문자열 특성상 Latin-1 보충 구역(ë, ì, í 등)의 문자가 포함됩니다.
+    // 이미 정상적인 한글("별내")인 문자열은 변환하면 오히려 깨지므로 패턴 검사 후 변환합니다.
+    const isBroken = /[\u00c0-\u00ff]/.test(str);
+
+    if (isBroken) {
+        try {
+            return Buffer.from(str, 'latin1').toString('utf8');
+        } catch (e) {
+            console.error("인코딩 변환 실패:", e);
+            return str;
+        }
+    }
+    return str;
+};
