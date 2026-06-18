@@ -35,8 +35,8 @@ module.exports = function (app) {
     //출근 등록 - 엑셀 다운로드
     app.route('/v1/download/work/template').get(workService.downloadTemplate);
 
-    //계약서 파일 업로드
-    app.route('/v1/upload/file/:sIdx').post(upload.array('file', 10), contractService.uploadContractFile);
+    //계약서 파일 업로드 - 임의의 필드명(file_contract_0, file_contract_1 등)을 모두 허용하기 위해 upload.any() 사용
+    app.route('/v1/upload/file/:sIdx').post(upload.any(), contractService.uploadContractFile);
 
     //계약서 파일 다운로드
     app.route('/v1/download/file/:sIdx').get(contractService.downLoadContractFile);
