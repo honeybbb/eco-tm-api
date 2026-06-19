@@ -196,7 +196,7 @@ exports.saveContract = async function (contract) {
             let sql = `
                 UPDATE new_tb_site_contract 
                 SET type=?, jsonData=?, total_cost=?, firstContractDt=?, startDt=?, endDt=?, staffCount=?, staffDetail=?, 
-                    workSchedule=?, breaktime=?, isAutoCalc=?, meltOptions=?, viewConfig=?, salarySource=?, cleaningConfig=?,
+                    workSchedule=?, breaktime=?, isAutoCalc=?, meltOptions=?, viewConfig=?, salarySource=?, cleaningConfig=?
                 WHERE idx = ? 
             `;
             let params = [
