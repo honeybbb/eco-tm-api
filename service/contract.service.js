@@ -42,64 +42,47 @@ exports.setSiteContract = async function (req, res) {
 }
 
 exports.uploadContractFile = async function (req, res) {
-    let files = req.files; // upload.any()로 수집된 모든 파일 배열
-    let sIdx = req.params.sIdx; // 현장 PK
-
-    if (!files || files.length === 0) {
-        return res.json({'result': false, 'msg': '파일이 전달되지 않았습니다.'});
-    }
+    let files = req.files || [];
 
     try {
-        // 1. 해당 현장(sIdx)에 등록된 계약 노무 그룹들을 순서대로(idx 정렬) 가져옵니다.
-        // /site/register 단계에서 이미 계약 로우들이 생성되어 있어야 매핑이 가능합니다.
-        let contracts = await contractModel.getContractsBySite(sIdx);
+        let targetScIdxs = new Set();
 
-        if (!contracts || contracts.length === 0) {
-            return res.json({'result': false, 'msg': '해당 현장에 등록된 계약 정보가 존재하지 않습니다.'});
-        }
-
-        // 2. 프론트엔드에서 전송한 contract 인덱스별로 파일들을 그룹화합니다.
-        // 구조 예시: { '0': [file1, file2], '1': [file3] }
-        let fileGroups = {};
-        files.forEach(file => {
-            let match = file.fieldname.match(/file_contract_(\d+)/);
-            if (match) {
-                let contractIndex = match[1];
-                if (!fileGroups[contractIndex]) {
-                    fileGroups[contractIndex] = [];
-                }
-                fileGroups[contractIndex].push(file);
-            }
+        // 1. 넘어온 데이터에서 scIdx 번호들만 쏙쏙 추출
+        files.forEach(f => {
+            let match = f.fieldname.match(/file_contract_(\d+)/);
+            if (match) targetScIdxs.add(match[1]);
+        });
+        Object.keys(req.body).forEach(key => {
+            let match = key.match(/existing_files_(\d+)/);
+            if (match) targetScIdxs.add(match[1]);
         });
 
-        // 3. 그룹화된 파일들을 순회하며 해당하는 계약 row의 파일 컬럼을 업데이트합니다.
-        for (const [contractIndexStr, groupFiles] of Object.entries(fileGroups)) {
-            let contractIndex = parseInt(contractIndexStr, 10);
+        if (targetScIdxs.size === 0) return res.json({result: true});
 
-            // DB에서 가져온 계약 로우 중 프론트 인덱스와 매핑되는 계약 데이터 선택
-            let targetContract = contracts[contractIndex];
-            if (!targetContract) continue; // 해당 인덱스에 매칭되는 DB 계약 row가 없으면 패스
+        // 2. 추출한 scIdx 계약만 콕 집어서 DB 업데이트!
+        for (let scIdx of targetScIdxs) {
+            let newFiles = files.filter(f => f.fieldname === `file_contract_${scIdx}`);
+            let existStr = req.body[`existing_files_${scIdx}`];
 
-            let originalNames = [];
-            let fileUrls = [];
+            // 변경사항이 없으면 안전하게 스킵
+            if (newFiles.length === 0 && !existStr) continue;
 
-            groupFiles.forEach(file => {
-                originalNames.push(file.originalname);
-                fileUrls.push(`/uploads/${file.filename}`);
+            let existFiles = existStr ? JSON.parse(existStr) : [];
+            let finalNames = existFiles.map(f => f.name);
+            let finalUrls = existFiles.map(f => f.url);
+
+            newFiles.forEach(f => {
+                finalNames.push(f.originalname);
+                finalUrls.push(`/uploads/${f.filename}`);
             });
 
-            // 파일 매핑 저장 방식 규칙에 맞춰 문자열화 (Varchar(255) 구조 고려)
-            const originalNamesStr = JSON.stringify(originalNames);
-            const fileUrlsStr = JSON.stringify(fileUrls);
-
-            // 4. 계약 테이블(new_tb_site_contract)의 PK(idx)를 타겟으로 파일 경로 업데이트
-            await contractModel.updateContractFilePath(originalNamesStr, fileUrlsStr, targetContract.idx);
+            // 🚨 다른 계약은 절대 건드리지 않고, 지정된 scIdx만 완벽하게 덮어쓰기!
+            await contractModel.updateContractFilePath(JSON.stringify(finalNames), JSON.stringify(finalUrls), scIdx);
         }
-
-        res.json({'result': true, 'msg': '계약별 파일 업로드가 완료되었습니다.'});
+        res.json({result: true, msg: '파일 업로드 성공'});
     } catch (err) {
-        console.error('계약서 파일 업로드 중 서버 에러:', err);
-        res.json({'result': false, 'msg': '파일 저장 중 서버 오류가 발생했습니다.'});
+        console.error(err);
+        res.json({result: false, msg: '서버 에러'});
     }
 }
 
