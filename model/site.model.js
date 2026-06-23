@@ -650,7 +650,7 @@ exports.getSiteData = async function (sIdx) {
             CONCAT('[', GROUP_CONCAT(
                 DISTINCT CASE 
             WHEN sb.sIdx IS NOT NULL 
-            THEN JSON_OBJECT('bigo', sb.bigo, 'regDt', sb.regDt) 
+            THEN JSON_OBJECT('bigo', sb.bigo, 'writer', sb.admin_id, 'type', sb.type, 'regDt', sb.regDt) 
           END
         ), ']') AS bigoList
 
