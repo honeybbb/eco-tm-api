@@ -14,7 +14,7 @@ exports.getSettleList = async function (req, res) {
 
     res.json({"result": true, "data": result});
 }
-
+//급여총액 조회
 exports.getSettleSummary = async function (req, res) {
     let
         // cIdx = req.user.cIdx,
@@ -24,6 +24,17 @@ exports.getSettleSummary = async function (req, res) {
     let result = await settleModel.getSettleSummary(year, month);
 
     res.json({'result': true, 'data': result})
+}
+
+//청구현황 조회
+exports.getSettleBilling = async function (req, res) {
+    let cIdx = req.user.cIdx,
+        year = req.query.year,
+        month = req.query.month;
+
+    let result = await settleModel.getSettleBilling(cIdx, year, month);
+
+    res.json({'result': true, 'data': result});
 }
 
 exports.setSettleData = async function (req, res) {

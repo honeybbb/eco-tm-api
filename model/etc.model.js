@@ -188,6 +188,20 @@ exports.getCompanyData = async function (cIdx) {
     }
 }
 
+exports.setCompanyAccount = async function (cIdx, bank, accountNumber, accountName, isDefault, memo) {
+    let sql = "insert into new_tb_config_account (cIdx, bank, accountNumber, accountName, isDefault, memo, regDt)"
+    sql += " values (?, ?, ?, ?, ? ,?, NOW())"
+    let aParameter = [cIdx, bank, accountNumber, accountName, isDefault, memo];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.getWageCode = async function (cIdx) {
     let sql = "SELECT itemNm, itemCd, groupCd,"
     sql += " `option` as `tax_free`,useFl, deleteFl, editFl, sort,"

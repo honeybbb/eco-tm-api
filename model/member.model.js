@@ -687,13 +687,15 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
              foreigner, nationality, visa_code, visa_date,
              etc_name_1, etc_value_1, etc_name_2, etc_value_2, etc_name_3, etc_value_3,
              bank, accountNm, accountNumber, four_ins, retire_pension, 
-             inDate, outDate, outReason, status, address, bigo)
+             inDate, outDate, outReason, transferDate, 
+             status, address, bigo)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, 
-                    ?, ?, ?, ?, ?, ?)
+                    ?, ?, ?, ?, 
+                    ?, ?, ?)
         `;
 
         let paramMember = [
@@ -706,7 +708,8 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
             member.etc_name_3, member.etc_value_3,
             member.bank, member.accountNm, member.accountNumber,
             member.four_ins, member.retire_pension,
-            member.inDate, member.outDate, member.outReason, member.status, member.address, member.bigo
+            member.inDate, member.outDate, member.outReason, member.transferDate,
+            member.status, member.address, member.bigo
         ];
 
         let resMember = await connection.query(sqlMember, paramMember);
@@ -780,7 +783,8 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
             disability_grade = ?, defector = ?, patriot = ?, intern = ?, 
             beneficiary = ?, foreigner = ?, nationality = ?, visa_code = ?, 
             visa_date = ?, bank = ?, accountNm = ?, accountNumber = ?,
-            inDate = ?, outDate = ?, outReason = ?, address = ?, bigo = ?, status = ?,
+            inDate = ?, outDate = ?, outReason = ?, transferDate = ?, 
+            address = ?, bigo = ?, status = ?,
             four_ins = ?, retire_pension = ?
         `;
 
@@ -792,7 +796,8 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
                 member.disability_grade, member.defector, member.patriot, member.intern,
                 member.beneficiary, member.foreigner, member.nationality, member.visa_code,
                 member.visa_date, member.bank, member.accountNm, member.accountNumber,
-                member.inDate, member.outDate, member.outReason, member.addr, member.bigo, member.status,
+                member.inDate, member.outDate, member.outReason, member.transferDate,
+                member.addr, member.bigo, member.status,
                 member.fourInsurance, member.retirePension, member.password, mIdx
             ];
         } else {
@@ -803,7 +808,8 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
                 member.disability_grade, member.defector, member.patriot, member.intern,
                 member.beneficiary, member.foreigner, member.nationality, member.visa_code,
                 member.visa_date, member.bank, member.accountNm, member.accountNumber,
-                member.inDate, member.outDate, member.outReason, member.addr, member.bigo, member.status,
+                member.inDate, member.outDate, member.outReason, member.transferDate,
+                member.addr, member.bigo, member.status,
                 member.fourInsurance, member.retirePension, mIdx
             ];
         }

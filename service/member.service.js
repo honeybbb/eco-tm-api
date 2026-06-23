@@ -455,7 +455,8 @@ exports.registerFullMember = async function (req, res) {
             retire_pension: body.retire_pension,
             inDate: body.joinDate || null,
             outDate: body.outDate || null,
-            outReason: body.endReason, // 필요시 추가
+            outReason: body.endReason,
+            transferDate: body.transferDate,
             status: body.status,
             address: body.address,
             bigo: body.bigo
@@ -512,6 +513,162 @@ exports.registerFullMember = async function (req, res) {
     }
 }
 
+exports.registerBulkMember = async (req, res) => {
+    try {
+        const cIdx = req.user.cIdx;   // 인증 미들웨어를 통해 설정된 회사 식별자
+        const body = req.body;
+        const sIdx = body.sIdx;
+        const members = body.members; // validItems 배열
+
+        console.log(`일괄 등록 확인 - 현장 ID: ${sIdx}, 요청 인원: ${members?.length || 0}명`);
+
+        if (!sIdx || !members || !Array.isArray(members) || members.length === 0) {
+            return res.json({ result: false, message: '현장 및 등록할 직원 데이터가 없습니다.' });
+        }
+
+        const results = [];
+        let successCount = 0;
+        let failCount = 0;
+
+        // "O", "Y" 등을 DB에 들어갈 Y/N으로 변환하는 함수
+        const toYn = (val) => {
+            if (!val) return 'N';
+            const str = String(val).trim().toUpperCase();
+            return (str === 'Y' || str === 'O' || str === '예' || str === 'TRUE') ? 'Y' : 'N';
+        };
+
+        // 성별 포맷 통일
+        const getGender = (val) => {
+            if (!val) return null;
+            const str = String(val).trim();
+            if (str === '남' || str === 'M') return 'M';
+            if (str === '여' || str === 'F') return 'F';
+            return null;
+        };
+
+        // For ... of 반복문을 사용하여 트랜잭션 순차 진입 (async/await 보장)
+        for (const item of members) {
+            try {
+                // 1. 비밀번호 해시화 (1234로 임시 발급)
+                const defaultPassword = '1234';
+                const hash = await bcrypt.hash(defaultPassword, 10);
+
+                // 2. 주민번호 암호화
+                const encryptedRrn = item.rrn ? encryptRRN(item.rrn.replace(/[^0-9-]/g, '')) : null;
+
+                // 3. 모델에 넘길 데이터 구조화
+
+                // (1) Member 데이터
+                const memberData = {
+                    cIdx: cIdx,
+                    type: '01001002', // 일괄등록 시 기본 직원 구분 코드
+                    name: item.name,
+                    id: item.empNo || null, // 사번을 ID로 활용
+                    password: hash,
+                    birthDt: null,
+                    rrn: encryptedRrn,
+                    phone: item.phone || null,
+                    position: item.position || null,
+                    gender: getGender(item.gender),
+                    email: null,
+
+                    disability: toYn(item.disability),
+                    disability_date: item.disability_date || null,
+                    disability_grade: item.disability_grade || null,
+
+                    defector: toYn(item.defector),
+                    patriot: toYn(item.patriot),
+                    intern: toYn(item.intern),
+                    beneficiary: toYn(item.beneficiary),
+                    foreigner: toYn(item.foreigner),
+
+                    nationality: item.nationality || null,
+                    visa_code: item.visa_code || null,
+                    visa_date: item.visa_date || null,
+
+                    etc_name_1: null, etc_value_1: null,
+                    etc_name_2: null, etc_value_2: null,
+                    etc_name_3: null, etc_value_3: null,
+
+                    bank: item.bankName || null,
+                    accountNm: item.accountNm || item.name, // 예금주가 입력 안되어 있으면 본인 이름
+                    accountNumber: item.accountNumber || null,
+
+                    four_ins: toYn(item.insurance),
+                    retire_pension: toYn(item.retirementPension),
+
+                    inDate: item.joinDate || null,
+                    outDate: item.leaveDate || null,
+                    outReason: item.resignReason || null,
+
+                    status: item.leaveDate ? '2' : '1', // 퇴사일이 있으면 퇴직상태(2)
+                    address: item.address || null,
+                    bigo: item.note || null
+                };
+
+                // (2) Contract 데이터
+                const contractData = {
+                    sIdx: sIdx, // 배치될 현장 번호
+                    type: memberData.type,
+                    dayWorkTime: 0,
+                    monthWorkTime: 0,
+                    payItems: JSON.stringify({}),
+                    deductionItems: JSON.stringify({}),
+                    workSchedule: JSON.stringify({}),
+                    startDt: item.joinDate || null,
+                    endDt: item.contractEndDate || null,
+                    bigo: item.note || null
+                };
+
+                // (3) Staffing 데이터
+                const staffingData = {
+                    sIdx: sIdx
+                };
+
+                // 4. 단일 직원 트랜잭션 함수 호출 구문 재활용
+                const result = await memberModel.registerMemberWithContractAndStaffing(
+                    memberData,
+                    contractData,
+                    staffingData
+                );
+
+                if (result.result) {
+                    successCount++;
+                    results.push({ name: item.name, success: true, mIdx: result.mIdx });
+                } else {
+                    failCount++;
+                    results.push({ name: item.name, success: false, error: result.error });
+                }
+
+            } catch (innerErr) {
+                console.error(`직원 [${item.name}] 등록 과정 에러:`, innerErr);
+                failCount++;
+                results.push({ name: item.name, success: false, error: innerErr.message });
+            }
+        }
+
+        // 응답
+        if (successCount > 0) {
+            res.json({
+                result: true,
+                message: `총 ${members.length}명 중 ${successCount}명 성공, ${failCount}명 실패`,
+                successCount,
+                failCount,
+                data: results
+            });
+        } else {
+            res.json({
+                result: false,
+                message: '직원 일괄 등록에 실패했습니다.',
+            });
+        }
+
+    } catch (err) {
+        console.error('Bulk Register API Error:', err);
+        res.status(500).json({ result: false, message: '서버 에러가 발생했습니다.' });
+    }
+};
+
 exports.updateMemberData = async function (req, res) {
     try {
         const mIdx = req.params.idx;
@@ -556,6 +713,7 @@ exports.updateMemberData = async function (req, res) {
             inDate: body.joinDate,
             outDate: body.status == '1' ? body.endDate : null,
             outReason: body.status == '1' ? body.endReason : null,
+            transferDate: body.transferDate,
             addr: body.address,
             bigo: body.bigo,
             status: body.status,

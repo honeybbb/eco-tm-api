@@ -8,6 +8,9 @@ module.exports = function (app) {
     //급여총액 리스트
     app.route('/v1/settle/payroll/summary').get(service.getSettleSummary);
 
+    //청구현황
+    app.route('/v1/settle/billing/list').get(service.getSettleBilling);
+
     // 용역 정산서 저장
     app.route('/v1/settle/site/data/:sIdx').post(service.setSettleData)
 

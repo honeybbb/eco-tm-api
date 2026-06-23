@@ -24,6 +24,9 @@ module.exports = function (app) {
     //직원 등록
     app.route('/v1/member/register').post(service.registerFullMember);
 
+    //직원 일괄 등록
+    app.route('/v1/member/bulk').post(service.registerBulkMember);
+
     app.route('/v1/member/data/:idx').put(service.updateMemberData);
 
     app.route('/v1/member/status/four/ins/:idx').put(service.updateMemberFourInsStatus);

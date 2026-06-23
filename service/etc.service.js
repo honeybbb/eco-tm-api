@@ -103,6 +103,19 @@ exports.getCompanyData = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
+exports.setCompanyAccount = async function (req, res) {
+    let cIdx = req.params.cIdx,
+        bank = req.params.bank,
+        accountNumber = req.body.accountNumber,
+        accountName = req.body.accountName,
+        isDefault = req.params.isDefault,
+        memo = req.params.memo;
+
+    let result = await etcModel.setCompanyAccount(cIdx, bank, accountNumber, accountName, isDefault, memo);
+
+    res.json({'result': true, 'data': result})
+}
+
 exports.getWageCode = async function (req, res) {
     let cIdx = req.params.cIdx;
 

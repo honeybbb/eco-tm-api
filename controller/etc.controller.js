@@ -27,6 +27,9 @@ module.exports = function (app) {
     //company 정보 조회
     app.route('/v1/config/company').get(service.getCompanyData);
 
+    //company 계좌 추가
+    app.route('/v1/config/company/account/:cIdx').post(service.setCompanyAccount);
+
     //급여항목 조회
     app.route('/v1/config/code/wage/:cIdx').get(service.getWageCode);
 

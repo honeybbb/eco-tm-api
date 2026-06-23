@@ -111,6 +111,59 @@ exports.getSettleSummary = async function (year, month) {
     }
 }
 
+exports.getSettleBilling = async function (cIdx, year, month) {
+    //구분(type), docType, 근무인원, 단지청구일, 계산서 작성일(?),
+    //단지(sName), payment_day, 본사담당자, 청구담당자,
+    //공급가/면세, 공급가/과세, 부가세, 합계, 은행명, 입금일, 금액, 계
+    let sql = `SELECT
+            ss.year,
+            ss.month,
+            ss.type,
+            c.itemNm AS typeNm,
+            ss.docType,
+            s.name as \`siteName\`,
+            s.payment_day,
+            s.manager,
+            s.billingManager,
+            ss.subTotal,
+            ss.vatAmount,
+            ss.grandTotal,
+            ss.billingDt, 
+            ss.status,
+            ss.depositDt,
+            s.bankName
+        FROM new_tb_site_settlement ss
+        /* 1. 현장별, 년월별로 가장 최근(MAX) 등록일시를 찾아서 조인 */
+        INNER JOIN (
+            SELECT
+                sIdx,
+                year,
+                month,
+                MAX(regDt) as max_regDt
+            FROM new_tb_site_settlement
+            GROUP BY sIdx, year, month
+        ) max_ss
+            ON ss.sIdx = max_ss.sIdx
+            AND ss.year = max_ss.year
+            AND ss.month = max_ss.month
+            AND ss.regDt = max_ss.max_regDt
+        /* 2. 찾아낸 최신 정산 데이터와 현장 테이블 조인 */
+        LEFT JOIN new_tb_site s ON s.idx = ss.sIdx
+        LEFT JOIN new_tb_code c ON c.itemCd = ss.type AND c.cIdx = ?
+        where ss.year = ? and ss.month = ?`;
+    // and ss.cIdx = ?`;
+
+    let aParameter = [cIdx, year, month];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 /** 20260416 수정
 exports.getSettleList = async function (year, month, docType, cIdx) {
     let sql = "SELECT ss.*, ";
