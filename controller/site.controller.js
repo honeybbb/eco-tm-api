@@ -9,11 +9,19 @@ module.exports = function (app) {
     //현장 비고 저장
     app.route('/v1/site/bigo/register').post(service.setSiteBigo);
 
+    //현장 비고 수정
+    // app.route('/v1/site/bigo/update').put(service.updateSiteBigo);
+
+    //현장 비고 삭제
+    // app.route('/v1/site/bigo/:idx').delete(service.DeleteSiteBigo);
+
     //현장 비품 예산 설정
     app.route('/v1/site/order/budgets').post(service.setSiteOrderBudgets);
 
     // 현장 데이터 조회
     app.route('/v1/site/data/:sIdx').get(service.getSiteData);
+
+    app.route('/v2/site/data/:sIdx').get(service.getSiteData_v2);
 
     // 현장 위도,경도 조회
     app.route('/v1/site/coords/:sIdx').get(service.getSiteCoords);
