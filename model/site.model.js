@@ -130,7 +130,7 @@ exports.saveSite = async function (site) {
                     area=?, areaUnder=?, areaOver=?, is_vat=?, manager=?,
                     director=?, director_phone=?, billingManager = ?, payrollManager = ?,
                     bankName=?, accountNumber=?, accountName=?, payment_day=?,
-                    businessNumber=?, representative=?, businessType=?, businessItem=?, 
+                    businessNumber=?, businessName =?, representative=?, businessType=?, businessItem=?, 
                     email=?
                 WHERE idx = ?
             `;
@@ -139,7 +139,7 @@ exports.saveSite = async function (site) {
                 site.area, site.areaUnder, site.areaOver, site.is_vat,site.manager,
                 site.director, site.director_phone, site.billingManager, site.payrollManager,
                 site.bankName, site.accountNumber, site.accountName, site.payment_day,
-                site.businessNumber, site.representative, site.businessType, site.businessItem,
+                site.businessNumber, site.businessName, site.representative, site.businessType, site.businessItem,
                 site.email,
                 new_sIdx
             ];
@@ -152,14 +152,14 @@ exports.saveSite = async function (site) {
                  building_su, unit_su, area, areaUnder, areaOver, is_vat, manager,
                  director, director_phone, billingManager, payrollManager, 
                  bankName, accountNumber, accountName, payment_day,
-                 businessNumber, representative, businessType, businessItem,
+                 businessNumber,businessName, representative, businessType, businessItem,
                  email)
                 VALUES (
                         ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, 
                         ?, ?, ?, ?,
-                        ?, ?, ?, ?,
+                        ?,?, ?, ?, ?,
                         ?
                        )
             `;
@@ -169,7 +169,7 @@ exports.saveSite = async function (site) {
                 site.area, site.areaUnder, site.areaOver, site.is_vat, site.manager,
                 site.director, site.director_phone, site.billingManager, site.payrollManager,
                 site.bankName, site.accountNumber, site.accountName, site.payment_day,
-                site.businessNumber, site.representative, site.businessType, site.businessItem,
+                site.businessNumber, site.businessName, site.representative, site.businessType, site.businessItem,
                 site.email
             ];
             let result = await connection.query(sql, params);
