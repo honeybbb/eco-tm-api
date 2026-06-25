@@ -30,6 +30,15 @@ module.exports = function (app) {
     //company 계좌 추가
     app.route('/v1/config/company/account/:cIdx').post(service.setCompanyAccount);
 
+    //company 계좌 조회
+    app.route('/v1/config/company/account').get(service.getCompanyAccount);
+
+    //company 계좌 수정
+    app.route('/v1/config/account/:idx').put(service.updateCompanyAccount);
+
+    //company 계좌 삭제
+    app.route('/v1/config/company/account/:idx').delete(service.deleteCompanyAccount);
+
     //급여항목 조회
     app.route('/v1/config/code/wage/:cIdx').get(service.getWageCode);
 

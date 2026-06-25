@@ -202,6 +202,45 @@ exports.setCompanyAccount = async function (cIdx, bank, accountNumber, accountNa
     }
 }
 
+exports.getCompanyAccount = async function (cIdx) {
+    let sql = "select * from new_tb_config_account where cIdx in (?)"
+    let aParameter = [cIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.updateCompanyAccount = async function (idx, bank, accountNumber, accountName, memo, isDefault) {
+    let sql = "update new_tb_config_account set bank=?, accountNumber=?, accountName=?,"
+    sql += "memo=?, isDefault=? where idx in (?)"
+    let aParameter = [bank, accountNumber, accountName, memo, isDefault, idx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+exports.deleteCompanyAccount = async function (idx) {
+    let sql = "delete from new_tb_config_account where idx in (?)"
+    let aParameter = [idx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.getWageCode = async function (cIdx) {
     let sql = "SELECT itemNm, itemCd, groupCd,"
     sql += " `option` as `tax_free`,useFl, deleteFl, editFl, sort,"

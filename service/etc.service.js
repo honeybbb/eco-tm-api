@@ -105,15 +105,46 @@ exports.getCompanyData = async function (req, res) {
 
 exports.setCompanyAccount = async function (req, res) {
     let cIdx = req.params.cIdx,
-        bank = req.params.bank,
+        bank = req.body.bank,
         accountNumber = req.body.accountNumber,
         accountName = req.body.accountName,
-        isDefault = req.params.isDefault,
-        memo = req.params.memo;
+        isDefault = req.body.isDefault,
+        memo = req.body.memo;
+    console.log(cIdx, bank, accountNumber, accountName, isDefault, memo)
 
     let result = await etcModel.setCompanyAccount(cIdx, bank, accountNumber, accountName, isDefault, memo);
 
     res.json({'result': true, 'data': result})
+}
+
+exports.getCompanyAccount = async function (req, res) {
+    let cIdx = req.user.cIdx;
+
+    let result = await etcModel.getCompanyAccount(cIdx);
+
+    res.json({'result': true, 'data': result})
+}
+
+exports.updateCompanyAccount = async function (req, res) {
+    let idx = req.params.idx,
+        bank = req.body.bank,
+        accountNumber = req.body.accountNumber,
+        accountName = req.body.accountName,
+        memo = req.body.memo,
+        isDefault = req.body.isDefault;
+
+    let result = await etcModel.updateCompanyAccount(idx, bank, accountNumber, accountName, memo, isDefault);
+
+    res.json({'result': true, 'data': result})
+}
+
+exports.deleteCompanyAccount = async function (req, res) {
+    let idx = req.params.idx;
+
+    let result = await etcModel.deleteCompanyAccount(idx);
+
+    res.json({'result': true, 'data': result})
+
 }
 
 exports.getWageCode = async function (req, res) {
