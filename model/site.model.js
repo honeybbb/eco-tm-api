@@ -88,6 +88,32 @@ exports.setSiteBigo = async function (sIdx, bigo, admin) {
     }
 }
 
+exports.updateSiteBigo = async function (idx, bigo, admin) {
+    let sql = "update new_tb_site_bigo set bigo=?, admin_id=? where idx = ?"
+    let aParameter = [bigo, admin, idx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.DeleteSiteBigo = async function (idx) {
+    let sql = "delete from new_tb_site_bigo where idx = ?";
+    let aParameter = [idx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.setSiteOrderBudgets = async function (sIdx, value, admin) {
     let sql = "insert into new_tb_site_budget (sIdx, value, admin, regDt) values (?, ?, ?, NOW())";
     sql += " ON DUPLICATE KEY UPDATE value = ?, managerId = ?, modDt = NOW()";
@@ -650,7 +676,7 @@ exports.getSiteData = async function (sIdx) {
             CONCAT('[', GROUP_CONCAT(
                 DISTINCT CASE 
             WHEN sb.sIdx IS NOT NULL 
-            THEN JSON_OBJECT('bigo', sb.bigo, 'writer', sb.admin_id, 'type', sb.type, 'regDt', sb.regDt) 
+            THEN JSON_OBJECT('bgIdx', sb.idx ,'bigo', sb.bigo, 'writer', sb.admin_id, 'type', sb.type, 'regDt', sb.regDt) 
           END
         ), ']') AS bigoList
 

@@ -10,10 +10,10 @@ module.exports = function (app) {
     app.route('/v1/site/bigo/register').post(service.setSiteBigo);
 
     //현장 비고 수정
-    // app.route('/v1/site/bigo/update').put(service.updateSiteBigo);
+    app.route('/v1/site/bigo/update/:bgIdx').put(service.updateSiteBigo);
 
     //현장 비고 삭제
-    // app.route('/v1/site/bigo/:idx').delete(service.DeleteSiteBigo);
+    app.route('/v1/site/bigo/:bgIdx').delete(service.DeleteSiteBigo);
 
     //현장 비품 예산 설정
     app.route('/v1/site/order/budgets').post(service.setSiteOrderBudgets);

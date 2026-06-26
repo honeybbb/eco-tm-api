@@ -18,6 +18,22 @@ exports.setSiteBigo = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
+exports.updateSiteBigo = async function (req, res) {
+    let bgIdx = req.params.bgIdx,
+        bigo = req.body.bigo,
+        adminId =  req.body.adminId;
+
+    let result = await siteModel.updateSiteBigo(bgIdx, bigo, adminId);
+    res.json({'result': true, 'data': result})
+}
+
+exports.DeleteSiteBigo = async function (req, res) {
+    let bgIdx = req.params.bgIdx;
+
+    let result = await siteModel.DeleteSiteBigo(bgIdx);
+    res.json({'result': true, 'data': result})
+}
+
 exports.setSiteOrderBudgets = async function (req, res) {
     let sIdx = req.body.cIdx,
         value = req.body.value,
