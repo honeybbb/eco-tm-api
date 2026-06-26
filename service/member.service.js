@@ -516,9 +516,9 @@ exports.registerFullMember = async function (req, res) {
 exports.registerBulkMember = async (req, res) => {
     try {
         const cIdx = req.user.cIdx;   // 인증 미들웨어를 통해 설정된 회사 식별자
-        const body = req.body;
-        const sIdx = body.sIdx;
-        const members = body.members; // validItems 배열
+        const sIdx = req.body.sIdx,
+            type = req.body.type,
+            members = req.body.members; // validItems 배열
 
         console.log(`일괄 등록 확인 - 현장 ID: ${sIdx}, 요청 인원: ${members?.length || 0}명`);
 
@@ -541,8 +541,8 @@ exports.registerBulkMember = async (req, res) => {
         const getGender = (val) => {
             if (!val) return null;
             const str = String(val).trim();
-            if (str === '남' || str === 'M') return 'M';
-            if (str === '여' || str === 'F') return 'F';
+            if (str === '남' || str === 'M' || str === '男') return 'M';
+            if (str === '여' || str === 'F' || str === '女') return 'F';
             return null;
         };
 
@@ -553,19 +553,61 @@ exports.registerBulkMember = async (req, res) => {
                 const defaultPassword = '1234';
                 const hash = await bcrypt.hash(defaultPassword, 10);
 
-                // 2. 주민번호 암호화
-                const encryptedRrn = item.rrn ? encryptRRN(item.rrn.replace(/[^0-9-]/g, '')) : null;
+                // 2. 주민번호 암호화 및 생년월일(birthDt) 추출
+                let birthDt = null;
+                let encryptedRrn = null;
+
+                if (item.rrn) {
+                    const rrnStr = String(item.rrn).replace(/[^0-9-]/g, ''); // 숫자와 하이픈만 남기기
+                    encryptedRrn = encryptRRN(rrnStr);
+
+                    let front = '';
+                    let back = '';
+
+                    // 하이픈 분리 또는 전체 자릿수 기준으로 앞/뒷자리 분리
+                    if (rrnStr.includes('-')) {
+                        const parts = rrnStr.split('-');
+                        front = parts[0];
+                        back = parts[1] || '';
+                    } else if (rrnStr.length === 13) {
+                        front = rrnStr.substring(0, 6);
+                        back = rrnStr.substring(6);
+                    }
+
+                    if (front.length === 6) {
+                        const yy = front.substring(0, 2);
+                        const mm = front.substring(2, 4);
+                        const dd = front.substring(4, 6);
+
+                        // 뒷자리 첫 번째 숫자로 세기(Century) 판별
+                        // 1, 2, 5, 6 -> 1900년대 / 3, 4, 7, 8 -> 2000년대 / 9, 0 -> 1800년대
+                        let century = '19';
+                        if (back.length > 0) {
+                            const centuryDigit = back.charAt(0);
+                            if (['3', '4', '7', '8'].includes(centuryDigit)) {
+                                century = '20';
+                            } else if (['9', '0'].includes(centuryDigit)) {
+                                century = '18';
+                            }
+                        } else {
+                            // 뒷자리가 전달되지 않은 경우, 현재 연도(26년) 기준으로 대략적 추론
+                            century = parseInt(yy, 10) > 26 ? '19' : '20';
+                        }
+
+                        birthDt = `${century}${yy}-${mm}-${dd}`;
+                    }
+                }
 
                 // 3. 모델에 넘길 데이터 구조화
 
                 // (1) Member 데이터
                 const memberData = {
                     cIdx: cIdx,
-                    type: '01001002', // 일괄등록 시 기본 직원 구분 코드
+                    type: type, // 일괄등록 시 기본 직원 구분 코드 (경비/미화)
                     name: item.name,
                     id: item.empNo || null, // 사번을 ID로 활용
                     password: hash,
-                    birthDt: null,
+                    birthDt: birthDt, // 추출 및 가공된 생년월일(yyyy-mm-dd) 주입
                     rrn: encryptedRrn,
                     phone: item.phone || null,
                     position: item.position || null,
