@@ -62,7 +62,7 @@ exports.getBaseSalary = async function (cIdx) {
     sql += " m.id,";
     sql += " m.type,";
     sql += " m.birthDt,";
-    sql += " m.inDate, m.outDate, m.status as mStatus,"
+    sql += " m.inDate, m.outDate, m.transferDate, m.status as mStatus,"
     sql += " (SELECT name FROM new_tb_site WHERE idx = ma.sIdx LIMIT 1) as siteName,";
     sql += " ma.sIdx as sIdx,";
     sql += " c.itemNm as role,";
