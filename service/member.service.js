@@ -640,10 +640,10 @@ exports.registerBulkMember = async (req, res) => {
                     retire_pension: toYn(item.retirementPension),
 
                     inDate: item.joinDate || null,
-                    outDate: item.leaveDate || null,
-                    outReason: item.resignReason || null,
+                    outDate: item.outDate || null,
+                    outReason: item.outReason || null,
 
-                    status: item.leaveDate ? '2' : '1', // 퇴사일이 있으면 퇴직상태(2)
+                    status: item.outDate ? '1' : '0', // 퇴사일이 있으면 퇴직상태(1)
                     address: item.address || null,
                     bigo: item.note || null
                 };
