@@ -711,66 +711,72 @@ exports.getSiteData = async function (sIdx) {
     }
 }
 
+// 1. 현장 기본 정보 쿼리
 exports.getSiteData_v2 = async function (sIdx) {
-    let sql = `
-        SELECT
-            s.*,
-            -- 모든 계약 정보를 JSON 배열로 묶어서 반환 (시작일 오름차순 정렬)
-            CONCAT('[', GROUP_CONCAT(
-                DISTINCT CASE 
-                    WHEN sc.sIdx IS NOT NULL 
-                    THEN JSON_OBJECT(
-                        'workDays',       sc.workdays,
-                        'firstContractDt',sc.firstContractDt,
-                        'startDt',        sc.startDt,
-                        'endDt',          sc.endDt,
-                        'workSchedule',   sc.workSchedule,
-                        'breaktime',      sc.breaktime,
-                        'budget',         sc.jsonData,
-                        'totalCost',      sc.total_cost,
-                        'scIdx',          sc.idx,
-                        'staffList',      sc.staffDetail,
-                        'staffCount',     sc.staffCount,
-                        'isAutoCalc',     sc.isAutoCalc,
-                        'meltOptions',    sc.meltOptions,
-                        'viewConfig',     sc.viewConfig,
-                        'salarySource',   sc.salarySource,
-                        'contractFileOriginal', sc.contractFileOriginal,
-                        'contractFileSaved',    sc.contractFileSaved,
-                        'category',       (SELECT itemNm FROM new_tb_code WHERE itemCd = sc.type AND cIdx = sc.cIdx LIMIT 1),
-                        'type',           sc.type,
-                        'cleaningConfig', sc.cleaningConfig
-                    ) 
-                END
-                ORDER BY sc.startDt ASC -- 엑셀 시트 순서를 위해 과거 계약부터 오름차순 정렬
-            ), ']') AS contractList,
-
-            -- 특이사항(bigoList)은 기존 유지
-            CONCAT('[', GROUP_CONCAT(
-                DISTINCT CASE 
-                    WHEN sb.sIdx IS NOT NULL 
-                    THEN JSON_OBJECT('bigo', sb.bigo, 'writer', sb.admin_id, 'type', sb.type, 'regDt', sb.regDt) 
-                END
-            ), ']') AS bigoList
-
-        FROM new_tb_site s
-        
-        -- latest 서브쿼리 제거하고 모든 계약 데이터를 그냥 JOIN
-        LEFT JOIN new_tb_site_contract sc ON sc.sIdx = s.idx
-        LEFT JOIN new_tb_site_bigo sb ON sb.sIdx = s.idx
-
-        WHERE s.idx IN (?)
-        GROUP BY s.idx
-    `;
-
+    const sql = `SELECT * FROM new_tb_site WHERE idx = ?`;
     try {
         let [res] = await pool.query(sql, [sIdx]);
         return res;
     } catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
+        console.error('getSiteOnly_v2 err', e);
+        return [];
     }
-}
+};
+
+// 2. 해당 현장의 모든 계약 정보 쿼리 (JSON 변환 없이 가져옴)
+exports.getContractsBySite_v2 = async function (sIdx) {
+    const sql = `
+        SELECT 
+            sc.sIdx,
+            sc.workdays AS workDays,
+            sc.firstContractDt,
+            sc.startDt,
+            sc.endDt,
+            sc.workSchedule,
+            sc.breaktime,
+            sc.jsonData AS budget,
+            sc.total_cost AS totalCost,
+            sc.idx AS scIdx,
+            sc.staffDetail AS staffList,
+            sc.staffCount,
+            sc.isAutoCalc,
+            sc.meltOptions,
+            sc.viewConfig,
+            sc.salarySource,
+            sc.contractFileOriginal,
+            sc.contractFileSaved,
+            sc.type,
+            sc.cleaningConfig,
+            (SELECT itemNm FROM new_tb_code WHERE itemCd = sc.type AND cIdx = sc.cIdx LIMIT 1) AS category
+        FROM new_tb_site_contract sc
+        WHERE sc.sIdx = ?
+        ORDER BY sc.startDt ASC
+    `;
+    try {
+        let [res] = await pool.query(sql, [sIdx]);
+        return res;
+    } catch (e) {
+        console.error('getContractsBySite_v2 err', e);
+        return [];
+    }
+};
+
+// 3. 해당 현장의 비고(특이사항) 정보 쿼리
+exports.getBigosBySite_v2 = async function (sIdx) {
+    const sql = `
+        SELECT idx AS bgIdx, bigo, admin_id AS writer, type, regDt 
+        FROM new_tb_site_bigo 
+        WHERE sIdx = ?
+    `;
+    try {
+        let [res] = await pool.query(sql, [sIdx]);
+        return res;
+    } catch (e) {
+        console.error('getBigosBySite_v2 err', e);
+        return [];
+    }
+};
+
 exports.getWorkContracts = async function (sIdx) {
     let sql = `SELECT scIdx, position, workhours FROM new_tb_work_contract WHERE sIdx = ?`;
     try {

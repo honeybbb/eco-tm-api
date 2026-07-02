@@ -21,6 +21,7 @@ module.exports = function (app) {
     // 현장 데이터 조회
     app.route('/v1/site/data/:sIdx').get(service.getSiteData);
 
+    // 현장 데이터 조회(new)
     app.route('/v2/site/data/:sIdx').get(service.getSiteData_v2);
 
     // 현장 위도,경도 조회
