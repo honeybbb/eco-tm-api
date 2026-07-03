@@ -300,7 +300,7 @@ exports.getWorkDayCount = async function (date)  {
 }
 
 exports.getWorkList = async function (month, sIdx) {
-    let sql = "select *,(select type from new_tb_member m where m.idx=mIdx) as `type` from new_tb_work"
+    let sql = "select *,(select type from new_tb_member m where m.idx=mIdx) as `type`, (select outDate from new_tb_member m where m.idx=mIdx) as `outDate` from new_tb_work"
     sql += " WHERE workStartDt LIKE CONCAT(?, '%') AND sIdx in (?)";
     /*
     let sql = "SELECT mIdx,COUNT(*) as workDays"
