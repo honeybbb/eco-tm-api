@@ -470,6 +470,24 @@ exports.getTaxIncome = async function (year, salary, familyCnt) {
     }
 }
 
+// 연도별 세율 구간표 전체 조회
+exports.getTaxIncomeTable = async function (year) {
+    const sql = `
+        SELECT income_min, income_max,
+               family_1, family_2, family_3, family_4, family_5, family_6,
+               family_7, family_8, family_9, family_10, family_11
+        FROM new_tb_tax_income
+        WHERE apply_year = ?
+        ORDER BY income_min ASC`;
+    try {
+        const [rows] = await pool.query(sql, [year]);
+        return rows;
+    } catch (e) {
+        console.log('db err', e);
+        return [];
+    }
+}
+
 exports.setOrders = async function (sIdx, orderList, mIdx) {
     const conn = await pool.getConnection();
     try {

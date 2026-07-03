@@ -249,6 +249,13 @@ exports.getTaxIncome = async function (req, res) {
         salary = req.query.salary,
         familyCnt = req.query.familyCnt;
 
+    // salary가 없으면 구간표 전체 반환 (프론트 초기 로드용)
+    if (salary === undefined) {
+        const table = await etcModel.getTaxIncomeTable(year);
+        return res.json({ result: true, data: table });
+    }
+
+    // 기존 단건 계산 로직 그대로 유지
     let result = await etcModel.getTaxIncome(year, salary, familyCnt);
 
     const incomeTax = result[0]?.tax_amt || 0;
