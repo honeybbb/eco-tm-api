@@ -27,6 +27,13 @@ module.exports = function (app) {
     //직원 일괄 등록
     app.route('/v1/member/bulk').post(service.registerBulkMember);
 
+    //직원 비고 수정
+    app.route('/v1/member/bigo/update/:bgIdx').put(service.updateMemberBigo);
+
+    //직원 비고 삭제
+    app.route('/v1/member/bigo/:bgIdx').delete(service.DeleteMemberBigo);
+
+    //직원 정보 수정
     app.route('/v1/member/data/:idx').put(service.updateMemberData);
 
     app.route('/v1/member/status/four/ins/:idx').put(service.updateMemberFourInsStatus);

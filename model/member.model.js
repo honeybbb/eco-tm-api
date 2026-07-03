@@ -153,7 +153,7 @@ exports.getMemberIdxMap = async function (ids) {
 
 exports.getMemberData = async function (id) {
     let sql = `
-        SELECT 
+        SELECT
             m.*,
             (SELECT itemNm FROM new_tb_code WHERE itemCd = m.disability_grade LIMIT 1) AS disability_grade,
             IFNULL(ms.sIdx, '0') AS \`sIdx\`,
@@ -163,18 +163,22 @@ exports.getMemberData = async function (id) {
             cd2.itemNm AS \`type\`,
             cd2.itemCd AS \`typeCd\`,
             cd3.itemCd AS \`disabilityCd\`,
+            
+            -- 현장 정보
             CONCAT('[',
                 GROUP_CONCAT(DISTINCT
                     CASE WHEN ms.mIdx IS NOT NULL THEN
                         JSON_OBJECT('name', s.name, 'address', s.address)
                     END
                 ), ']') AS \`sites\`,
+                
+            -- 계약 정보
             CONCAT('[',
                 GROUP_CONCAT(DISTINCT
                     CASE WHEN mc.idx IS NOT NULL THEN
                         JSON_OBJECT(
-                            'contractData', mc.payItems,
-                            'contractData', mc.deductionItems,
+                            'payItems', mc.payItems,
+                            'deductionItems', mc.deductionItems,
                             'contractStartDt', mc.contractStartDt,
                             'contractEndDt', mc.contractEndDt,
                             'workSchedule', mc.workSchedule,
@@ -182,19 +186,36 @@ exports.getMemberData = async function (id) {
                             'dayWorkTime', mc.day_work_time
                         )
                     END
-                ), ']') AS \`contract\`
+                ), ']') AS \`contract\`,
+                
+            -- 특이사항(비고) 누적 히스토리
+            CONCAT('[',
+                GROUP_CONCAT(DISTINCT
+                    CASE WHEN mb.idx IS NOT NULL THEN
+                        JSON_OBJECT(
+                            'bgIdx', mb.idx,
+                            'type', mb.type,
+                            'bigo', mb.bigo,
+                            'regDt', DATE_FORMAT(mb.regDt, '%Y-%m-%d %H:%i:%s'),
+                            'admin_id', IFNULL(mb.admin_id, '')
+                        )
+                    END
+                ), ']') AS \`bigoList\`
+
         FROM new_tb_member m
-        LEFT JOIN new_tb_code cd ON cd.itemCd = m.position
-        LEFT JOIN new_tb_code cd2 ON cd2.itemCd = m.type
-        LEFT JOIN new_tb_code cd3 ON cd3.itemCd = m.disability_grade
-        LEFT JOIN new_tb_member_assignment ms ON m.idx = ms.mIdx
-        LEFT JOIN new_tb_site s ON s.idx = ms.sIdx
-        LEFT JOIN (
+            LEFT JOIN new_tb_code cd ON cd.itemCd = m.position
+            LEFT JOIN new_tb_code cd2 ON cd2.itemCd = m.type
+            LEFT JOIN new_tb_code cd3 ON cd3.itemCd = m.disability_grade
+            LEFT JOIN new_tb_member_assignment ms ON m.idx = ms.mIdx
+            LEFT JOIN new_tb_site s ON s.idx = ms.sIdx
+            LEFT JOIN (
             SELECT mIdx, MAX(idx) AS max_idx
             FROM new_tb_member_contract
             GROUP BY mIdx
-        ) LatestC ON m.idx = LatestC.mIdx
-        LEFT JOIN new_tb_member_contract mc ON mc.idx = LatestC.max_idx
+            ) LatestC ON m.idx = LatestC.mIdx
+            LEFT JOIN new_tb_member_contract mc ON mc.idx = LatestC.max_idx
+            LEFT JOIN new_tb_member_bigo mb ON m.idx = mb.mIdx -- 🔥 테이블 JOIN 추가
+
         WHERE m.id = ?
         GROUP BY m.idx
     `;
@@ -671,7 +692,7 @@ exports.insertAssignment = async function (staffing) {
     }
 };
 
-exports.registerMemberWithContractAndStaffing = async function (member, contract, staffing) {
+exports.registerMemberWithContractAndStaffing = async function (member, contract, staffing, bigoLogs) {
     const connection = await pool.getConnection(); // 커넥션 가져오기
 
     try {
@@ -688,14 +709,14 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
              etc_name_1, etc_value_1, etc_name_2, etc_value_2, etc_name_3, etc_value_3,
              bank, accountNm, accountNumber, four_ins, retire_pension, 
              inDate, outDate, outReason, transferDate, 
-             status, address, bigo)
+             status, address)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, 
                     ?, ?, ?, ?, 
-                    ?, ?, ?)
+                    ?, ?)
         `;
 
         let paramMember = [
@@ -709,11 +730,32 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
             member.bank, member.accountNm, member.accountNumber,
             member.four_ins, member.retire_pension,
             member.inDate, member.outDate, member.outReason, member.transferDate,
-            member.status, member.address, member.bigo
+            member.status, member.address
         ];
 
         let resMember = await connection.query(sqlMember, paramMember);
         let new_mIdx = resMember[0].insertId; // 생성된 직원 PK (mIdx) 가져오기
+
+        // -----------------------------------------------------
+        // 1-2. 비고 누적 기록 (new_tb_member_bigo) 등록
+        // -----------------------------------------------------
+        // 기본 특이사항 (type: 1)
+        if (bigoLogs.bigo && bigoLogs.bigo.trim() !== '') {
+            let sqlBigo1 = `
+                INSERT INTO new_tb_member_bigo (mIdx, bigo, type, regDt) 
+                VALUES (?, ?, '1', NOW())
+            `;
+            await connection.query(sqlBigo1, [new_mIdx, bigoLogs.bigo]);
+        }
+
+        // 급여 관련 특이사항 (type: 2)
+        if (bigoLogs.payrollBigo && bigoLogs.payrollBigo.trim() !== '') {
+            let sqlBigo2 = `
+                INSERT INTO new_tb_member_bigo (mIdx, bigo, type, regDt) 
+                VALUES (?, ?, '2', NOW())
+            `;
+            await connection.query(sqlBigo2, [new_mIdx, bigoLogs.payrollBigo]);
+        }
 
         // -----------------------------------------------------
         // 2. 계약서(Contract) 등록
@@ -771,7 +813,7 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
     }
 }
 
-exports.updateMemberWithContractAndStaffing = async function (mIdx, member, contract, staffing) {
+exports.updateMemberWithContractAndStaffing = async function (mIdx, member, contract, staffing, bigoLogs) {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
@@ -784,7 +826,7 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
             beneficiary = ?, foreigner = ?, nationality = ?, visa_code = ?, 
             visa_date = ?, bank = ?, accountNm = ?, accountNumber = ?,
             inDate = ?, outDate = ?, outReason = ?, transferDate = ?, 
-            address = ?, bigo = ?, status = ?,
+            address = ?, status = ?,
             four_ins = ?, retire_pension = ?
         `;
 
@@ -797,7 +839,7 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
                 member.beneficiary, member.foreigner, member.nationality, member.visa_code,
                 member.visa_date, member.bank, member.accountNm, member.accountNumber,
                 member.inDate, member.outDate, member.outReason, member.transferDate,
-                member.addr, member.bigo, member.status,
+                member.addr, member.status,
                 member.fourInsurance, member.retirePension, member.password, mIdx
             ];
         } else {
@@ -809,11 +851,28 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
                 member.beneficiary, member.foreigner, member.nationality, member.visa_code,
                 member.visa_date, member.bank, member.accountNm, member.accountNumber,
                 member.inDate, member.outDate, member.outReason, member.transferDate,
-                member.addr, member.bigo, member.status,
+                member.addr, member.status,
                 member.fourInsurance, member.retirePension, mIdx
             ];
         }
         await connection.query(sqlMember, paramMember);
+
+        // 내용이 존재할 때만 Insert 실행
+        if (bigoLogs && bigoLogs.bigo && bigoLogs.bigo.trim() !== '') {
+            const sqlBigo1 = `
+                INSERT INTO new_tb_member_bigo (mIdx, bigo, type, regDt, admin_id) 
+                VALUES (?, ?, '1', NOW(), ?)
+            `;
+            await connection.query(sqlBigo1, [mIdx, bigoLogs.bigo.trim(), bigoLogs.admin_id]);
+        }
+
+        if (bigoLogs && bigoLogs.payrollBigo && bigoLogs.payrollBigo.trim() !== '') {
+            const sqlBigo2 = `
+                INSERT INTO new_tb_member_bigo (mIdx, bigo, type, regDt, admin_id) 
+                VALUES (?, ?, '2', NOW(), ?)
+            `;
+            await connection.query(sqlBigo2, [mIdx, bigoLogs.payrollBigo.trim(), bigoLogs.admin_id]);
+        }
 
         // 2. Contract 업데이트
         const sqlContractCheck = `SELECT idx FROM new_tb_member_contract WHERE mIdx = ? ORDER BY idx DESC LIMIT 1`;
@@ -868,6 +927,32 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
         connection.release();
     }
 };
+
+exports.updateMemberBigo = async function (idx, bigo, admin){
+    let sql = "update new_tb_member_bigo set bigo=? where idx = ?"
+    let aParameter = [bigo, idx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.DeleteMemberBigo = async function (idx) {
+    let sql = "delete from new_tb_member_bigo where idx = ?";
+    let aParameter = [idx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
 
 exports.updateMemberFourInsStatus = async function (cIdx, mIdx, colName, status) {
     // 1. 기존 `four_ins_status`를 동적 변수 ${colName}으로 변경

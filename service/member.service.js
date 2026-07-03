@@ -6,6 +6,7 @@ const bcrypt  = require("bcrypt");
 const crypto = require("crypto");
 const { encryptRRN, decryptRRN, hashPassword} = require("../utils/password");
 const xlsx = require("xlsx");
+const siteModel = require("../model/site.model");
 
 //관리자 등록
 exports.registerManager = async function (req, res) {
@@ -459,7 +460,14 @@ exports.registerFullMember = async function (req, res) {
             transferDate: body.transferDate,
             status: body.status,
             address: body.address,
-            bigo: body.bigo
+            // bigo: body.bigo
+        };
+
+        // 비고 누적용 데이터
+        const bigoLogs = {
+            bigo: body.bigo,           // type: '1'
+            payrollBigo: body.payrollBigo,  // type: '2'
+            // admin_id: body.id           //토큰/세션에서 가져온 등록자 ID
         };
 
         const wageInputs = body.contractData?.wageInputs || {};
@@ -498,7 +506,8 @@ exports.registerFullMember = async function (req, res) {
         const result = await memberModel.registerMemberWithContractAndStaffing(
             memberData,
             contractData,
-            staffingData
+            staffingData,
+            bigoLogs
         );
 
         if (result.result) {
@@ -711,6 +720,24 @@ exports.registerBulkMember = async (req, res) => {
     }
 };
 
+exports.updateMemberBigo = async function (req, res) {
+    let bgIdx = req.params.bgIdx,
+        bigo = req.body.bigo,
+        adminId =  req.body.adminId;
+
+    console.log(bgIdx, bigo, adminId);
+
+    let result = await memberModel.updateMemberBigo(bgIdx, bigo, adminId);
+    res.json({'result': true, 'data': result})
+}
+
+exports.DeleteMemberBigo = async function (req, res) {
+    let bgIdx = req.params.bgIdx;
+
+    let result = await memberModel.DeleteMemberBigo(bgIdx);
+    res.json({'result': true, 'data': result})
+}
+
 exports.updateMemberData = async function (req, res) {
     try {
         const mIdx = req.params.idx;
@@ -763,6 +790,12 @@ exports.updateMemberData = async function (req, res) {
             fourInsurance: body.four_ins,
         };
 
+        const bigoLogs = {
+            bigo: body.bigo,
+            payrollBigo: body.payrollBigo,
+            admin_id: body.adminId
+        };
+
         const payItems = {};
         const deductionItems = {};
 
@@ -798,7 +831,8 @@ exports.updateMemberData = async function (req, res) {
             mIdx,
             memberData,
             contractData,
-            staffingData
+            staffingData,
+            bigoLogs
         );
 
         if (result.result) {
