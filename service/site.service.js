@@ -86,6 +86,7 @@ exports.registerSiteWithContract = async function (req, res) {
             address: req.body.address,
             address_detail: req.body.addressDetail,
             payment_day: req.body.payment_day,
+            billing_day: req.body.billing_day,
 
             businessNumber: req.body.businessNumber || '',
             businessName: req.body.businessName || '',

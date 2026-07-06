@@ -155,7 +155,7 @@ exports.saveSite = async function (site) {
                 SET sType=?, name=?, zipcode = ?, address=?, phone=?, building_su=?, unit_su=?, 
                     area=?, areaUnder=?, areaOver=?, is_vat=?, manager=?,
                     director=?, director_phone=?, billingManager = ?, payrollManager = ?,
-                    bankName=?, accountNumber=?, accountName=?, payment_day=?,
+                    bankName=?, accountNumber=?, accountName=?, payment_day=?, billing_day=?,
                     businessNumber=?, businessName =?, representative=?, businessType=?, businessItem=?, 
                     email=?
                 WHERE idx = ?
@@ -164,7 +164,7 @@ exports.saveSite = async function (site) {
                 site.sType, site.name, site.zipcode, site.address, site.phone, site.building_su, site.unit_su,
                 site.area, site.areaUnder, site.areaOver, site.is_vat,site.manager,
                 site.director, site.director_phone, site.billingManager, site.payrollManager,
-                site.bankName, site.accountNumber, site.accountName, site.payment_day,
+                site.bankName, site.accountNumber, site.accountName, site.payment_day, site.billing_day,
                 site.businessNumber, site.businessName, site.representative, site.businessType, site.businessItem,
                 site.email,
                 new_sIdx
@@ -177,15 +177,15 @@ exports.saveSite = async function (site) {
                 (cIdx, sType, name, zipcode, address, phone,
                  building_su, unit_su, area, areaUnder, areaOver, is_vat, manager,
                  director, director_phone, billingManager, payrollManager, 
-                 bankName, accountNumber, accountName, payment_day,
+                 bankName, accountNumber, accountName, payment_day, billing_day,
                  businessNumber,businessName, representative, businessType, businessItem,
                  email)
                 VALUES (
                         ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, 
-                        ?, ?, ?, ?,
-                        ?,?, ?, ?, ?,
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?,
                         ?
                        )
             `;
@@ -194,7 +194,7 @@ exports.saveSite = async function (site) {
                 site.phone, site.building_su, site.unit_su,
                 site.area, site.areaUnder, site.areaOver, site.is_vat, site.manager,
                 site.director, site.director_phone, site.billingManager, site.payrollManager,
-                site.bankName, site.accountNumber, site.accountName, site.payment_day,
+                site.bankName, site.accountNumber, site.accountName, site.payment_day, site.billing_day,
                 site.businessNumber, site.businessName, site.representative, site.businessType, site.businessItem,
                 site.email
             ];
