@@ -270,7 +270,9 @@ exports.getWageCode2 = async function (cIdx) {
                \`option\` AS tax_free,
                useFl, deleteFl, editFl, sort
         FROM   new_tb_code
-        WHERE groupCd LIKE '04%' and cIdx in (?)
+        WHERE
+--             groupCd LIKE '04%' and 
+            cIdx in (?)
         ORDER  BY sort, itemCd
     `;
     try {
