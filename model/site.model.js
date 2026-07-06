@@ -44,7 +44,8 @@ exports.getSiteList = async function (cIdx) {
                                           'jsonData', sc.jsonData,
                                           'staffDetail', sc.staffDetail,
                                           'salarySource', sc.salarySource,
-                                          'cleaningConfig', sc.cleaningConfig
+                                          'cleaningConfig', sc.cleaningConfig,
+                                          'staffCount', sc.staffCount
                                   )
                           )
                    FROM new_tb_site_contract sc
