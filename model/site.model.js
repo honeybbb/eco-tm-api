@@ -461,6 +461,19 @@ exports.insertSiteAndContract = async function (site, contract) {
     }
 }
 
+exports.DeleteSiteContract = async function (scIdx, cIdx) {
+    let sql = "delete from new_tb_site_contract where idx = ? and cIdx = ?"
+    let aParameter = [scIdx, cIdx];
+
+    try {
+        let res = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.registerBudget = async function (sIdx, jsonData) {
     let sql = "update new_tb_site_contract set jsonData=? where sIdx = ?"
     let aParameter = [jsonData,sIdx];

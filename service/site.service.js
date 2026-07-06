@@ -201,6 +201,16 @@ exports.registerSiteWithContract = async function (req, res) {
     }
 };
 
+exports.DeleteSiteContract = async function (req, res) {
+    let cIdx = req.user.cIdx,
+        idx = req.params.idx;
+    console.log(cIdx, idx);
+    return;
+    let result = await siteModel.DeleteSiteContract(idx, cIdx);
+
+    res.json({'result': true, 'data': result})
+}
+
 exports.registerBudget = async function (req, res) {
     let sIdx = req.body.sIdx,
         jsonData = req.body.jsonData;

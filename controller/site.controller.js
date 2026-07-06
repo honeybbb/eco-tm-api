@@ -33,6 +33,9 @@ module.exports = function (app) {
     // 현장 및 계약 등록
     app.route('/v1/site/register').post(service.registerSiteWithContract);
 
+    //현장 계약 삭제
+    app.route('/v1/site/contract/:idx').delete(service.DeleteSiteContract);
+
     //산출내역서 저장
     app.route('/v1/site/estimate/:sIdx').post(service.setSiteEstimate);
 
