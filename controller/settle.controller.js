@@ -5,6 +5,9 @@ module.exports = function (app) {
     // 정산관리 리스트 조회
     app.route('/v1/settle/site/list').get(service.getSettleList);
 
+    // 정산 데이터 불러오기
+    app.route('/v1/settle/payroll').get(service.getSettlePayroll);
+
     //급여총액 리스트
     app.route('/v1/settle/payroll/summary').get(service.getSettleSummary);
 

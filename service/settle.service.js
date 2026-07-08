@@ -1,4 +1,5 @@
 const settleModel = require("../model/settle.model");
+const payrollModel = require("../model/payroll.model");
 
 exports.getSettleList = async function (req, res) {
     let cIdx = req.user.cIdx;
@@ -14,6 +15,18 @@ exports.getSettleList = async function (req, res) {
 
     res.json({"result": true, "data": result});
 }
+
+exports.getSettlePayroll = async function (req, res) {
+    let cIdx = req.user.cIdx,
+        year = req.query.year,
+        month = req.query.month,
+        sIdx = req.query.sIdx;
+
+    let result = await settleModel.getSettlePayroll(cIdx, year, month, sIdx);
+
+    res.json({'result': true, 'data': result})
+}
+
 //급여총액 조회
 exports.getSettleSummary = async function (req, res) {
     let

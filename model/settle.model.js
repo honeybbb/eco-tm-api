@@ -20,6 +20,84 @@ exports.getSettleList = async function (startMonth, endMonth, docType, cIdx) {
     }
 }
 
+exports.getSettlePayroll = async function (cIdx, year, month, sIdx){
+    let sql = "select";
+    sql += " m.idx,";
+    sql += " m.id,";
+    sql += " m.type,";
+    sql += " m.birthDt,";
+    sql += " m.inDate, m.outDate, m.transferDate, m.status as mStatus,"
+    sql += " (SELECT name FROM new_tb_site WHERE idx = ma.sIdx LIMIT 1) as siteName,";
+    sql += " ma.sIdx as sIdx,";
+    sql += " c.itemNm as role,";
+    sql += " c.sort,";
+    sql += " m.name as staff,";
+    sql += " m.billingName as billingName,";
+    sql += " m.disability,m.disability_grade, m.disability_date,"
+    //자동 계산 여부
+    sql += " IFNULL(mbs.isAutoCalc, IFNULL(mc.isAutoCalc, 'Y')) as isAutoCalc,";
+
+    // 1. 급여 항목 데이터 매핑
+    sql += " mc.payItems as payItems,";
+    sql += " mc.deductionItems as deductionItems,";
+    sql += " IFNULL(mbs.checkedItems, JSON_OBJECT()) as checkedItems,";
+
+    // 2. 상태값(status) 처리: mbs 데이터가 없으면(NULL이면) 0, 있으면 1(또는 mbs의 기존 상태값)
+    // mbs.idx가 없다는 것은 계약서에서 데이터를 끌어왔다는 의미이므로 0을 반환합니다.
+    sql += " CASE WHEN mbs.idx IS NULL THEN 0 ELSE 1 END as status,";
+    sql += " mbs.grossPay, mbs.deductions AS totalDeduction, mbs.netPay";
+    sql += " from new_tb_member m";
+
+    // 기본급 정보 (최신 1건)
+    sql += " left join new_tb_member_base_salary mbs ON mbs.idx = (SELECT idx FROM new_tb_member_base_salary WHERE mIdx = m.idx ORDER BY regDt DESC LIMIT 1)";
+
+    // 계약서 정보 (최신 1건)
+    sql += " left join new_tb_member_contract mc ON mc.idx = (SELECT idx FROM new_tb_member_contract WHERE mIdx = m.idx ORDER BY regDt DESC LIMIT 1)";
+
+    sql += " left join new_tb_site s on s.idx = mbs.sIdx";
+    sql += " left join new_tb_member_assignment ma ON ma.idx = (";
+    sql += "     SELECT idx FROM new_tb_member_assignment ";
+    sql += "     WHERE mIdx = m.idx ORDER BY idx DESC LIMIT 1"; // 최신 배정 정보 1건만
+    sql += " )";
+    //sql += " left join new_tb_code c on c.itemCd = m.position and c.cIdx = m.cIdx";
+    // LEFT(m.position, 8)을 사용하여 앞에서부터 8자리만 추출해 매칭
+    sql += " left join new_tb_code c on c.itemCd = LEFT(m.position, 8) and c.cIdx = m.cIdx";
+
+    // 기본 WHERE 조건
+    sql += " WHERE m.cIdx = ?";
+    let aParameter = [cIdx];
+
+    if (year && month) {
+        const targetMonth = String(month).padStart(2, '0'); // month가 '7'로 와도 '07'로 안전하게 변환
+        const targetDate = `${year}-${targetMonth}-01`;
+
+        // 1. 입사일이 해당 월의 마지막 날보다 작거나 같음 (MySQL의 LAST_DAY 함수 사용)
+        sql += " AND m.inDate <= LAST_DAY(?)";
+        aParameter.push(targetDate);
+
+        // 2. 퇴사일이 없거나(NULL), 해당 월의 1일보다 크거나 같음
+        sql += " AND (m.outDate IS NULL OR m.outDate >= ?)";
+        aParameter.push(targetDate);
+    }
+
+    // 2. sIdx가 넘어왔을 경우에만 AND 조건 동적 추가
+    if (sIdx) {
+        sql += " AND ma.sIdx = ?"; // 배정된 현장(ma.sIdx) 기준으로 필터링 (필요시 s.idx로 변경)
+        aParameter.push(sIdx);
+    }
+
+    // 3. ORDER BY는 반드시 WHERE 조건 조립이 모두 끝난 마지막에 와야 합니다.
+    sql += " order by s.idx, c.sort, m.idx";
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.getSettleSummary = async function (year, month) {
     // 단지명, 계약인원, 현재인원(status=0), 여(gender=F), 남(gender=M), 입사(inDate), 퇴사(outDate), 공백(급여작업인원-계약인원),
     // 단지청구액, 급여지급액
