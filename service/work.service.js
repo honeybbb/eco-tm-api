@@ -930,7 +930,8 @@ exports.bulkRegisterWork = async function (req, res) {
         let skipLeaveCount = 0;
 
         for (const staff of staffList) {
-            const schedule = scheduleMap[staff.position]; // 해당 직원의 직책 스케줄
+            const positionKey = staff.position ? String(staff.position).substring(0, 8) : '';
+            const schedule = scheduleMap[positionKey]; // 해당 직원의 직책 스케줄
             if (!schedule) continue;
 
             const inDate = toYMD(staff.inDate);
