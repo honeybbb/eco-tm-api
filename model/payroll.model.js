@@ -263,7 +263,7 @@ exports.getPayrollMonthTemp = async function (year, month) {
 }
 
 //직원 급여 내역 조회 (일할 일수 반올림)
-exports.getPayrollMonth = async function (year, month, cIdx) {
+exports.getPayrollMonth1 = async function (year, month, cIdx) {
     let sql = `
         SELECT 
             m.idx, 
@@ -338,6 +338,99 @@ exports.getPayrollMonth = async function (year, month, cIdx) {
 
     // 파라미터 매칭: 근태 조인(2) + 급여 조인(2) = 총 4개
     let aParameter = [year, month, year, month, cIdx, year, month, year, month];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.getPayrollMonth = async function (year, month, cIdx) {
+    let sql = `
+        SELECT 
+            m.idx, 
+            m.id, 
+            m.type, 
+            m.name AS staff,
+            m.birthDt AS birthDt,
+            m.rrn as personalNo,
+            s.idx AS sIdx,
+            s.name AS siteName,
+            s.payment_day,
+            c.itemNm AS role,
+            c.sort,
+            m.inDate, m.outDate,
+            m.bank, m.accountNumber,
+            s.billingManager,
+            
+            IFNULL(w.absentDays, 0) AS absentDays,
+
+            IFNULL(mpm.scheduledDays, 0) AS scheduledDays,
+            IFNULL(mpm.workedDays, 0) AS workedDays,
+            IFNULL(mpm.grossPay, 0) AS grossPay,
+            IFNULL(mpm.deductions, 0) AS totalDeduction,
+            IFNULL(mpm.netPay, 0) AS netPay,
+            
+            mpm.payItems,
+            mpm.deductionItems,
+
+            /* mpm(이번 달 저장분)이 있으면 그걸 우선, 없으면 base_salary(기본 설정값)로 폴백 */
+            COALESCE(mpm.checkedItems, bs.checkedItems) AS checkedItems,
+            
+            IF(mpm.idx IS NOT NULL, 1, 0) AS status
+
+        FROM new_tb_member m
+        
+        LEFT JOIN new_tb_code c ON c.itemCd = m.position AND c.cIdx = m.cIdx
+        LEFT JOIN new_tb_member_assignment ma ON ma.idx = (
+            SELECT idx FROM new_tb_member_assignment
+            WHERE mIdx = m.idx
+            ORDER BY idx DESC LIMIT 1
+            )
+        LEFT JOIN new_tb_site s ON s.idx = ma.sIdx
+
+        LEFT JOIN (
+            SELECT mIdx, COUNT(DISTINCT DATE(workStartDt)) AS absentDays 
+            FROM new_tb_work 
+            WHERE YEAR(workStartDt) = ? AND MONTH(workStartDt) = ? 
+              AND workType = 'absent'
+            GROUP BY mIdx
+        ) w ON w.mIdx = m.idx
+
+        LEFT JOIN (
+            SELECT p1.*
+            FROM new_tb_member_payroll_month p1
+            INNER JOIN (
+                SELECT mIdx, MAX(idx) AS max_idx
+                FROM new_tb_member_payroll_month
+                WHERE year = ? AND month = ?
+                GROUP BY mIdx
+            ) p2 ON p1.idx = p2.max_idx
+        ) mpm ON mpm.mIdx = m.idx
+
+        /* --- [JOIN 3] 기본급 설정: 해당 귀속년도 가장 최근 1건 --- */
+        LEFT JOIN (
+            SELECT bs1.*
+            FROM new_tb_member_base_salary bs1
+            INNER JOIN (
+                SELECT mIdx, MAX(idx) AS max_idx
+                FROM new_tb_member_base_salary
+                WHERE year = ?
+                GROUP BY mIdx
+            ) bs2 ON bs1.idx = bs2.max_idx
+        ) bs ON bs.mIdx = m.idx
+
+        WHERE m.cIdx = ?
+          AND m.inDate <= LAST_DAY(STR_TO_DATE(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'), '%Y-%m-%d'))
+          AND (m.outDate IS NULL OR m.outDate >= STR_TO_DATE(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'), '%Y-%m-%d'))
+        ORDER BY s.idx, c.sort, m.idx
+    `;
+
+    // 근태(2) + mpm(2) + base_salary(1) + cIdx(1) + 날짜조건(4) = 총 10개
+    let aParameter = [year, month, year, month, year, cIdx, year, month, year, month];
 
     try {
         let [res] = await pool.query(sql, aParameter);
