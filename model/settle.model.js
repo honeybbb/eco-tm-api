@@ -20,6 +20,29 @@ exports.getSettleList = async function (startMonth, endMonth, docType, cIdx) {
     }
 }
 
+// 대상 월의 실제 근무 기반 급여 데이터를 반환하는 통합 API
+exports.getAssignedMembers = async function (cIdx, sIdx, endDt, startDt) {
+    let sql = `
+        SELECT m.idx, m.name, m.position, m.inDate, m.outDate, c.itemNm as roleNm
+        FROM new_tb_member m
+                 JOIN new_tb_member_assignment ma ON ma.mIdx = m.idx
+                 LEFT JOIN new_tb_code c ON c.itemCd = LEFT(m.position, 8) AND c.cIdx = m.cIdx
+        WHERE m.cIdx = ? AND ma.sIdx = ?
+          AND m.inDate <= ? AND (m.outDate IS NULL OR m.outDate >= ?)
+    `;
+    let aParameter = [cIdx, sIdx, endDt, startDt];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.error('getAssignedMembers db err', e);
+        // DB 에러가 발생했을 때 '-9999'를 리턴하면 Controller의 for...of 에서 에러가 남
+        // 가능하면 throw e; 를 해서 Controller의 catch 블록으로 넘기는 것이 정석
+        return { 'data': '-9999' };
+    }
+}
+
 exports.getSettlePayroll = async function (cIdx, year, month, sIdx){
     let sql = "select";
     sql += " m.idx,";

@@ -1,5 +1,7 @@
 const settleModel = require("../model/settle.model");
 const payrollModel = require("../model/payroll.model");
+const siteModel = require("../model/site.model");
+const workModel = require("../model/work.model");
 
 exports.getSettleList = async function (req, res) {
     let cIdx = req.user.cIdx;
@@ -14,6 +16,71 @@ exports.getSettleList = async function (req, res) {
     let result = await settleModel.getSettleList(startMonth, endMonth, docType, cIdx);
 
     res.json({"result": true, "data": result});
+}
+
+exports.getCalculatedPayroll = async function (req, res) {
+    try {
+        const { cIdx, sIdx, year, month, type } = req.query;
+
+        // 1. 해당 월의 시작일과 종료일 계산
+        const targetMonth = String(month).padStart(2, '0');
+        const startDt = `${year}-${targetMonth}-01`;
+        const endDt = new Date(year, month, 0).toISOString().split('T')[0];
+
+        // 2. 현장 산출 내역(Budget) 가져오기
+        const siteData = await siteModel.getSiteData(sIdx);
+        let budgetMap = {};
+
+        if (siteData && siteData.length > 0 && siteData[0].contractList) {
+            const contracts = JSON.parse(siteData[0].contractList);
+            const targetContract = contracts.find(c => c.type === type);
+
+            if (targetContract && targetContract.budget) {
+                const parsedBudget = typeof targetContract.budget === 'string' ? JSON.parse(targetContract.budget) : targetContract.budget;
+                if (parsedBudget.directLabor) {
+                    parsedBudget.directLabor.forEach(labor => {
+                        budgetMap[labor.label] = labor.values;
+                    });
+                }
+            }
+        }
+
+        // 3. Model 호출 (함수명 변경 및 sIdx 추가)
+        let members = await settleModel.getAssignedMembers(cIdx, sIdx, endDt, startDt);
+
+        // ※ 예외 처리: 데이터베이스 에러 등으로 '-9999' 객체가 넘어온 경우
+        if (!Array.isArray(members)) {
+            return res.status(500).json({ result: false, message: '직원 데이터를 불러오지 못했습니다.' });
+        }
+
+        // 4. 직원별 실제 근태 데이터 집계
+        for (let member of members) {
+            // 수정: mIdx -> member.idx
+            let workData = await workModel.getWorkSheet(member.idx, startDt, endDt);
+
+            // 수정: workData는 배열이므로, JS에서 직접 일수와 시간을 계산
+            if (Array.isArray(workData)) {
+                // 하루에 두 번 출근(오전/오후) 기록이 있을 수 있으니 날짜(date) 중복 제거하여 일수 계산
+                const uniqueDays = new Set(workData.map(w => w.date));
+                member.actualWorkDays = uniqueDays.size;
+
+                // duration 합산하여 총 시간 계산
+                member.actualWorkHours = workData.reduce((sum, row) => sum + Number(row.duration), 0);
+            } else {
+                member.actualWorkDays = 0;
+                member.actualWorkHours = 0;
+            }
+
+            // 현장 산출 내역(Budget) 정보 주입
+            member.budgetData = budgetMap[member.position] || null;
+        }
+
+        res.json({ result: true, data: members });
+
+    } catch (e) {
+        console.error('getCalculatedPayroll 에러:', e);
+        res.status(500).json({ result: false, message: '서버 에러' });
+    }
 }
 
 exports.getSettlePayroll = async function (req, res) {
