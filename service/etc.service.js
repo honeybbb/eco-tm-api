@@ -73,7 +73,7 @@ exports.setBaseCode = async function (req, res) {
         itemNm = req.body.itemNm,
         sort = req.body.sort,
         useFl = req.body.useFl,
-        option = req.body.option,
+        option = req.body.option || req.body.tax_free,
         // logicFl = req.body.logicFl,
         regDt = new Date();
 
