@@ -200,7 +200,21 @@ exports.getMemberData = async function (id) {
                             'admin_id', IFNULL(mb.admin_id, '')
                         )
                     END
-                ), ']') AS \`bigoList\`
+                ), ']') AS \`bigoList\`,
+                
+            -- 입사/퇴사/휴직/일용/대근 누적 히스토리
+            CONCAT('[',
+                GROUP_CONCAT(DISTINCT
+                    CASE WHEN mh.idx IS NOT NULL THEN
+                        JSON_OBJECT(
+                            'hIdx', mh.idx,
+                            'status', mh.historyStatus,
+                            'startDate', IFNULL(DATE_FORMAT(mh.startDate, '%Y-%m-%d'), ''),
+                            'endDate', IFNULL(DATE_FORMAT(mh.endDate, '%Y-%m-%d'), ''),
+                            'outReason', IFNULL(mh.outReason, '')
+                        )
+                    END
+                ), ']') AS \`historyList\`
 
         FROM new_tb_member m
             LEFT JOIN new_tb_code cd ON cd.itemCd = m.position
@@ -214,7 +228,8 @@ exports.getMemberData = async function (id) {
             GROUP BY mIdx
             ) LatestC ON m.idx = LatestC.mIdx
             LEFT JOIN new_tb_member_contract mc ON mc.idx = LatestC.max_idx
-            LEFT JOIN new_tb_member_bigo mb ON m.idx = mb.mIdx -- 🔥 테이블 JOIN 추가
+            LEFT JOIN new_tb_member_bigo mb ON m.idx = mb.mIdx
+            LEFT JOIN new_tb_member_history mh ON m.idx = mh.mIdx AND mh.useFl = 'Y'
 
         WHERE m.id = ?
         GROUP BY m.idx
@@ -692,7 +707,7 @@ exports.insertAssignment = async function (staffing) {
     }
 };
 
-exports.registerMemberWithContractAndStaffing = async function (member, contract, staffing, bigoLogs) {
+exports.registerMemberWithContractAndStaffing = async function (member, contract, staffing, bigoLogs, periodsData) {
     const connection = await pool.getConnection(); // 커넥션 가져오기
 
     try {
@@ -708,14 +723,16 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
              foreigner, nationality, visa_code, visa_date,
              etc_name_1, etc_value_1, etc_name_2, etc_value_2, etc_name_3, etc_value_3,
              bank, accountNm, accountNumber, four_ins, retire_pension, 
-             inDate, outDate, outReason, transferDate, 
+             inDate, outDate, outReason, 
+             transferDate, 
              status, address)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, 
-                    ?, ?, ?, ?, 
+--                     ?, ?, ?, 
+                    ?, 
                     ?, ?)
         `;
 
@@ -729,7 +746,8 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
             member.etc_name_3, member.etc_value_3,
             member.bank, member.accountNm, member.accountNumber,
             member.four_ins, member.retire_pension,
-            member.inDate, member.outDate, member.outReason, member.transferDate,
+            member.inDate, member.outDate, member.outReason,
+            member.transferDate,
             member.status, member.address
         ];
 
@@ -797,6 +815,31 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
 
         await connection.query(sqlStaffing, paramStaffing);
 
+        // -----------------------------------------------------
+        // 4. 입사/퇴사일 이력 누적 기록(new_tb_member_history) 등록
+        // -----------------------------------------------------
+        if (periodsData && periodsData.length > 0) {
+            let sqlPeriod = `
+                INSERT INTO new_tb_member_history 
+                (mIdx, sIdx, historyStatus, startDate, endDate, outReason, regDt) 
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
+            `;
+
+            // 다중 기간(일용직/대근)일 경우 배열 길이만큼 반복해서 INSERT
+            for (const period of periodsData) {
+                // startDate나 endDate가 null이 아닐 때만 유효한 기록으로 간주하여 넣거나,
+                // 무조건 넣고 싶다면 조건문 없이 바로 쿼리 실행 가능
+                await connection.query(sqlPeriod, [
+                    new_mIdx,
+                    staffing.sIdx,
+                    period.status,
+                    period.startDate,
+                    period.endDate,
+                    period.outReason
+                ]);
+            }
+        }
+
         // 모든 쿼리가 성공하면 커밋
         await connection.commit();
 
@@ -813,7 +856,7 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
     }
 }
 
-exports.updateMemberWithContractAndStaffing = async function (mIdx, member, contract, staffing, bigoLogs) {
+exports.updateMemberWithContractAndStaffing = async function (mIdx, member, contract, staffing, bigoLogs, periodsData) {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
@@ -825,7 +868,7 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
             disability_grade = ?, defector = ?, patriot = ?, intern = ?, 
             beneficiary = ?, foreigner = ?, nationality = ?, visa_code = ?, 
             visa_date = ?, bank = ?, accountNm = ?, accountNumber = ?,
-            inDate = ?, outDate = ?, outReason = ?, transferDate = ?, 
+            transferDate = ?, 
             address = ?, status = ?,
             four_ins = ?, retire_pension = ?
         `;
@@ -838,7 +881,8 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
                 member.disability_grade, member.defector, member.patriot, member.intern,
                 member.beneficiary, member.foreigner, member.nationality, member.visa_code,
                 member.visa_date, member.bank, member.accountNm, member.accountNumber,
-                member.inDate, member.outDate, member.outReason, member.transferDate,
+                // member.inDate, member.outDate, member.outReason,
+                member.transferDate,
                 member.addr, member.status,
                 member.fourInsurance, member.retirePension, member.password, mIdx
             ];
@@ -850,7 +894,8 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
                 member.disability_grade, member.defector, member.patriot, member.intern,
                 member.beneficiary, member.foreigner, member.nationality, member.visa_code,
                 member.visa_date, member.bank, member.accountNm, member.accountNumber,
-                member.inDate, member.outDate, member.outReason, member.transferDate,
+                // member.inDate, member.outDate, member.outReason,
+                member.transferDate,
                 member.addr, member.status,
                 member.fourInsurance, member.retirePension, mIdx
             ];
@@ -916,6 +961,39 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
                 ON DUPLICATE KEY UPDATE sIdx = VALUES(sIdx)
         `;
         await connection.query(sqlStaffing, [mIdx, staffing.sIdx]);
+
+        // -----------------------------------------------------------------
+        // 4. 이력(History) 테이블 업데이트 처리 (Soft Delete 방식)
+        // -----------------------------------------------------------------
+        // 과거 데이터를 지우지 않고, 사용 여부(useFl)를 'N'으로 변경하여 히스토리 보존
+        const sqlDeactivateHistory = `
+            UPDATE new_tb_member_history 
+            SET useFl = 'N' 
+            WHERE mIdx = ?
+        `;
+        await connection.query(sqlDeactivateHistory, [mIdx]);
+
+        if (periodsData && periodsData.length > 0) {
+            // 새롭게 들어온 데이터는 useFl = 'Y'로 저장 (최신 데이터 표시)
+            const sqlInsertHistory = `
+                INSERT INTO new_tb_member_history 
+                (mIdx, sIdx, historyStatus, startDate, endDate, outReason, useFl, regDt) 
+                VALUES (?, ?, ?, ?, ?, ?, 'Y', NOW())
+            `;
+
+            for (const p of periodsData) {
+                if (p.startDate || p.endDate) {
+                    await connection.query(sqlInsertHistory, [
+                        mIdx,
+                        staffing.sIdx,
+                        p.status,
+                        p.startDate,
+                        p.endDate,
+                        p.outReason
+                    ]);
+                }
+            }
+        }
 
         await connection.commit();
         return { result: true };
