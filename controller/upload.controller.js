@@ -43,6 +43,9 @@ module.exports = function (app) {
 
     //이미지 업로드
     app.route('/v1/upload/image').post(upload.single('image'), uploadImage);
+
+    //파일 업로드
+    app.route('/v1/upload/file').post(upload.single('file'), uploadFile);
 }
 
 function uploadImage(req, res) {
@@ -64,6 +67,26 @@ function uploadImage(req, res) {
 
     } catch (error) {
         console.error('이미지 업로드 에러:', error);
+        return res.status(500).json({ 'result': false, 'msg': '서버 오류가 발생했습니다.' });
+    }
+}
+
+function uploadFile(req, res) {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ 'result': false, 'msg': '업로드된 파일이 없습니다.' });
+        }
+
+        const fileUrl = `/uploads/${req.file.filename}`;
+
+        return res.json({
+            'result': true,
+            'url': fileUrl,
+            'originalName': req.file.originalname   // ← 프론트에서 표시용 파일명 쓸 수 있게 추가
+        });
+
+    } catch (error) {
+        console.error('파일 업로드 에러:', error);
         return res.status(500).json({ 'result': false, 'msg': '서버 오류가 발생했습니다.' });
     }
 }
