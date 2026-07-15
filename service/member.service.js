@@ -454,14 +454,39 @@ exports.registerFullMember = async function (req, res) {
             accountNumber: body.accountNumber,
             four_ins: body.four_ins,
             retire_pension: body.retire_pension,
-            inDate: body.joinDate || null,
-            outDate: body.outDate || null,
-            outReason: body.endReason,
+            // inDate: body.joinDate || null,
+            // outDate: body.outDate || null,
+            // outReason: body.outReason,
             transferDate: body.transferDate,
             status: body.status,
             address: body.address,
             // bigo: body.bigo
         };
+
+        // -----------------------------------------------------
+        // 입사/퇴사일 누적용 데이터 정규화 배열
+        // -----------------------------------------------------
+        let normalizedPeriods = [];
+
+        if (body.status === '2' || body.status === '3') {
+            // 일용직(2) 또는 대근(3)인 경우 다중 periodsData 배열 사용
+            if (Array.isArray(body.periodsData) && body.periodsData.length > 0) {
+                normalizedPeriods = body.periodsData.map(p => ({
+                    status: body.status,
+                    startDate: p.startDate || null,
+                    endDate: p.endDate || null,
+                    outReason: p.outReason || ''
+                }));
+            }
+        } else {
+            // 재직(0), 퇴사(1), 휴직(4)인 경우 기본 폼의 joinDate, outDate 사용
+            normalizedPeriods.push({
+                status: body.status,
+                startDate: body.joinDate || null,
+                endDate: body.outDate || null,
+                outReason: body.outReason || ''
+            });
+        }
 
         // 비고 누적용 데이터
         const bigoLogs = {
@@ -507,7 +532,8 @@ exports.registerFullMember = async function (req, res) {
             memberData,
             contractData,
             staffingData,
-            bigoLogs
+            bigoLogs,
+            normalizedPeriods
         );
 
         if (result.result) {
@@ -720,6 +746,20 @@ exports.registerBulkMember = async (req, res) => {
     }
 };
 
+exports.setMemberMemo = async function (req, res) {
+    let mIdx = req.params.mIdx,
+        colName = req.body.colName,
+        type = req.body.type,
+        text = req.body.text;
+
+    console.log(mIdx, colName, type, text);
+    return;
+
+    let result = await memberModel.setMemberMemo(mIdx, colName, type, text);
+
+    res.json({'result': true, 'data': result})
+}
+
 exports.updateMemberBigo = async function (req, res) {
     let bgIdx = req.params.bgIdx,
         bigo = req.body.bigo,
@@ -780,8 +820,8 @@ exports.updateMemberData = async function (req, res) {
             accountNm: body.accountNm,
             accountNumber: body.accountNumber,
             inDate: body.joinDate,
-            outDate: body.status == '1' ? body.endDate : null,
-            outReason: body.status == '1' ? body.endReason : null,
+            outDate: body.status == '1' ? body.outDate : null,
+            outReason: body.status == '1' ? body.outReason : null,
             transferDate: body.transferDate,
             addr: body.address,
             bigo: body.bigo,
@@ -827,12 +867,48 @@ exports.updateMemberData = async function (req, res) {
             sIdx: body.sIdx
         };
 
+        const periodsData = [];
+
+        if (body.status === '2' || body.status === '3') {
+            // 일용직(2), 대근(3): 다중 배열 데이터 처리
+            if (Array.isArray(body.periodsData)) {
+                body.periodsData.forEach(p => {
+                    // 시작일과 종료일이 모두 있는 유효한 데이터만 필터링
+                    if (p.startDate && p.endDate) {
+                        periodsData.push({
+                            status: body.status,
+                            startDate: p.startDate,
+                            endDate: p.endDate,
+                            outReason: p.outReason || ''
+                        });
+                    }
+                });
+            }
+        } else if (body.status === '4') {
+            // 휴직(4): startDate, endDate 매핑
+            periodsData.push({
+                status: body.status,
+                startDate: body.startDate || body.joinDate || null,
+                endDate: body.endDate || body.outDate || null,
+                outReason: body.outReason || body.endReason || ''
+            });
+        } else {
+            // 재직(0), 퇴사(1): joinDate, outDate 매핑
+            periodsData.push({
+                status: body.status,
+                startDate: body.joinDate || null,
+                endDate: body.status === '1' ? (body.endDate || body.outDate || null) : null,
+                outReason: body.status === '1' ? (body.endReason || body.outReason || '') : ''
+            });
+        }
+
         const result = await memberModel.updateMemberWithContractAndStaffing(
             mIdx,
             memberData,
             contractData,
             staffingData,
-            bigoLogs
+            bigoLogs,
+            periodsData
         );
 
         if (result.result) {
