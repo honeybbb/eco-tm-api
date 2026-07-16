@@ -105,7 +105,7 @@ exports.getMemberList = async function (cIdx) {
     sql += " left join new_tb_code c2 on c2.itemCd = m.position and c2.cIdx = m.cIdx"
     sql += " left join new_tb_code c3 on c3.itemCd = m.disability_grade and c3.cIdx = m.cIdx"
 
-    sql += " where m.cIdx in (?)"
+    sql += " where m.cIdx in (?) and m.deleteFl = 'N'"
     // sql += " order by ms.sIdx desc, m.idx"
     sql += " order by ms.sIdx desc, c2.sort, m.idx"
 
@@ -1048,7 +1048,8 @@ exports.updateMemberFourInsStatus = async function (cIdx, mIdx, colName, status)
 }
 
 exports.deleteMember = async function (mId) {
-    let sql = "delete from new_tb_member where id = ?"
+    // let sql = "delete from new_tb_member where id = ?"
+    let sql = "update new_tb_member set deleteFl = 'Y' where id = ?";
     let aParameter = [mId];
     try {
         let [res] = await pool.query(sql, aParameter);
