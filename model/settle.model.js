@@ -121,6 +121,193 @@ exports.getSettlePayroll = async function (cIdx, year, month, sIdx){
     }
 }
 
+exports.getSettlePayroll_v2 = async function (cIdx, year, month, sIdx) {
+    let sql = "select";
+    sql += " m.idx,";
+    sql += " m.id,";
+    sql += " m.type,";
+    sql += " m.birthDt,";
+    sql += " m.inDate, m.outDate, m.transferDate, m.status as mStatus,";
+    sql += " (SELECT name FROM new_tb_site WHERE idx = ma.sIdx LIMIT 1) as siteName,";
+    sql += " ma.sIdx as sIdx,";
+    sql += " c.itemNm as role,";
+    sql += " c.sort,";
+    sql += " m.name as staff,";
+    sql += " m.billingName as billingName,";
+    sql += " m.disability, m.disability_grade, m.disability_date,";
+    sql += " IFNULL(mbs.isAutoCalc, IFNULL(mc.isAutoCalc, 'Y')) as isAutoCalc,";
+    sql += " IFNULL(mbs.payItems, mc.payItems) as payItems,";
+    sql += " IFNULL(mbs.deductionItems, mc.deductionItems) as deductionItems,";
+    sql += " IFNULL(mbs.checkedItems, JSON_OBJECT()) as checkedItems,";
+    sql += " CASE WHEN mbs.idx IS NULL THEN 0 ELSE 1 END as status,";
+    sql += " mbs.grossPay, mbs.deductions AS totalDeduction, mbs.netPay,";
+
+    // ── ★ 추가: 근무일수 계산 (getPayrollCalculate와 동일 패턴) ──
+    sql += " DAY(LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))) AS scheduledDays,";
+
+    sql += ` (
+      DATEDIFF(
+        LEAST(
+          IFNULL(
+            CASE WHEN m.outDate IS NOT NULL AND m.outDate != '0000-00-00'
+                 THEN m.outDate
+            END,
+            LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))
+          ),
+          LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))
+        ),
+        GREATEST(
+          DATE(m.inDate),
+          CONCAT(?, '-', LPAD(?, 2, '0'), '-01')
+        )
+      ) + 1
+    ) AS eligibleDays,`;
+
+    sql += ` (
+      SELECT COUNT(DISTINCT DATE(workStartDt))
+      FROM new_tb_work
+      WHERE mIdx = m.idx
+        AND YEAR(workStartDt) = ? AND MONTH(workStartDt) = ?
+        AND workType = 'absent'
+    ) AS absentDays,`;
+
+    sql += ` (
+      (
+        DATEDIFF(
+          LEAST(
+            IFNULL(
+              CASE WHEN m.outDate IS NOT NULL AND m.outDate != '0000-00-00'
+                   THEN m.outDate
+              END,
+              LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))
+            ),
+            LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))
+          ),
+          GREATEST(
+            DATE(m.inDate),
+            CONCAT(?, '-', LPAD(?, 2, '0'), '-01')
+          )
+        ) + 1
+      )
+      -
+      (
+        SELECT COUNT(DISTINCT DATE(workStartDt))
+        FROM new_tb_work
+        WHERE mIdx = m.idx
+          AND YEAR(workStartDt) = ? AND MONTH(workStartDt) = ?
+          AND workType = 'absent'
+      )
+    ) AS workedDays`;
+
+    sql += " from new_tb_member m";
+    sql += " left join new_tb_member_base_salary mbs ON mbs.idx = (SELECT idx FROM new_tb_member_base_salary WHERE mIdx = m.idx ORDER BY regDt DESC LIMIT 1)";
+    sql += " left join new_tb_member_contract mc ON mc.idx = (SELECT idx FROM new_tb_member_contract WHERE mIdx = m.idx ORDER BY regDt DESC LIMIT 1)";
+    sql += " left join new_tb_site s on s.idx = mbs.sIdx";
+    sql += " left join new_tb_member_assignment ma ON ma.idx = (";
+    sql += "     SELECT idx FROM new_tb_member_assignment ";
+    sql += "     WHERE mIdx = m.idx ORDER BY idx DESC LIMIT 1";
+    sql += " )";
+    sql += " left join new_tb_code c on c.itemCd = LEFT(m.position, 8) and c.cIdx = m.cIdx";
+
+    sql += " WHERE m.cIdx = ?";
+    let aParameter = [
+        year, month,        // scheduledDays
+        year, month,        // eligibleDays: LEAST outDate
+        year, month,        // eligibleDays: LAST_DAY
+        year, month,        // eligibleDays: GREATEST inDate
+        year, month,        // absentDays
+        year, month,        // workedDays: LEAST outDate
+        year, month,        // workedDays: LAST_DAY
+        year, month,        // workedDays: GREATEST inDate
+        year, month,        // workedDays: absentDays 서브쿼리
+        cIdx,                // WHERE m.cIdx
+    ];
+
+    if (year && month) {
+        const targetMonth = String(month).padStart(2, '0');
+        const targetDate = `${year}-${targetMonth}-01`;
+
+        sql += " AND m.inDate <= LAST_DAY(?)";
+        aParameter.push(targetDate);
+
+        sql += " AND (m.outDate IS NULL OR m.outDate >= ?)";
+        aParameter.push(targetDate);
+    }
+
+    if (sIdx) {
+        sql += " AND ma.sIdx = ?";
+        aParameter.push(sIdx);
+    }
+
+    sql += " order by s.idx, c.sort, m.idx";
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+
+        // ── ★ 후처리: 일할 계산 적용 ──
+        const safeParse = (val) => {
+            if (!val) return {};
+            if (typeof val === 'object') return val;
+            try { return JSON.parse(val); } catch { return {}; }
+        };
+
+        // 근무일수 비율 곱해서 항목별 금액 재계산할 때 제외할 코드
+        // (연차/퇴직/근로자의날 적립금, 산재보험 등은 별도 로직에서 처리하므로 여기선 그대로 둠)
+        const EXCLUDE_FROM_PRORATE = ['04001003', '04001004', '04001002007', '04002001008'];
+
+        const round10 = (n) => Math.floor(n / 10) * 10;
+
+        res = res.map(row => {
+            const scheduledDays = Number(row.scheduledDays) || 0;
+            const eligibleDays  = Number(row.eligibleDays)  || 0;
+            const absentDays    = Number(row.absentDays)    || 0;
+            const workedDays    = Math.max(0, Number(row.workedDays) || 0);
+
+            // 재직 유효일수 기준 비율 (결근 반영)
+            // 예: 이 달에 20일 재직 가능했는데 2일 결근 → 18/20 비율
+            const ratio = eligibleDays > 0 ? workedDays / eligibleDays : 0;
+
+            const payItemsObj = safeParse(row.payItems);
+            const deductionItemsObj = safeParse(row.deductionItems);
+
+            const proratedPayItems = {};
+            Object.entries(payItemsObj).forEach(([cd, amt]) => {
+                const num = Number(amt) || 0;
+                proratedPayItems[cd] = EXCLUDE_FROM_PRORATE.includes(cd)
+                    ? num
+                    : round10(num * ratio);
+            });
+
+            const proratedDeductionItems = {};
+            Object.entries(deductionItemsObj).forEach(([cd, amt]) => {
+                const num = Number(amt) || 0;
+                proratedDeductionItems[cd] = EXCLUDE_FROM_PRORATE.includes(cd)
+                    ? num
+                    : round10(num * ratio);
+            });
+
+            return {
+                ...row,
+                scheduledDays,
+                eligibleDays,
+                absentDays,
+                workedDays,
+                workRatio: ratio,
+                // 원본은 참고용으로 별도 보관, 실제 사용값은 prorated로 덮어씀
+                originalPayItems: row.payItems,
+                originalDeductionItems: row.deductionItems,
+                payItems: JSON.stringify(proratedPayItems),
+                deductionItems: JSON.stringify(proratedDeductionItems),
+            };
+        });
+
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return { 'data': '-9999' };
+    }
+};
+
 exports.getSettleSummary = async function (year, month) {
     // 단지명, 계약인원, 현재인원(status=0), 여(gender=F), 남(gender=M), 입사(inDate), 퇴사(outDate), 공백(급여작업인원-계약인원),
     // 단지청구액, 급여지급액

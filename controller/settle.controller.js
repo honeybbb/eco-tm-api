@@ -8,6 +8,8 @@ module.exports = function (app) {
     // 정산 데이터 불러오기
     app.route('/v1/settle/payroll').get(service.getSettlePayroll);
 
+    app.route('/v2/settle/payroll').get(service.getSettlePayroll_v2);
+
     app.route('/v1/settle/payroll/calculate').get(service.getCalculatedPayroll)
 
     //급여총액 리스트
