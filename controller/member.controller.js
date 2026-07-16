@@ -42,7 +42,7 @@ module.exports = function (app) {
     app.route('/v1/member/status/four/ins/:idx').put(service.updateMemberFourInsStatus);
 
     //직원 삭제
-    app.route('/v1/member/:id').delete(service.deleteMember);
+    app.route('/v1/member/:id').put(service.deleteMember);
 
     //직원 연차 조회
     app.route('/v1/member/annual/list').get(service.getMemberLeave);

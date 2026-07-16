@@ -94,6 +94,17 @@ exports.getSettlePayroll = async function (req, res) {
     res.json({'result': true, 'data': result})
 }
 
+exports.getSettlePayroll_v2 = async function (req, res) {
+    let cIdx = req.user.cIdx,
+        year = req.query.year,
+        month = req.query.month,
+        sIdx = req.query.sIdx;
+
+    let result = await settleModel.getSettlePayroll_v2(cIdx, year, month, sIdx);
+
+    res.json({'result': true, 'data': result})
+}
+
 //급여총액 조회
 exports.getSettleSummary = async function (req, res) {
     let

@@ -1051,7 +1051,6 @@ exports.uploadExcel = async function (req, res) {
 
 exports.deleteMember = async function (req, res) {
     let mId = req.params.id;
-    console.log(mId, 'deleteMember')
 
     let result = await memberModel.deleteMember(mId);
     res.json({'result': true, 'data': result});
