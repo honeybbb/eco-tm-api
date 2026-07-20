@@ -223,7 +223,7 @@ exports.saveContract = async function (contract) {
             let sql = `
                 UPDATE new_tb_site_contract 
                 SET type=?, jsonData=?, total_cost=?, firstContractDt=?, startDt=?, endDt=?, staffCount=?, staffDetail=?, 
-                    workSchedule=?, breaktime=?, isAutoCalc=?, meltOptions=?, viewConfig=?, salarySource=?, cleaningConfig=?
+                    workSchedule=?, breaktime=?, isAutoCalc=?, meltOptions=?, viewConfig=?, salarySource=?, cleaningConfig=?, exportConfig=?
                 WHERE idx = ? 
             `;
             let params = [
@@ -242,6 +242,7 @@ exports.saveContract = async function (contract) {
                 contract.viewConfig,
                 contract.salarySource,
                 contract.cleaningConfig,
+                contract.exportConfig,
                 contract.scIdx // WHERE 조건
             ];
             await connection.query(sql, params);
@@ -252,11 +253,11 @@ exports.saveContract = async function (contract) {
                 INSERT INTO new_tb_site_contract 
                 (sIdx, cIdx, type, workdays, total_cost,
                  firstContractDt, startDt, endDt, staffCount, staffDetail, workSchedule, breaktime,
-                 jsonData, isAutoCalc, meltOptions, viewConfig, salarySource, cleaningConfig) 
+                 jsonData, isAutoCalc, meltOptions, viewConfig, salarySource, cleaningConfig, exportConfig) 
                 VALUES (
                         ?, ?, ?, ?, ?,
                         ?, ?, ? , ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?)
+                        ?, ?, ?, ?, ?, ?, ?)
             `;
             let params = [
                 contract.sIdx, // 현장 FK
@@ -277,6 +278,7 @@ exports.saveContract = async function (contract) {
                 contract.viewConfig,
                 contract.salarySource,
                 contract.cleaningConfig,
+                contract.exportConfig
             ];
             let [result] = await connection.query(sql, params);
             current_scIdx = result.insertId;
@@ -761,6 +763,7 @@ exports.getContractsBySite_v2 = async function (sIdx) {
             sc.contractFileSaved,
             sc.type,
             sc.cleaningConfig,
+            sc.exportConfig,
             (SELECT itemNm FROM new_tb_code WHERE itemCd = sc.type AND cIdx = sc.cIdx LIMIT 1) AS category
         FROM new_tb_site_contract sc
         WHERE sc.sIdx = ?

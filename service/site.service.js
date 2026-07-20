@@ -107,6 +107,7 @@ exports.registerSiteWithContract = async function (req, res) {
             accountNumber: req.body.accountNumber,
             accountName: req.body.accountName,
             viewConfig: req.body.viewConfig || null,
+            exportConfig: req.body.exportConfig || null,
         };
 
         // console.log(siteData, 'siteData');
@@ -175,7 +176,8 @@ exports.registerSiteWithContract = async function (req, res) {
                     meltOptions: contractItem.meltOptions ? JSON.stringify(contractItem.meltOptions) : null,
                     viewConfig: siteData.viewConfig || null,
                     salarySource: contractItem.salarySource || 'employee',
-                    cleaningConfig: JSON.stringify(contractItem.cleaningTasks) //청소계약
+                    cleaningConfig: JSON.stringify(contractItem.cleaningTasks), //청소계약
+                    exportConfig: siteData.exportConfig || null,
                 };
 
                 // 개별 계약 저장
