@@ -731,7 +731,7 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
                     ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, 
---                     ?, ?, ?, 
+                    ?, ?, ?, 
                     ?, 
                     ?, ?)
         `;
