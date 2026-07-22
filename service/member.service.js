@@ -702,11 +702,49 @@ exports.registerBulkMember = async (req, res) => {
                     sIdx: sIdx
                 };
 
-                // 4. 단일 직원 트랜잭션 함수 호출 구문 재활용
+                // 🌟 (4) 비고(BigoLogs) 데이터 구조화 추가
+                const bigoLogs = {
+                    bigo: item.note || null,
+                    payrollBigo: item.payrollBigo || null // 프론트에서 급여 비고 컬럼 추가 시 매핑
+                };
+
+                // 🌟 (5) 이력(PeriodsData) 데이터 구조화 추가
+                const periodsData = [];
+
+                // 기본 입사/퇴사일 처리
+                if (item.joinDate) {
+                    periodsData.push({
+                        status: item.outDate ? '1' : '0', // 퇴사일이 있으면 1(퇴사), 없으면 0(재직)
+                        startDate: item.joinDate.trim(),
+                        endDate: item.outDate ? item.outDate.trim() : null,
+                        outReason: item.outReason || null
+                    });
+                }
+
+                // 엑셀에서 "2023-01-01~2023-01-05, 2023-02-01~2023-02-10" 형태로
+                // 추가 근무기간(extraPeriods)을 넘겼을 경우 분리해서 배열에 추가
+                if (item.extraPeriods) {
+                    const extraArray = item.extraPeriods.split(',');
+                    for (const periodStr of extraArray) {
+                        const [start, end] = periodStr.split('~');
+                        if (start && start.trim()) {
+                            periodsData.push({
+                                status: '1', // 과거 이력이므로 퇴사 상태로 간주
+                                startDate: start.trim(),
+                                endDate: end ? end.trim() : null,
+                                outReason: '일괄등록 추가이력'
+                            });
+                        }
+                    }
+                }
+
+                // 4. 단일 직원 트랜잭션 함수 호출 구문 재활용 (수정됨)
                 const result = await memberModel.registerMemberWithContractAndStaffing(
                     memberData,
                     contractData,
-                    staffingData
+                    staffingData,
+                    bigoLogs,    // 👈 4번째 파라미터 추가! (이게 없어서 에러가 났음)
+                    periodsData  // 👈 5번째 파라미터 추가!
                 );
 
                 if (result.result) {
