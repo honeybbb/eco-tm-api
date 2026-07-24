@@ -791,11 +791,22 @@ exports.setMemberMemo = async function (req, res) {
         text = req.body.text;
 
     console.log(mIdx, colName, type, text);
-    return;
+    // return;
 
     let result = await memberModel.setMemberMemo(mIdx, colName, type, text);
 
     res.json({'result': true, 'data': result})
+}
+
+exports.deleteMemberMemo = async function (req, res) {
+    let mIdx = req.params.mIdx;
+    let colName = req.body.colName;
+
+    console.log(mIdx, req.body)
+    // Model 함수 호출
+    let result = await memberModel.deleteMemberMemo(mIdx, colName);
+
+    return res.json({ result: true, data: result });
 }
 
 exports.updateMemberBigo = async function (req, res) {
