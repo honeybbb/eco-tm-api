@@ -151,7 +151,7 @@ exports.getMemberIdxMap = async function (ids) {
     }
 }
 
-exports.getMemberData = async function (id) {
+exports.getMemberData = async function (id, cIdx) {
     let sql = `
         SELECT
             m.*,
@@ -231,11 +231,11 @@ exports.getMemberData = async function (id) {
             LEFT JOIN new_tb_member_bigo mb ON m.idx = mb.mIdx
             LEFT JOIN new_tb_member_history mh ON m.idx = mh.mIdx AND mh.useFl = 'Y'
 
-        WHERE m.id = ?
+        WHERE m.id = ? and cd.cIdx = ? and m.cIdx = ?
         GROUP BY m.idx
     `;
 
-    let aParameter = [id];
+    let aParameter = [id, cIdx, cIdx];
 
     try {
         let [res] = await pool.query(sql, aParameter);
@@ -243,6 +243,118 @@ exports.getMemberData = async function (id) {
     } catch (e) {
         console.log('db err', e);
         return {'data': '-9999'};
+    }
+};
+
+exports.getMemberData_v2 = async function (id, cIdx) {
+    // JSON 문자열 잘림 방지용 세션 변수 설정
+    await pool.query(`SET SESSION group_concat_max_len = 100000;`);
+
+    let sql = `
+        SELECT
+            m.*,
+            (SELECT itemNm FROM new_tb_code WHERE itemCd = m.disability_grade AND cIdx = ? LIMIT 1) AS disability_grade,
+            
+            -- 루트 레벨 sIdx 추가 (배정 내역이 여러 개일 경우 가장 최신(idx 역순) 값을 가져옴)
+            IFNULL((
+                SELECT sIdx 
+                FROM new_tb_member_assignment 
+                WHERE mIdx = m.idx 
+                ORDER BY idx DESC 
+                LIMIT 1
+            ), '0') AS \`sIdx\`,
+            
+            cd.itemCd AS \`positionCd\`,
+            cd.itemNm AS \`positionName\`,
+            cd2.itemNm AS \`type\`,
+            cd2.itemCd AS \`typeCd\`,
+            cd3.itemCd AS \`disabilityCd\`,
+            
+            -- 현장 정보 (내부 객체에도 sIdx를 포함시켜주면 활용하기 좋습니다)
+            (
+                SELECT CONCAT('[', IFNULL(GROUP_CONCAT(
+                    JSON_OBJECT('sIdx', s.idx, 'name', s.name, 'address', s.address)
+                ), ''), ']')
+                FROM new_tb_member_assignment ms
+                JOIN new_tb_site s ON s.idx = ms.sIdx
+                WHERE ms.mIdx = m.idx
+            ) AS \`sites\`,
+                
+            -- 계약 정보
+            (
+                SELECT CONCAT('[', IFNULL(GROUP_CONCAT(
+                    JSON_OBJECT(
+                        'payItems', mc.payItems,
+                        'deductionItems', mc.deductionItems,
+                        'contractStartDt', mc.contractStartDt,
+                        'contractEndDt', mc.contractEndDt,
+                        'workSchedule', mc.workSchedule,
+                        'monthWorkTime', mc.month_work_time,
+                        'dayWorkTime', mc.day_work_time
+                    )
+                ), ''), ']')
+                FROM new_tb_member_contract mc
+                WHERE mc.mIdx = m.idx
+                  AND mc.idx = (SELECT MAX(idx) FROM new_tb_member_contract WHERE mIdx = m.idx)
+            ) AS \`contract\`,
+                
+            -- 특이사항 누적 히스토리
+            (
+                SELECT CONCAT('[', IFNULL(GROUP_CONCAT(
+                    JSON_OBJECT(
+                        'bgIdx', mb.idx,
+                        'type', mb.type,
+                        'bigo', mb.bigo,
+                        'regDt', DATE_FORMAT(mb.regDt, '%Y-%m-%d %H:%i:%s'),
+                        'admin_id', IFNULL(mb.admin_id, '')
+                    )
+                ), ''), ']')
+                FROM new_tb_member_bigo mb
+                WHERE mb.mIdx = m.idx
+            ) AS \`bigoList\`,
+                
+            -- 히스토리
+            (
+                SELECT CONCAT('[', IFNULL(GROUP_CONCAT(
+                    JSON_OBJECT(
+                        'hIdx', mh.idx,
+                        'status', mh.historyStatus,
+                        'startDate', IFNULL(DATE_FORMAT(mh.startDate, '%Y-%m-%d'), ''),
+                        'endDate', IFNULL(DATE_FORMAT(mh.endDate, '%Y-%m-%d'), ''),
+                        'outReason', IFNULL(mh.outReason, '')
+                    )
+                ), ''), ']')
+                FROM new_tb_member_history mh
+                WHERE mh.mIdx = m.idx AND mh.useFl = 'Y'
+            ) AS \`historyList\`
+
+        FROM new_tb_member m
+            LEFT JOIN new_tb_code cd ON cd.itemCd = m.position AND cd.cIdx = ?
+            LEFT JOIN new_tb_code cd2 ON cd2.itemCd = m.type AND cd2.cIdx = ?
+            LEFT JOIN new_tb_code cd3 ON cd3.itemCd = m.disability_grade AND cd3.cIdx = ?
+
+        WHERE m.id = ? AND m.cIdx = ?
+    `;
+
+    // 서브쿼리에 들어가는 파라미터까지 총 6개
+    let aParameter = [
+        cIdx, // 1. 서브쿼리 장애등급 cIdx
+        cIdx, // 2. cd (직급) cIdx
+        cIdx, // 3. cd2 (유형) cIdx
+        cIdx, // 4. cd3 (장애등급) cIdx
+        id,   // 5. m.id
+        cIdx  // 6. m.cIdx
+    ];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+
+        if (res.length === 0) return null;
+
+        return res;
+    } catch (e) {
+        console.error('db err', e);
+        return {'data': '-9999'}; // 기존 에러 리턴 방식 유지
     }
 };
 

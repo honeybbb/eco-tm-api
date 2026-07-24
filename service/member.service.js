@@ -86,9 +86,10 @@ exports.getMemberRRNBatch = async function (req, res) {
 
 //직원 데이터 조회
 exports.getMemberData = async function (req, res) {
-    let id = req.params.id;
+    let cIdx = req.user.cIdx,
+        id = req.params.id;
 
-    let result = await memberModel.getMemberData(id);
+    let result = await memberModel.getMemberData_v2(id, cIdx);
     if (result.length > 0) {
         let member = result[0];
 
