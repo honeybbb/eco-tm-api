@@ -28,7 +28,10 @@ module.exports = function (app) {
     app.route('/v1/member/bulk').post(service.registerBulkMember);
 
     //직원 메모 추가
-    // app.route('/v1/member/memo/:mIdx').put(service.setMemberMemo);
+    app.route('/v1/member/memo/:mIdx').post(service.setMemberMemo);
+
+    //직원 메모 삭제
+    app.route('/v1/member/memo/:mIdx').put(service.deleteMemberMemo);
 
     //직원 비고 수정
     app.route('/v1/member/bigo/update/:bgIdx').put(service.updateMemberBigo);

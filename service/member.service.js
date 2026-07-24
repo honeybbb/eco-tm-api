@@ -86,9 +86,10 @@ exports.getMemberRRNBatch = async function (req, res) {
 
 //직원 데이터 조회
 exports.getMemberData = async function (req, res) {
-    let id = req.params.id;
+    let cIdx = req.user.cIdx,
+        id = req.params.id;
 
-    let result = await memberModel.getMemberData(id);
+    let result = await memberModel.getMemberData_v2(id, cIdx);
     if (result.length > 0) {
         let member = result[0];
 
@@ -791,11 +792,22 @@ exports.setMemberMemo = async function (req, res) {
         text = req.body.text;
 
     console.log(mIdx, colName, type, text);
-    return;
+    // return;
 
     let result = await memberModel.setMemberMemo(mIdx, colName, type, text);
 
     res.json({'result': true, 'data': result})
+}
+
+exports.deleteMemberMemo = async function (req, res) {
+    let mIdx = req.params.mIdx;
+    let colName = req.body.colName;
+
+    console.log(mIdx, req.body)
+    // Model 함수 호출
+    let result = await memberModel.deleteMemberMemo(mIdx, colName);
+
+    return res.json({ result: true, data: result });
 }
 
 exports.updateMemberBigo = async function (req, res) {
