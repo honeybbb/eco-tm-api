@@ -51,13 +51,13 @@ exports.getPayrollMonth = async function (req, res) {
 
 exports.getPayrollCalculate = async function (req, res) {
     let cIdx = req.user.cIdx;
-    let { year, month } = req.query;
+    let { year, month, sIdx } = req.query;
 
     if (!year || !month) {
         return res.json({ 'result': false, 'msg': '날짜 설정을 확인해주세요.' });
     }
 
-    let result = await payrollModel.getPayrollCalculate(year, month, cIdx);
+    let result = await payrollModel.getPayrollCalculate(year, month, cIdx, sIdx);
 
     res.json({'result': true, 'data': result})
 }
