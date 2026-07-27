@@ -531,8 +531,8 @@ exports.getPayrollCalculate = async function (year, month, cIdx) {
 }
 
  */
-exports.getPayrollCalculate = async function (year, month, cIdx) {
-    const sql = `
+exports.getPayrollCalculate = async function (year, month, cIdx, sIdx) {
+    let sql = `
     SELECT
       m.idx,
       m.id,
@@ -635,7 +635,6 @@ exports.getPayrollCalculate = async function (year, month, cIdx) {
     LEFT JOIN new_tb_member_assignment ma ON ma.mIdx = m.idx
     LEFT JOIN new_tb_site s ON s.idx = ma.sIdx
     WHERE m.cIdx = ?
-    ORDER BY s.name, m.name
   `;
 
     // 파라미터 순서대로
@@ -652,6 +651,13 @@ exports.getPayrollCalculate = async function (year, month, cIdx) {
         year, month,           // mpm JOIN
         cIdx,                  // WHERE
     ];
+
+    if (sIdx) {
+        sql += ` AND ma.sIdx = ?`;
+        params.push(sIdx);
+    }
+
+    sql += ` ORDER BY s.name, m.name`;
 
     try {
         const [res] = await pool.query(sql, params);
