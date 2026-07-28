@@ -120,6 +120,7 @@ exports.getBaseSalary = async function (cIdx, sIdx) { // 1. 파라미터에 sIdx
     sql += " (SELECT name FROM new_tb_site WHERE idx = ma.sIdx LIMIT 1) as siteName,";
     sql += " ma.sIdx as sIdx,";
     sql += " c.itemNm as role,";
+    sql += " c.itemCd,"
     sql += " c.sort,";
     sql += " m.name as staff,";
     sql += " m.disability,m.disability_grade, m.disability_date,"
@@ -156,12 +157,12 @@ exports.getBaseSalary = async function (cIdx, sIdx) { // 1. 파라미터에 sIdx
 
     // 2. sIdx가 넘어왔을 경우에만 AND 조건 동적 추가
     if (sIdx) {
-        sql += " AND ma.sIdx = ?"; // 💡 배정된 현장(ma.sIdx) 기준으로 필터링 (필요시 s.idx로 변경)
+        sql += " AND ma.sIdx = ?";
         aParameter.push(sIdx);
     }
 
     // 3. ORDER BY는 반드시 WHERE 조건 조립이 모두 끝난 마지막에 와야 합니다.
-    sql += " order by s.idx, c.sort, m.idx";
+    sql += " order by s.idx desc, c.sort, m.idx";
 
     try {
         let [res] = await pool.query(sql, aParameter);
@@ -361,6 +362,7 @@ exports.getPayrollMonth = async function (year, month, cIdx) {
             s.name AS siteName,
             s.payment_day,
             c.itemNm AS role,
+            c.itemCd,
             c.sort,
             m.inDate, m.outDate,
             m.bank, m.accountNumber,

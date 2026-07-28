@@ -107,7 +107,7 @@ exports.getMemberList = async function (cIdx) {
 
     sql += " where m.cIdx in (?) and m.deleteFl = 'N'"
     // sql += " order by ms.sIdx desc, m.idx"
-    sql += " order by ms.sIdx desc, c2.sort, m.idx"
+    sql += " order by ms.sIdx desc, c.itemCd, c2.sort, m.idx"
 
     let aParameter = [cIdx];
 
