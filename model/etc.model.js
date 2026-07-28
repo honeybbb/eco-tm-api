@@ -273,7 +273,7 @@ exports.getWageCode2 = async function (cIdx) {
         WHERE
 --             groupCd LIKE '04%' and 
             cIdx in (?)
-        ORDER  BY sort, itemCd
+        ORDER  BY itemCd, sort
     `;
     try {
         const [res] = await pool.query(sql, [cIdx]);
