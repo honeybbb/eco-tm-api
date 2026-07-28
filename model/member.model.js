@@ -830,7 +830,8 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
         // -----------------------------------------------------
         let sqlMember = `
             INSERT INTO new_tb_member 
-            (cIdx, type, name, id, password, birthDt, rrn, phone, position, gender, email,
+            (cIdx, type, name, billingName, id, password, 
+             birthDt, rrn, phone, position, gender, email,
              disability, disability_date, disability_grade, defector, patriot, intern, beneficiary,
              foreigner, nationality, visa_code, visa_date,
              etc_name_1, etc_value_1, etc_name_2, etc_value_2, etc_name_3, etc_value_3,
@@ -838,7 +839,8 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
              inDate, outDate, outReason, 
              transferDate, 
              status, address)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            VALUES (?, ?, ?, ?, ?, ?, 
+                    ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?,
@@ -849,7 +851,8 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
         `;
 
         let paramMember = [
-            member.cIdx, member.type, member.name, member.id, member.password, member.birthDt, member.rrn,
+            member.cIdx, member.type, member.name, member.billingName, member.id, member.password,
+            member.birthDt, member.rrn,
             member.phone, member.position, member.gender, member.email,
             member.disability, member.disability_date, member.disability_grade, member.defector, member.patriot, member.intern,
             member.beneficiary, member.foreigner, member.nationality, member.visa_code, member.visa_date,
@@ -975,11 +978,13 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
 
         let sqlMember, paramMember;
         const commonFields = `
-            type = ?, name = ?, id = ?, birthDt = ?, rrn=?, phone = ?, position = ?, 
+            type = ?, name = ?, billingName = ?, id = ?, 
+            birthDt = ?, rrn=?, phone = ?, position = ?, 
             gender = ?, email = ?, disability = ?, disability_date = ?, 
             disability_grade = ?, defector = ?, patriot = ?, intern = ?, 
             beneficiary = ?, foreigner = ?, nationality = ?, visa_code = ?, 
             visa_date = ?, bank = ?, accountNm = ?, accountNumber = ?,
+            inDate = ?, outDate =?, outReason=?,
             transferDate = ?, 
             address = ?, status = ?,
             four_ins = ?, retire_pension = ?
@@ -988,12 +993,13 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
         if (member.password) {
             sqlMember = `UPDATE new_tb_member SET ${commonFields}, password = ? WHERE idx = ?`;
             paramMember = [
-                member.type, member.name, member.id, member.birthDt, member.rrn, member.phone, member.position,
+                member.type, member.name, member.billingName, member.id,
+                member.birthDt, member.rrn, member.phone, member.position,
                 member.gender, member.email, member.disability, member.disability_date,
                 member.disability_grade, member.defector, member.patriot, member.intern,
                 member.beneficiary, member.foreigner, member.nationality, member.visa_code,
                 member.visa_date, member.bank, member.accountNm, member.accountNumber,
-                // member.inDate, member.outDate, member.outReason,
+                member.inDate, member.outDate, member.outReason,
                 member.transferDate,
                 member.addr, member.status,
                 member.fourInsurance, member.retirePension, member.password, mIdx
@@ -1006,7 +1012,7 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
                 member.disability_grade, member.defector, member.patriot, member.intern,
                 member.beneficiary, member.foreigner, member.nationality, member.visa_code,
                 member.visa_date, member.bank, member.accountNm, member.accountNumber,
-                // member.inDate, member.outDate, member.outReason,
+                member.inDate, member.outDate, member.outReason,
                 member.transferDate,
                 member.addr, member.status,
                 member.fourInsurance, member.retirePension, mIdx

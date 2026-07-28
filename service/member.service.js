@@ -425,6 +425,7 @@ exports.registerFullMember = async function (req, res) {
             cIdx: body.cIdx,
             type: body.type,
             name: body.name,
+            billingName: body.billingName,
             id: body.id,
             password: hash, // 해시된 비밀번호
             birthDt: body.birthDate || null,
@@ -847,6 +848,7 @@ exports.updateMemberData = async function (req, res) {
         const memberData = {
             type: body.typeCd || body.type,
             name: body.name,
+            billingName: body.billingName,
             id: body.id,
             password: hashedPassword,
             birthDt: body.birthDt,
