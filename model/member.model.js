@@ -1007,7 +1007,8 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
         } else {
             sqlMember = `UPDATE new_tb_member SET ${commonFields} WHERE idx = ?`;
             paramMember = [
-                member.type, member.name, member.id, member.birthDt, member.rrn, member.phone, member.position,
+                member.type, member.name, member.billingName, member.id,
+                member.birthDt, member.rrn, member.phone, member.position,
                 member.gender, member.email, member.disability, member.disability_date,
                 member.disability_grade, member.defector, member.patriot, member.intern,
                 member.beneficiary, member.foreigner, member.nationality, member.visa_code,
