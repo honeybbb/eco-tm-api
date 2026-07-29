@@ -400,9 +400,6 @@ exports.getSettleSummary = async function (year, month) {
 }
 
 exports.getSettleBilling = async function (cIdx, startMonth, endMonth) {
-    //구분(type), docType, 근무인원, 단지청구일, 계산서 작성일(?),
-    //단지(sName), payment_day, 본사담당자, 청구담당자,
-    //공급가/면세, 공급가/과세, 부가세, 합계, 은행명, 입금일, 금액, 계
     let sql = `SELECT
             ss.sIdx,
             ss.year,
@@ -410,6 +407,7 @@ exports.getSettleBilling = async function (cIdx, startMonth, endMonth) {
             ss.type,
             c.itemNm AS typeNm,
             ss.docType,
+            sc.staffCount,
             s.name as \`siteName\`,
             s.payment_day,
             s.manager,
@@ -419,31 +417,27 @@ exports.getSettleBilling = async function (cIdx, startMonth, endMonth) {
             ss.grandTotal,
             ss.billingDt, 
             ss.status,
-            ss.depositDt,
+            ss.depositDt, -- 입금일자
+            ss.depositAmount, -- 입금액
             s.bankName
         FROM new_tb_site_settlement ss
-        /* 1. 현장별, 년월별로 가장 최근(MAX) 등록일시를 찾아서 조인 */
-        INNER JOIN (
-            SELECT
-                sIdx,
-                year,
-                month,
-                MAX(regDt) as max_regDt
-            FROM new_tb_site_settlement
-            GROUP BY sIdx, year, month
-        ) max_ss
-            ON ss.sIdx = max_ss.sIdx
-            AND ss.year = max_ss.year
-            AND ss.month = max_ss.month
-            AND ss.regDt = max_ss.max_regDt
-        /* 2. 찾아낸 최신 정산 데이터와 현장 테이블 조인 */
+        
         LEFT JOIN new_tb_site s ON s.idx = ss.sIdx
         LEFT JOIN new_tb_code c ON c.itemCd = ss.type AND c.cIdx = ?
-
+        /* 정산서의 귀속 년월이 계약 시작일(startDt)과 종료일(endDt) 사이에 포함되는 계약만 조인 */
+        LEFT JOIN new_tb_site_contract sc
+                  ON sc.sIdx = ss.sIdx
+                      AND sc.cIdx = ss.cIdx
+                      AND sc.type = ss.type
+                      AND CONCAT(ss.year, LPAD(ss.month, 2, '0'))
+                         BETWEEN DATE_FORMAT(sc.startDt, '%Y%m')
+                         AND IFNULL(DATE_FORMAT(sc.endDt, '%Y%m'), '999912')
+        
         WHERE CONCAT(ss.year, LPAD(ss.month, 2, '0')) BETWEEN ? AND ?
           and ss.cIdx = ?
+        
+        ORDER BY ss.year DESC, ss.month DESC, ss.regDt DESC
         `;
-    // where ss.year = ? and ss.month = ?
 
     let aParameter = [cIdx, startMonth, endMonth, cIdx];
 
