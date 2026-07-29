@@ -407,6 +407,7 @@ exports.getSettleBilling = async function (cIdx, startMonth, endMonth) {
             ss.type,
             c.itemNm AS typeNm,
             ss.docType,
+            sc.staffCount,
             s.name as \`siteName\`,
             s.payment_day,
             s.manager,
@@ -416,13 +417,22 @@ exports.getSettleBilling = async function (cIdx, startMonth, endMonth) {
             ss.grandTotal,
             ss.billingDt, 
             ss.status,
-            ss.depositDt,
+            ss.depositDt, -- 입금일자
+            ss.depositAmount, -- 입금액
             s.bankName
         FROM new_tb_site_settlement ss
         
         LEFT JOIN new_tb_site s ON s.idx = ss.sIdx
         LEFT JOIN new_tb_code c ON c.itemCd = ss.type AND c.cIdx = ?
-
+        /* 정산서의 귀속 년월이 계약 시작일(startDt)과 종료일(endDt) 사이에 포함되는 계약만 조인 */
+        LEFT JOIN new_tb_site_contract sc
+                  ON sc.sIdx = ss.sIdx
+                      AND sc.cIdx = ss.cIdx
+                      AND sc.type = ss.type
+                      AND CONCAT(ss.year, LPAD(ss.month, 2, '0'))
+                         BETWEEN DATE_FORMAT(sc.startDt, '%Y%m')
+                         AND IFNULL(DATE_FORMAT(sc.endDt, '%Y%m'), '999912')
+        
         WHERE CONCAT(ss.year, LPAD(ss.month, 2, '0')) BETWEEN ? AND ?
           and ss.cIdx = ?
         
