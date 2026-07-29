@@ -53,6 +53,7 @@ exports.getSettlePayroll = async function (cIdx, year, month, sIdx){
     sql += " (SELECT name FROM new_tb_site WHERE idx = ma.sIdx LIMIT 1) as siteName,";
     sql += " ma.sIdx as sIdx,";
     sql += " c.itemNm as role,";
+    sql += " c.itemCd,"
     sql += " c.sort,";
     sql += " m.name as staff,";
     sql += " m.billingName as billingName,";
@@ -61,7 +62,7 @@ exports.getSettlePayroll = async function (cIdx, year, month, sIdx){
     sql += " IFNULL(mbs.isAutoCalc, IFNULL(mc.isAutoCalc, 'Y')) as isAutoCalc,";
 
     // 1. 급여 항목 데이터 매핑
-    sql += " IFNULL(mbs.payItems, mc.payItems) as payItems,";
+    sql += " IFNULL(mbs.payItems, mc.payItems) as payItems,"; //mbs는 직원급여정보, mc는 현장산출 정보
     sql += " IFNULL(mbs.deductionItems, mc.deductionItems) as deductionItems,";
     sql += " IFNULL(mbs.checkedItems, JSON_OBJECT()) as checkedItems,";
 
@@ -109,7 +110,6 @@ exports.getSettlePayroll = async function (cIdx, year, month, sIdx){
         aParameter.push(sIdx);
     }
 
-    // 3. ORDER BY는 반드시 WHERE 조건 조립이 모두 끝난 마지막에 와야 합니다.
     sql += " order by s.idx, c.sort, m.idx";
 
     try {
@@ -142,7 +142,7 @@ exports.getSettlePayroll_v2 = async function (cIdx, year, month, sIdx) {
     sql += " CASE WHEN mbs.idx IS NULL THEN 0 ELSE 1 END as status,";
     sql += " mbs.grossPay, mbs.deductions AS totalDeduction, mbs.netPay,";
 
-    // ── ★ 추가: 근무일수 계산 (getPayrollCalculate와 동일 패턴) ──
+    // ── 근무일수 계산 (getPayrollCalculate와 동일 패턴) ──
     sql += " DAY(LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))) AS scheduledDays,";
 
     sql += ` (
@@ -399,11 +399,12 @@ exports.getSettleSummary = async function (year, month) {
     }
 }
 
-exports.getSettleBilling = async function (cIdx, year, month) {
+exports.getSettleBilling = async function (cIdx, startMonth, endMonth) {
     //구분(type), docType, 근무인원, 단지청구일, 계산서 작성일(?),
     //단지(sName), payment_day, 본사담당자, 청구담당자,
     //공급가/면세, 공급가/과세, 부가세, 합계, 은행명, 입금일, 금액, 계
     let sql = `SELECT
+            ss.sIdx,
             ss.year,
             ss.month,
             ss.type,
@@ -438,10 +439,13 @@ exports.getSettleBilling = async function (cIdx, year, month) {
         /* 2. 찾아낸 최신 정산 데이터와 현장 테이블 조인 */
         LEFT JOIN new_tb_site s ON s.idx = ss.sIdx
         LEFT JOIN new_tb_code c ON c.itemCd = ss.type AND c.cIdx = ?
-        where ss.year = ? and ss.month = ?`;
-    // and ss.cIdx = ?`;
 
-    let aParameter = [cIdx, year, month];
+        WHERE CONCAT(ss.year, LPAD(ss.month, 2, '0')) BETWEEN ? AND ?
+          and ss.cIdx = ?
+        `;
+    // where ss.year = ? and ss.month = ?
+
+    let aParameter = [cIdx, startMonth, endMonth, cIdx];
 
     try {
         let [res] = await pool.query(sql, aParameter);

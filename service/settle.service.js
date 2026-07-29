@@ -120,10 +120,10 @@ exports.getSettleSummary = async function (req, res) {
 //청구현황 조회
 exports.getSettleBilling = async function (req, res) {
     let cIdx = req.user.cIdx,
-        year = req.query.year,
-        month = req.query.month;
+        startMonth = req.query.startMonth,
+        endMonth = req.query.endMonth;
 
-    let result = await settleModel.getSettleBilling(cIdx, year, month);
+    let result = await settleModel.getSettleBilling(cIdx, startMonth, endMonth);
 
     res.json({'result': true, 'data': result});
 }
