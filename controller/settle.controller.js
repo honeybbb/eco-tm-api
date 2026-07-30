@@ -18,6 +18,9 @@ module.exports = function (app) {
     //청구현황
     app.route('/v1/settle/billing/list').get(service.getSettleBilling);
 
+    //총액리스트
+    app.route('/v1/settle/review/list').get(service.getSettleReview);
+
     // 용역 정산서 저장
     app.route('/v1/settle/site/data/:sIdx').post(service.setSettleData)
 

@@ -128,6 +128,17 @@ exports.getSettleBilling = async function (req, res) {
     res.json({'result': true, 'data': result});
 }
 
+exports.getSettleReview = async function (req, res) {
+    let cIdx = req.user.cIdx,
+        startMonth = req.query.startMonth,
+        endMonth = req.query.endMonth,
+        sIdx = req.query.sIdx;
+
+    let result = await settleModel.getSettleReview(cIdx, startMonth, endMonth, sIdx);
+
+    res.json({'result': true, 'data': result});
+}
+
 exports.setSettleData = async function (req, res) {
     const sIdx = req.params.sIdx;
     const {
