@@ -400,14 +400,16 @@ exports.getSettleSummary = async function (year, month) {
 }
 
 exports.getSettleBilling = async function (cIdx, startMonth, endMonth) {
-    let sql = `SELECT
+    let sql = `
+        SELECT
+            ss.idx, -- [추가] 정산서 고유 인덱스 (중복 확인 및 기준점)
             ss.sIdx,
             ss.year,
             ss.month,
             ss.type,
             c.itemNm AS typeNm,
             ss.docType,
-            sc.staffCount,
+            MAX(sc.staffCount) AS staffCount, -- [핵심 수정] 계약서가 중복될 경우 MAX값 1개만 추출
             s.name as \`siteName\`,
             s.payment_day,
             s.manager,
@@ -415,29 +417,36 @@ exports.getSettleBilling = async function (cIdx, startMonth, endMonth) {
             ss.subTotal,
             ss.vatAmount,
             ss.grandTotal,
-            ss.billingDt, 
+            ss.billingDt,
             ss.status,
             ss.depositDt, -- 입금일자
             ss.depositAmount, -- 입금액
             s.bankName
         FROM new_tb_site_settlement ss
-        
-        LEFT JOIN new_tb_site s ON s.idx = ss.sIdx
-        LEFT JOIN new_tb_code c ON c.itemCd = ss.type AND c.cIdx = ?
-        /* 정산서의 귀속 년월이 계약 시작일(startDt)과 종료일(endDt) 사이에 포함되는 계약만 조인 */
-        LEFT JOIN new_tb_site_contract sc
-                  ON sc.sIdx = ss.sIdx
-                      AND sc.cIdx = ss.cIdx
-                      AND sc.type = ss.type
-                      AND CONCAT(ss.year, LPAD(ss.month, 2, '0'))
-                         BETWEEN DATE_FORMAT(sc.startDt, '%Y%m')
-                         AND IFNULL(DATE_FORMAT(sc.endDt, '%Y%m'), '999912')
-        
+
+                 LEFT JOIN new_tb_site s ON s.idx = ss.sIdx
+                 LEFT JOIN new_tb_code c ON c.itemCd = ss.type AND c.cIdx = ?
+            /* 정산서의 귀속 년월이 계약 시작일(startDt)과 종료일(endDt) 사이에 포함되는 계약만 조인 */
+                 LEFT JOIN new_tb_site_contract sc
+                           ON sc.sIdx = ss.sIdx
+                               AND sc.cIdx = ss.cIdx
+                               AND sc.type = ss.type
+                               AND CONCAT(ss.year, LPAD(ss.month, 2, '0'))
+                                  BETWEEN DATE_FORMAT(sc.startDt, '%Y%m')
+                                  AND IFNULL(DATE_FORMAT(sc.endDt, '%Y%m'), '999912')
+
         WHERE CONCAT(ss.year, LPAD(ss.month, 2, '0')) BETWEEN ? AND ?
           and ss.cIdx = ?
-        
+
+        -- [핵심 추가] 정산서 1개당 무조건 1줄만 나오도록 그룹화 (ONLY_FULL_GROUP_BY 방어용으로 전체 컬럼 명시)
+        GROUP BY
+            ss.idx, ss.sIdx, ss.year, ss.month, ss.type, c.itemNm, ss.docType,
+            s.name, s.payment_day, s.manager, s.billingManager, ss.subTotal,
+            ss.vatAmount, ss.grandTotal, ss.billingDt, ss.status, ss.depositDt,
+            ss.depositAmount, s.bankName, ss.regDt
+
         ORDER BY ss.year DESC, ss.month DESC, ss.regDt DESC
-        `;
+    `;
 
     let aParameter = [cIdx, startMonth, endMonth, cIdx];
 
