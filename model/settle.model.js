@@ -400,14 +400,16 @@ exports.getSettleSummary = async function (year, month) {
 }
 
 exports.getSettleBilling = async function (cIdx, startMonth, endMonth) {
-    let sql = `SELECT
+    let sql = `
+        SELECT
+            ss.idx, -- [추가] 정산서 고유 인덱스 (중복 확인 및 기준점)
             ss.sIdx,
             ss.year,
             ss.month,
             ss.type,
             c.itemNm AS typeNm,
             ss.docType,
-            sc.staffCount,
+            MAX(sc.staffCount) AS staffCount, -- [핵심 수정] 계약서가 중복될 경우 MAX값 1개만 추출
             s.name as \`siteName\`,
             s.payment_day,
             s.manager,
@@ -415,35 +417,340 @@ exports.getSettleBilling = async function (cIdx, startMonth, endMonth) {
             ss.subTotal,
             ss.vatAmount,
             ss.grandTotal,
-            ss.billingDt, 
+            ss.billingDt,
             ss.status,
             ss.depositDt, -- 입금일자
             ss.depositAmount, -- 입금액
             s.bankName
         FROM new_tb_site_settlement ss
-        
-        LEFT JOIN new_tb_site s ON s.idx = ss.sIdx
-        LEFT JOIN new_tb_code c ON c.itemCd = ss.type AND c.cIdx = ?
-        /* 정산서의 귀속 년월이 계약 시작일(startDt)과 종료일(endDt) 사이에 포함되는 계약만 조인 */
-        LEFT JOIN new_tb_site_contract sc
-                  ON sc.sIdx = ss.sIdx
-                      AND sc.cIdx = ss.cIdx
-                      AND sc.type = ss.type
-                      AND CONCAT(ss.year, LPAD(ss.month, 2, '0'))
-                         BETWEEN DATE_FORMAT(sc.startDt, '%Y%m')
-                         AND IFNULL(DATE_FORMAT(sc.endDt, '%Y%m'), '999912')
-        
+
+                 LEFT JOIN new_tb_site s ON s.idx = ss.sIdx
+                 LEFT JOIN new_tb_code c ON c.itemCd = ss.type AND c.cIdx = ?
+            /* 정산서의 귀속 년월이 계약 시작일(startDt)과 종료일(endDt) 사이에 포함되는 계약만 조인 */
+                 LEFT JOIN new_tb_site_contract sc
+                           ON sc.sIdx = ss.sIdx
+                               AND sc.cIdx = ss.cIdx
+                               AND sc.type = ss.type
+                               AND CONCAT(ss.year, LPAD(ss.month, 2, '0'))
+                                  BETWEEN DATE_FORMAT(sc.startDt, '%Y%m')
+                                  AND IFNULL(DATE_FORMAT(sc.endDt, '%Y%m'), '999912')
+
         WHERE CONCAT(ss.year, LPAD(ss.month, 2, '0')) BETWEEN ? AND ?
           and ss.cIdx = ?
-        
+
+        -- [핵심 추가] 정산서 1개당 무조건 1줄만 나오도록 그룹화 (ONLY_FULL_GROUP_BY 방어용으로 전체 컬럼 명시)
+        GROUP BY
+            ss.idx, ss.sIdx, ss.year, ss.month, ss.type, c.itemNm, ss.docType,
+            s.name, s.payment_day, s.manager, s.billingManager, ss.subTotal,
+            ss.vatAmount, ss.grandTotal, ss.billingDt, ss.status, ss.depositDt,
+            ss.depositAmount, s.bankName, ss.regDt
+
         ORDER BY ss.year DESC, ss.month DESC, ss.regDt DESC
-        `;
+    `;
 
     let aParameter = [cIdx, startMonth, endMonth, cIdx];
 
     try {
         let [res] = await pool.query(sql, aParameter);
         return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.getSettleReview_v1 = async function (cIdx, startMonth, endMonth, sIdx) {
+    // 1-1) 계약인원 : new_tb_site_contract sc.staffCount
+    // 1-2) 실제근무인원 : new_tb_site_settlement ss 의 payrollData.length
+    // 2-1) 기준급여총액 : new_tb_site_contract sc.jsonData (직접노무비)
+    // 2-2) 실제급여총액 : pm_agg.actualTotalPayroll (new_tb_member_payroll_month 조인 및 최신값 합산)
+    // 3-1) 기준청구액 : new_tb_site_contract의 월간용역비 총계
+    // 3-2) 실제청구액 : new_tb_site_settlement ss 의 grandTotal
+
+    let sql = `
+        SELECT
+            ss.idx,
+            ss.sIdx,
+            ss.year,
+            ss.month,
+            ss.type,
+            ss.docType,
+            ss.grandTotal,       -- 3-2) 실제청구액
+            ss.payrollData,      -- 1-2) 실제근무인원 계산용 (기존)
+            ss.status,
+            s.name AS siteName,
+            sc.staffCount,       -- 1-1) 계약인원
+            sc.jsonData,         -- 2-1, 3-1) 기준급여총액 / 기준청구액 계산용
+            IFNULL(pm_agg.actualTotalPayroll, 0) AS actualTotalPayroll, -- 2-2) 실제급여총액
+
+            -- 해당 월에 실제로 1일이라도 출근한 총 근무인원
+            (
+                SELECT COUNT(DISTINCT ma.mIdx)
+                FROM new_tb_member_assignment ma
+                WHERE ma.sIdx = ss.sIdx
+                  -- AND ma.isActive = 'Y' -- 퇴사자 포함을 위해 주석 처리 또는 제거
+                  AND ma.startDt < DATE_ADD(CONCAT(ss.year, '-', LPAD(ss.month, 2, '0'), '-01'), INTERVAL 1 MONTH)
+                  AND (ma.endDt IS NULL OR ma.endDt >= CONCAT(ss.year, '-', LPAD(ss.month, 2, '0'), '-01'))
+            ) AS actualWorkingStaffCount,
+
+            -- 계약인원 대비 배치인원 부족일수 (공제일수)
+            (
+                SELECT COUNT(*)
+                FROM (
+                         SELECT (units.n + tens.n * 10) AS dayOffset
+                         FROM (SELECT 0 n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+                               UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) units
+                                  CROSS JOIN (SELECT 0 n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3) tens
+                     ) cal
+                WHERE DATE_ADD(
+                              CONCAT(ss.year, '-', LPAD(ss.month, 2, '0'), '-01'),
+                              INTERVAL cal.dayOffset DAY
+              ) < DATE_ADD(CONCAT(ss.year, '-', LPAD(ss.month, 2, '0'), '-01'), INTERVAL 1 MONTH)
+                  AND (
+                          SELECT COUNT(*)
+                          FROM new_tb_member_assignment ma
+                          WHERE ma.sIdx = ss.sIdx
+                            -- [핵심 수정] 퇴사자(3/6 퇴사)의 상태가 'N'일 수 있으므로 주석 처리하여 카운트에 포함
+                            -- AND ma.isActive = 'Y' 
+                            AND ma.startDt <= DATE_ADD(
+                                  CONCAT(ss.year, '-', LPAD(ss.month, 2, '0'), '-01'),
+                                  INTERVAL cal.dayOffset DAY
+                    )
+                            AND (
+                              ma.endDt IS NULL
+                                  OR ma.endDt >= DATE_ADD(
+                                      CONCAT(ss.year, '-', LPAD(ss.month, 2, '0'), '-01'),
+                                      INTERVAL cal.dayOffset DAY
+                       )
+                              )
+                      ) < IFNULL(sc.staffCount, 0)
+            ) AS deductionDays
+
+        FROM new_tb_site_settlement ss
+                 LEFT JOIN new_tb_site s ON s.idx = ss.sIdx
+                 LEFT JOIN new_tb_site_contract sc
+                           ON sc.sIdx = ss.sIdx
+                               AND sc.cIdx = ss.cIdx
+                               AND sc.type = ss.type
+                               AND CONCAT(ss.year, LPAD(ss.month, 2, '0'))
+                                  BETWEEN DATE_FORMAT(sc.startDt, '%Y%m')
+                                  AND IFNULL(DATE_FORMAT(sc.endDt, '%Y%m'), '999912')
+
+            -- 2-2) 실제급여총액 조인 (중복 방지 및 최신 데이터만 합산)
+                 LEFT JOIN (
+            SELECT
+                pm.sIdx,
+                pm.year,
+                pm.month,
+                SUM(pm.grossPay) AS actualTotalPayroll
+            FROM new_tb_member_payroll_month pm
+                     INNER JOIN (
+                -- 1. 조건에 해당하는 기간 내에서 sIdx, mIdx 별 가장 큰(최신) idx 추출
+                SELECT MAX(idx) AS max_idx
+                FROM new_tb_member_payroll_month
+                WHERE CONCAT(year, LPAD(month, 2, '0')) BETWEEN ? AND ?
+                GROUP BY year, month, sIdx, mIdx
+            ) latest ON pm.idx = latest.max_idx
+            GROUP BY pm.sIdx, pm.year, pm.month
+        ) pm_agg ON pm_agg.sIdx = ss.sIdx
+            AND pm_agg.year = ss.year
+            AND pm_agg.month = ss.month
+
+        WHERE ss.cIdx = ?
+          AND CONCAT(ss.year, LPAD(ss.month, 2, '0')) BETWEEN ? AND ?
+            ${sIdx ? 'AND ss.sIdx = ?' : ''}
+        ORDER BY ss.year DESC, ss.month DESC, s.name ASC
+    `;
+
+    let aParameter = sIdx
+        ? [startMonth, endMonth, cIdx, startMonth, endMonth, sIdx]
+        : [startMonth, endMonth, cIdx, startMonth, endMonth];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return { 'data': '-9999' };
+    }
+}
+
+exports.getSettleReview = async function (cIdx, startMonth, endMonth) {
+    // 1. 청구서 및 계약 데이터 조회
+    let sqlSettlement = `
+        SELECT
+            ss.idx,
+            ss.sIdx,
+            ss.year,
+            ss.month,
+            ss.type,
+            -- 여러 계약이 조인되더라도 1개로 합치기 위해 MAX 사용
+            IFNULL(MAX(sc.staffCount), 0) AS staffCount
+        FROM new_tb_site_settlement ss
+                 LEFT JOIN new_tb_site_contract sc
+                           ON sc.sIdx = ss.sIdx
+                               AND sc.cIdx = ss.cIdx
+                               AND sc.type = ss.type
+                               AND CONCAT(ss.year, LPAD(ss.month, 2, '0'))
+                                  BETWEEN DATE_FORMAT(sc.startDt, '%Y%m')
+                                  AND IFNULL(DATE_FORMAT(sc.endDt, '%Y%m'), '999912')
+        WHERE ss.cIdx = ?
+          AND CONCAT(ss.year, LPAD(ss.month, 2, '0')) BETWEEN ? AND ?
+
+        -- 정산서 고유 인덱스(ss.idx) 기준으로 그룹화하여 뻥튀기 방지
+        GROUP BY ss.idx, ss.sIdx, ss.year, ss.month, ss.type
+
+        ORDER BY ss.year DESC, ss.month DESC, ss.sIdx ASC, ss.type ASC
+    `;
+
+    // 2. 배치 이력 조회 (Member 테이블 조인하여 직무 type 가져오기)
+    let sqlAssignment = `
+        SELECT
+            ma.sIdx,
+            ma.mIdx,
+            m.type,  -- [추가] 사원 테이블에서 가져온 직무 타입
+            DATE_FORMAT(ma.startDt, '%Y-%m-%d') AS startDt,
+            DATE_FORMAT(ma.endDt, '%Y-%m-%d') AS endDt
+        FROM new_tb_member_assignment ma
+                 LEFT JOIN new_tb_member m ON m.idx = ma.mIdx
+        WHERE ma.startDt <= LAST_DAY(STR_TO_DATE(CONCAT(?, '01'), '%Y%m%d'))
+          AND (ma.endDt IS NULL OR ma.endDt >= STR_TO_DATE(CONCAT(?, '01'), '%Y%m%d'))
+    `;
+
+    // 3. 해당 월 급여 데이터 조회 (Member 테이블 조인하여 직무 type 가져오기)
+    let sqlPayroll = `
+        SELECT
+            p.sIdx,
+            p.year,
+            p.month,
+            m.type,  -- [추가] 사원 테이블에서 가져온 직무 타입
+            p.grossPay,
+            p.deductions,
+            p.total,
+            p.payItems,
+            p.deductionItems
+        FROM new_tb_member_payroll_month p
+                 INNER JOIN (
+            SELECT MAX(idx) AS max_idx
+            FROM new_tb_member_payroll_month
+            WHERE CONCAT(year, LPAD(month, 2, '0')) BETWEEN ? AND ?
+            GROUP BY sIdx, mIdx, year, month
+        ) latest ON p.idx = latest.max_idx
+                 LEFT JOIN new_tb_member m ON m.idx = p.mIdx
+    `;
+
+    // 4. 급여 코드 조회
+    let sqlCode = `
+        SELECT itemCd, itemNm
+        FROM new_tb_code
+        WHERE cIdx = ? AND (itemCd LIKE '04001%' OR itemCd LIKE '04002%')
+    `;
+
+    try {
+        let [settlements] = await pool.query(sqlSettlement, [cIdx, startMonth, endMonth]);
+        if (settlements.length === 0) return settlements;
+
+        let [assignments] = await pool.query(sqlAssignment, [endMonth, startMonth]);
+        let [payrolls] = await pool.query(sqlPayroll, [startMonth, endMonth]);
+        let [codes] = await pool.query(sqlCode, [cIdx]);
+
+        const codeMap = {};
+        codes.forEach(c => {
+            codeMap[c.itemCd] = c.itemNm; // 조회 쿼리에 맞춰 itemCd, itemNm으로 수정
+        });
+
+        for (let row of settlements) {
+            const year = Number(row.year);
+            const month = Number(row.month);
+            const staffCount = row.staffCount;
+
+            const lastDayOfMonth = new Date(year, month, 0).getDate();
+            const monthStartStr = `${year}-${String(month).padStart(2, '0')}-01`;
+            const monthEndStr = `${year}-${String(month).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
+
+            // ---------------------------------------------------------
+            // [1] 배치 인원 및 공제일수 계산 (type 일치 조건 추가)
+            // ---------------------------------------------------------
+            const siteAssignments = assignments.filter(a => {
+                // 단지와 '직무(type)'가 모두 일치해야 함
+                if (a.sIdx !== row.sIdx || a.type !== row.type) return false;
+                const e = a.endDt || '9999-12-31';
+                return a.startDt <= monthEndStr && e >= monthStartStr;
+            });
+
+            const uniqueMembers = new Set(siteAssignments.map(a => a.mIdx));
+            row.workStaffCount = uniqueMembers.size;
+
+            let deductionDays = 0;
+            for (let day = 1; day <= lastDayOfMonth; day++) {
+                const currentDayStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                let dailyActiveMembers = new Set();
+
+                for (let a of siteAssignments) {
+                    const e = a.endDt || '9999-12-31';
+                    if (currentDayStr >= a.startDt && currentDayStr <= e) {
+                        dailyActiveMembers.add(a.mIdx);
+                    }
+                }
+                if (dailyActiveMembers.size < staffCount) deductionDays++;
+            }
+            row.deductionDays = deductionDays;
+
+            // ---------------------------------------------------------
+            // [2] 급여 및 공제 내역 합산 (type 일치 조건 추가)
+            // ---------------------------------------------------------
+            const sitePayrolls = payrolls.filter(p =>
+                p.sIdx === row.sIdx &&
+                p.year === year &&
+                p.month === month &&
+                p.type === row.type // 직무(type) 일치 확인
+            );
+
+            let totalGrossPay = 0;
+            let totalDeductions = 0;
+            let totalNetPay = 0;
+            let totalPayItemsSum = 0;
+
+            let aggregatedPayItems = {};
+            let aggregatedDeductionItems = {};
+
+            for (let p of sitePayrolls) {
+                totalGrossPay += (p.grossPay || 0);
+                totalDeductions += (p.deductions || 0);
+                totalNetPay += (p.total || 0);
+
+                if (p.payItems) {
+                    let payObj = typeof p.payItems === 'string' ? JSON.parse(p.payItems) : p.payItems;
+                    for (let [code, amount] of Object.entries(payObj)) {
+                        const amt = Number(amount) || 0;
+                        totalPayItemsSum += amt;
+
+                        const codeName = codeMap[code] || code;
+                        aggregatedPayItems[codeName] = (aggregatedPayItems[codeName] || 0) + amt;
+                    }
+                }
+
+                if (p.deductionItems) {
+                    let dedObj = typeof p.deductionItems === 'string' ? JSON.parse(p.deductionItems) : p.deductionItems;
+                    for (let [code, amount] of Object.entries(dedObj)) {
+                        const amt = Number(amount) || 0;
+                        const codeName = codeMap[code] || code;
+                        aggregatedDeductionItems[codeName] = (aggregatedDeductionItems[codeName] || 0) + amt;
+                    }
+                }
+            }
+
+            row.totalGrossPay = totalGrossPay;
+            row.totalDeductions = totalDeductions;
+            row.totalNetPay = totalNetPay;
+
+            row.totalPayItemsSum = totalPayItemsSum;
+            row.detailPayItems = aggregatedPayItems;
+            row.detailDeductionItems = aggregatedDeductionItems;
+        }
+
+        return settlements;
+
     } catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
