@@ -47,6 +47,7 @@ exports.getSettlePayroll = async function (cIdx, year, month, sIdx){
     let sql = "select";
     sql += " m.idx,";
     sql += " m.id,";
+    sql += " m.position as positionCd,"//group join용
     sql += " m.type,";
     sql += " m.birthDt,";
     sql += " m.inDate, m.outDate, m.transferDate, m.status as mStatus,"
