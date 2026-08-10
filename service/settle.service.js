@@ -104,13 +104,22 @@ exports.getSettlePayroll = async function (req, res) {
     let rows = await settleModel.getSettlePayroll(cIdx, year, month, sIdx);
 
     const monthStart = new Date(year, month - 1, 1);
+    monthStart.setHours(0, 0, 0, 0);
     const monthEnd   = new Date(year, month, 0);
+    monthEnd.setHours(0, 0, 0, 0);
 
     const byRole = {};
     rows.forEach(r => {
         const key = `${r.sIdx}_${r.itemCd || 'none'}`;
         (byRole[key] ||= []).push(r);
     });
+
+    //DB에서 온 날짜 문자열의 시간 오차를 없애주는 헬퍼 함수
+    const getMidnight = (dateString) => {
+        const d = new Date(dateString);
+        d.setHours(0, 0, 0, 0);
+        return d;
+    };
 
     Object.values(byRole).forEach(group => {
         group.forEach(row => { row.gapDays = 0; });
@@ -151,18 +160,20 @@ exports.getSettlePayroll = async function (req, res) {
             }
 
             const gapEnd = new Date(new Date(inDate).setDate(inDate.getDate() - 1));
-            const diffDays = Math.floor((gapEnd - gapStart) / 86400000) + 1;
+            const diffDays = Math.round((gapEnd - gapStart) / 86400000) + 1;
+            //const diffDays = Math.floor((gapEnd - gapStart) / 86400000) + 1;
             if (diffDays > 0) joinRow.gapDays += diffDays;
         });
 
-        // 2) ★ 매칭 안 된(대체자가 아직 없는) 퇴사자 → 퇴사일 다음날 ~ 월말까지 자체 공백
+        // 2) 매칭 안 된(대체자가 아직 없는) 퇴사자 → 퇴사일 다음날 ~ 월말까지 자체 공백
         departures.forEach(depRow => {
             if (depRow._matched) return;
 
             const gapStart = new Date(new Date(depRow.outDate).setDate(new Date(depRow.outDate).getDate() + 1));
             const gapEnd = monthEnd;
 
-            const diffDays = Math.floor((gapEnd - gapStart) / 86400000) + 1;
+            const diffDays = Math.round((gapEnd - gapStart) / 86400000) + 1;
+            //const diffDays = Math.floor((gapEnd - gapStart) / 86400000) + 1;
             if (diffDays > 0) depRow.gapDays += diffDays;
 
             delete depRow._matched; // 임시 플래그 정리
