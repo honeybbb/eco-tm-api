@@ -128,40 +128,40 @@ exports.getSettlePayroll = async function (req, res) {
         const departures = group
             .filter(g => {
                 if (!g.outDate) return false;
-                const o = new Date(g.outDate);
+                const o = getMidnight(g.outDate);
                 return o >= monthStart && o <= monthEnd;
             })
-            .sort((a, b) => new Date(a.outDate) - new Date(b.outDate));
+            .sort((a, b) => getMidnight(a.outDate) - getMidnight(b.outDate));
 
         // 이번 달 중간 입사자들 (오름차순)
         const joiners = group
             .filter(g => {
                 if (!g.inDate) return false;
-                const i = new Date(g.inDate);
+                const i = getMidnight(g.inDate);
                 return i >= monthStart && i <= monthEnd && i.getDate() !== 1;
             })
-            .sort((a, b) => new Date(a.inDate) - new Date(b.inDate));
+            .sort((a, b) => getMidnight(a.inDate) - getMidnight(b.inDate));
 
         // 1) 입사자 기준 선행 공백(직전 퇴사자와 매칭)
         joiners.forEach(joinRow => {
-            const inDate = new Date(joinRow.inDate);
+            const inDate = getMidnight(joinRow.inDate);
 
             const candidate = departures.find(d =>
-                !d._matched && new Date(d.outDate) < inDate
+                !d._matched && getMidnight(d.outDate) < inDate
             );
 
             let gapStart;
             if (candidate) {
                 candidate._matched = true;
-                const out = new Date(candidate.outDate);
+                const out = getMidnight(candidate.outDate);
                 gapStart = new Date(out.setDate(out.getDate() + 1));
             } else {
                 gapStart = monthStart;
             }
 
             const gapEnd = new Date(new Date(inDate).setDate(inDate.getDate() - 1));
+
             const diffDays = Math.round((gapEnd - gapStart) / 86400000) + 1;
-            //const diffDays = Math.floor((gapEnd - gapStart) / 86400000) + 1;
             if (diffDays > 0) joinRow.gapDays += diffDays;
         });
 
@@ -169,11 +169,11 @@ exports.getSettlePayroll = async function (req, res) {
         departures.forEach(depRow => {
             if (depRow._matched) return;
 
-            const gapStart = new Date(new Date(depRow.outDate).setDate(new Date(depRow.outDate).getDate() + 1));
+            const outDate = getMidnight(depRow.outDate);
+            const gapStart = new Date(outDate.setDate(outDate.getDate() + 1));
             const gapEnd = monthEnd;
 
             const diffDays = Math.round((gapEnd - gapStart) / 86400000) + 1;
-            //const diffDays = Math.floor((gapEnd - gapStart) / 86400000) + 1;
             if (diffDays > 0) depRow.gapDays += diffDays;
 
             delete depRow._matched; // 임시 플래그 정리
