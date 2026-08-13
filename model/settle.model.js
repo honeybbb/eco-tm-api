@@ -309,77 +309,92 @@ exports.getSettlePayroll_v2 = async function (cIdx, year, month, sIdx) {
     }
 };
 
-exports.getSettleSummary = async function (year, month) {
+exports.getSettleSummary = async function (cIdx, year, month) {
     // 단지명, 계약인원, 현재인원(status=0), 여(gender=F), 남(gender=M), 입사(inDate), 퇴사(outDate), 공백(급여작업인원-계약인원),
     // 단지청구액, 급여지급액
     // let sql = "select (select a.name new_tb_site a where a.idx = ss.sIdx) as `sName`, ss.docType, ss.type, ss.grandTotal, ss.billingData from new_tb_site_settlement ss"
     // sql += " where ss.year = ? and ss.month = ?"
+    // 기준청구액 추가하기
+    // 기준급여지급액 추가하기
+
     let sql = `
-        SELECT s.name AS siteName,
-           ss.docType,
-           ss.type,
-           ss.grandTotal AS billingAmt, /* 청구액 (총용역비) */
+        SELECT
+            ss.sIdx,
+            ss.idx, /* 정산서 입금일 */
+            s.name AS siteName,
+            IFNULL(ss.bankName, s.bankName) as bankName,
+            s.payment_day,
+            ss.docType,
+            ss.type,
+            ss.grandTotal AS billingAmt, /* 청구액 (총용역비) */
+            ss.depositDt, /* 입금일 */
+            ss.depositAmount, /* 입금액 */
+            ss.bigo, /* 월별청구현황 비고 */
+            ss.invoiceDt, /* 계산서 발행일 */
+            ss.invoiceAmount, /* 매수 */
 
-        /* 1. 단지 계약 테이블의 배정 직원수 */
-           IFNULL(sc.staffCount, 0)   AS contractCnt,
+            /* 1. 단지 계약 테이블의 배정 직원수 */
+            IFNULL(sc.staffCount, 0)   AS contractCnt,
 
-        /* 2. 인원 통계 (서브쿼리 m_stats) */
-           IFNULL(ma.currentCnt, 0)   AS currentCnt,
-           IFNULL(ma.female, 0)       AS female,
-           IFNULL(ma.male, 0)         AS male,
-           IFNULL(ma.joinCnt, 0)      AS \`join\`,
-           IFNULL(ma.outCnt, 0)       AS resign,
+            /* 2. 인원 통계 (서브쿼리 m_stats) */
+            IFNULL(ma.currentCnt, 0)   AS currentCnt,
+            IFNULL(ma.female, 0)       AS female,
+            IFNULL(ma.male, 0)         AS male,
+            IFNULL(ma.joinCnt, 0)      AS \`join\`,
+            IFNULL(ma.outCnt, 0)       AS resign,
 
-        /* 3. 급여지급액 합계 (서브쿼리 mpm) */
-           IFNULL(mpm.netPayTotal, 0) AS netPay,
-           IFNULL(mpm.payrollCnt, 0) AS payrollCnt
+            /* 3. 급여지급액 합계 (서브쿼리 mpm) */
+            IFNULL(mpm.netPayTotal, 0) AS netPay,
+            IFNULL(mpm.payrollCnt, 0) AS payrollCnt
 
         FROM new_tb_site_settlement ss
 
-         /* [청구 데이터] 최신 청구 데이터만 추출 */
-         INNER JOIN (SELECT MAX(idx) AS max_idx
-                     FROM new_tb_site_settlement
-                     WHERE year = ? AND month = ?
-                     GROUP BY sIdx) latest ON ss.idx = latest.max_idx
+                 /* [청구 데이터] 최신 청구 데이터만 추출 */
+                 INNER JOIN (SELECT MAX(idx) AS max_idx
+                             FROM new_tb_site_settlement
+                             WHERE year = ? AND month = ?
+                             GROUP BY sIdx) latest ON ss.idx = latest.max_idx
 
-         INNER JOIN new_tb_site s ON s.idx = ss.sIdx
+                 INNER JOIN new_tb_site s ON s.idx = ss.sIdx
 
-         /* [계약 인원] 현장 및 타입별 최신 계약 인원 가져오기 */
-         LEFT JOIN (SELECT sc1.sIdx, sc1.type, sc1.staffCount
-                    FROM new_tb_site_contract sc1
-                             INNER JOIN (SELECT sIdx, type, MAX(idx) AS max_idx
-                                         FROM new_tb_site_contract
-                                         GROUP BY sIdx, type) sc2 ON sc1.idx = sc2.max_idx) sc
-                   ON sc.sIdx = ss.sIdx AND sc.type = ss.type
+            /* [계약 인원] 현장 및 타입별 최신 계약 인원 가져오기 */
+                 LEFT JOIN (SELECT sc1.sIdx, sc1.type, sc1.staffCount
+                            FROM new_tb_site_contract sc1
+                                     INNER JOIN (SELECT sIdx, type, MAX(idx) AS max_idx
+                                                 FROM new_tb_site_contract
+                                                 GROUP BY sIdx, type) sc2 ON sc1.idx = sc2.max_idx) sc
+                           ON sc.sIdx = ss.sIdx AND sc.type = ss.type
 
-         /* [인원 통계] new_tb_member_assignment를 통해 직원의 최신 현장 매핑 */
-         LEFT JOIN (SELECT ma.sIdx, /* 배정 테이블의 현장 idx 기준 */
-                   SUM(CASE WHEN m.status = 0 THEN 1 ELSE 0 END)                                AS currentCnt,
-                   SUM(CASE WHEN m.status = 0 AND m.gender = 'F' THEN 1 ELSE 0 END)             AS female,
-                   SUM(CASE WHEN m.status = 0 AND m.gender = 'M' THEN 1 ELSE 0 END)             AS male,
-                   SUM(CASE WHEN YEAR (m.inDate) = ? AND MONTH(m.inDate) = ? THEN 1 ELSE 0 END) AS joinCnt,
-                   SUM(CASE WHEN YEAR (m.outDate) = ? AND MONTH(outDate) = ? THEN 1 ELSE 0 END) AS outCnt
-            FROM new_tb_member m
-             /* 직원의 가장 최근 배정 내역(assignment) 조인 */
-             INNER JOIN (SELECT a1.mIdx, a1.sIdx
-                         FROM new_tb_member_assignment a1
-                              INNER JOIN (SELECT mIdx, MAX(idx) AS max_idx
-                                  FROM new_tb_member_assignment
-                                  GROUP BY mIdx) a2 ON a1.idx = a2.max_idx) ma
-                                        ON m.idx = ma.mIdx
-                    GROUP BY ma.sIdx) ma ON ma.sIdx = ss.sIdx
+            /* [인원 통계] new_tb_member_assignment를 통해 직원의 최신 현장 매핑 */
+                 LEFT JOIN (SELECT ma.sIdx, /* 배정 테이블의 현장 idx 기준 */
+                                   SUM(CASE WHEN m.status = 0 THEN 1 ELSE 0 END)                                AS currentCnt,
+                                   SUM(CASE WHEN m.status = 0 AND m.gender = 'F' THEN 1 ELSE 0 END)             AS female,
+                                   SUM(CASE WHEN m.status = 0 AND m.gender = 'M' THEN 1 ELSE 0 END)             AS male,
+                                   SUM(CASE WHEN YEAR (m.inDate) = ? AND MONTH(m.inDate) = ? THEN 1 ELSE 0 END) AS joinCnt,
+                                   SUM(CASE WHEN YEAR (m.outDate) = ? AND MONTH(outDate) = ? THEN 1 ELSE 0 END) AS outCnt
+                            FROM new_tb_member m
+                                     /* 직원의 가장 최근 배정 내역(assignment) 조인 */
+                                     INNER JOIN (SELECT a1.mIdx, a1.sIdx
+                                                 FROM new_tb_member_assignment a1
+                                                          INNER JOIN (SELECT mIdx, MAX(idx) AS max_idx
+                                                                      FROM new_tb_member_assignment
+                                                                      GROUP BY mIdx) a2 ON a1.idx = a2.max_idx) ma
+                                                ON m.idx = ma.mIdx
+                            GROUP BY ma.sIdx) ma ON ma.sIdx = ss.sIdx
 
-        /* [급여 합계] 해당 연/월 실수령액 총합 */
-         LEFT JOIN (
-            SELECT 
-                sIdx,
-                SUM(netPay) AS netPayTotal,
-                count(*) as \`payrollCnt\`
-            FROM new_tb_member_payroll_month
-            WHERE year = ? AND month = ?
-            GROUP BY sIdx
+            /* [급여 합계] 해당 연/월 실수령액 총합 및 재직자 기준 급여인원 */
+                 LEFT JOIN (
+            SELECT
+                pm.sIdx,
+                SUM(pm.netPay) AS netPayTotal,
+                /* member 테이블과 조인하여 재직자(status=0)만 인원으로 카운트 */
+                SUM(CASE WHEN m.status = 0 THEN 1 ELSE 0 END) AS \`payrollCnt\`
+            FROM new_tb_member_payroll_month pm
+                     LEFT JOIN new_tb_member m ON pm.mIdx = m.idx
+            WHERE pm.year = ? AND pm.month = ?
+            GROUP BY pm.sIdx
         ) mpm ON mpm.sIdx = ss.sIdx
-        
+
         ORDER BY s.name ASC
     `;
 
@@ -390,6 +405,21 @@ exports.getSettleSummary = async function (year, month) {
         year, month,           // ma 퇴사자 카운트용
         year, month            // mpm 급여 합계용
     ];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+
+exports.updateSettleSummary = async function (cIdx, ssIdx, invoiceDt, invoiceAmount, bankName, bigo) {
+    let sql = "update new_tb_site_settlement set invoiceDt = ?, invoiceAmount = ?, bankName = ?, bigo = ? where cIdx = ? and idx = ?"
+
+    let aParameter = [invoiceDt, invoiceAmount, bankName, bigo, cIdx, ssIdx];
 
     try {
         let [res] = await pool.query(sql, aParameter);
@@ -580,27 +610,33 @@ exports.getSettleReview = async function (cIdx, startMonth, endMonth) {
     // 1. 청구서 및 계약 데이터 조회
     let sqlSettlement = `
         SELECT
-            ss.idx,
-            ss.sIdx,
-            ss.year,
-            ss.month,
-            ss.type,
-            -- 여러 계약이 조인되더라도 1개로 합치기 위해 MAX 사용
-            IFNULL(MAX(sc.staffCount), 0) AS staffCount
+            ss.idx, --청구서인덱스
+            ss.sIdx, --현장인덱스
+            ss.year, --청구연
+            ss.month, --청구월
+            ss.type, --청구구분(경비/미화)
+
+            -- 해당 청구년월에 유효한 계약 중, 가장 최근에 시작한 계약의 인원수 1개만 가져옴
+            IFNULL((
+                SELECT sc.staffCount
+                FROM new_tb_site_contract sc
+                WHERE sc.cIdx = ss.cIdx
+                  AND sc.sIdx = ss.sIdx
+                  AND sc.type = ss.type
+                  -- 계약 기간 안에 청구년월이 포함되는지 확인
+                  AND CONCAT(ss.year, LPAD(ss.month, 2, '0'))
+                    BETWEEN DATE_FORMAT(sc.startDt, '%Y%m')
+                    AND IFNULL(DATE_FORMAT(sc.endDt, '%Y%m'), '999912')
+                -- 만약 1월 계약과 5월 계약이 겹친다면, 더 나중에 갱신된(최근) 계약을 우선 적용
+                ORDER BY sc.startDt DESC
+                LIMIT 1
+                ), 0) AS staffCount
+
         FROM new_tb_site_settlement ss
-                 LEFT JOIN new_tb_site_contract sc
-                           ON sc.sIdx = ss.sIdx
-                               AND sc.cIdx = ss.cIdx
-                               AND sc.type = ss.type
-                               AND CONCAT(ss.year, LPAD(ss.month, 2, '0'))
-                                  BETWEEN DATE_FORMAT(sc.startDt, '%Y%m')
-                                  AND IFNULL(DATE_FORMAT(sc.endDt, '%Y%m'), '999912')
         WHERE ss.cIdx = ?
           AND CONCAT(ss.year, LPAD(ss.month, 2, '0')) BETWEEN ? AND ?
 
-        -- 정산서 고유 인덱스(ss.idx) 기준으로 그룹화하여 뻥튀기 방지
-        GROUP BY ss.idx, ss.sIdx, ss.year, ss.month, ss.type
-
+        -- 조인을 하지 않고 서브쿼리로 가져오므로 데이터 증식이 일어나지 않아 GROUP BY가 불필요함
         ORDER BY ss.year DESC, ss.month DESC, ss.sIdx ASC, ss.type ASC
     `;
 
@@ -609,7 +645,7 @@ exports.getSettleReview = async function (cIdx, startMonth, endMonth) {
         SELECT
             ma.sIdx,
             ma.mIdx,
-            m.type,  -- [추가] 사원 테이블에서 가져온 직무 타입
+            m.type,  -- [추가] 사원 테이블에서 가져온 구분(경비/미화) 타입
             DATE_FORMAT(ma.startDt, '%Y-%m-%d') AS startDt,
             DATE_FORMAT(ma.endDt, '%Y-%m-%d') AS endDt
         FROM new_tb_member_assignment ma
@@ -624,7 +660,7 @@ exports.getSettleReview = async function (cIdx, startMonth, endMonth) {
             p.sIdx,
             p.year,
             p.month,
-            m.type,  -- [추가] 사원 테이블에서 가져온 직무 타입
+            m.type,  -- 사원 테이블에서 가져온 구분(경비/미화) 타입
             p.grossPay,
             p.deductions,
             p.total,
@@ -757,6 +793,98 @@ exports.getSettleReview = async function (cIdx, startMonth, endMonth) {
         return {'data': '-9999'}
     }
 }
+
+exports.getSettlements = async function(cIdx, startMonth, endMonth) {
+    const sql = `
+        SELECT 
+            ss.idx, -- 정산서인덱스
+            ss.sIdx, -- 현장인덱스
+            ss.year, -- 청구연
+            ss.month, -- 청구월
+            ss.type, -- 구분값 (경비,미화)
+            ss.payrollData, -- length로 근무인원 뽑기
+               IFNULL((
+                   SELECT sc.staffCount FROM new_tb_site_contract sc
+                   WHERE sc.cIdx = ss.cIdx AND sc.sIdx = ss.sIdx AND sc.type = ss.type
+                     AND CONCAT(ss.year, LPAD(ss.month, 2, '0')) 
+                         BETWEEN DATE_FORMAT(sc.startDt, '%Y%m') AND IFNULL(DATE_FORMAT(sc.endDt, '%Y%m'), '999912')
+                   ORDER BY sc.startDt DESC LIMIT 1
+               ), 0) AS staffCount
+        FROM new_tb_site_settlement ss
+        WHERE 
+            ss.cIdx = ? AND 
+            CONCAT(ss.year, LPAD(ss.month, 2, '0')) BETWEEN ? AND ?
+        ORDER BY ss.year DESC, ss.month DESC, ss.sIdx ASC, ss.type ASC
+    `;
+
+    let aParameter = [cIdx, startMonth, endMonth];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
+
+exports.getAssignments = async function(startMonth, endMonth) {
+    const sql = `
+        SELECT
+            ma.sIdx, -- 현장 인덱스
+            ma.mIdx, -- 직원 인덱스
+            m.type,  -- 타입
+               DATE_FORMAT(ma.startDt, '%Y-%m-%d') AS startDt,
+               DATE_FORMAT(ma.endDt, '%Y-%m-%d') AS endDt
+        FROM new_tb_member_assignment ma
+        LEFT JOIN new_tb_member m ON m.idx = ma.mIdx
+        WHERE ma.startDt <= LAST_DAY(STR_TO_DATE(CONCAT(?, '01'), '%Y%m%d'))
+          AND (ma.endDt IS NULL OR ma.endDt >= STR_TO_DATE(CONCAT(?, '01'), '%Y%m%d'))
+    `;
+    const [rows] = await pool.query(sql, [endMonth, startMonth]);
+    return rows;
+};
+
+exports.getPayrolls = async function(startMonth, endMonth) {
+    const sql = `
+        SELECT 
+            p.sIdx, 
+            p.year,
+            p.month,
+            m.type,
+            p.grossPay, 
+            p.deductions, 
+            p.total,
+            p.payItems,
+            p.deductionItems
+        FROM new_tb_member_payroll_month p
+        INNER JOIN (
+            SELECT MAX(idx) AS max_idx FROM new_tb_member_payroll_month
+            WHERE CONCAT(year, LPAD(month, 2, '0')) BETWEEN ? AND ?
+            GROUP BY sIdx, mIdx, year, month
+        ) latest ON p.idx = latest.max_idx
+        LEFT JOIN new_tb_member m ON m.idx = p.mIdx
+    `;
+
+    let aParameter = [startMonth, endMonth];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
+
+exports.getCodes = async function(cIdx) {
+    const sql = `
+        SELECT itemCd, itemNm FROM new_tb_code
+        WHERE cIdx = ? AND (itemCd LIKE '04001%' OR itemCd LIKE '04002%')
+    `;
+    const [rows] = await pool.query(sql, [cIdx]);
+    return rows;
+};
 
 /** 20260416 수정
 exports.getSettleList = async function (year, month, docType, cIdx) {

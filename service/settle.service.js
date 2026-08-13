@@ -199,13 +199,45 @@ exports.getSettlePayroll_v2 = async function (req, res) {
 //급여총액 조회
 exports.getSettleSummary = async function (req, res) {
     let
-        // cIdx = req.user.cIdx,
+        cIdx = req.user.cIdx,
         year = req.query.year,
         month = req.query.month;
 
-    let result = await settleModel.getSettleSummary(year, month);
+    let result = await settleModel.getSettleSummary(cIdx, year, month);
 
     res.json({'result': true, 'data': result})
+}
+
+exports.updateSettleSummary = async function (req, res) {
+    let cIdx = req.user.cIdx,
+        data = req.body.data;
+
+    // 방어 로직: 데이터가 없거나 배열이 아닌 경우 튕겨냄
+    if (!data || !Array.isArray(data)) {
+        return res.status(400).json({ result: false, message: '잘못된 데이터 형식입니다.' });
+    }
+
+    try {
+        const updatePromises = data.map(item => {
+            return settleModel.updateSettleSummary(
+                cIdx,
+                item.ssIdx,
+                item.invoiceDt,
+                item.invoiceAmount,
+                item.bankName,
+                item.bigo
+            );
+        });
+
+        let result = await Promise.all(updatePromises);
+
+        // 4. 성공 응답
+        res.json({'result': true, 'data': result});
+
+    } catch (error) {
+        console.error('Update Settle Summary Error:', error);
+        res.status(500).json({'result': false, 'msg': '서버 오류가 발생했습니다.'});
+    }
 }
 
 //청구현황 조회
@@ -222,12 +254,192 @@ exports.getSettleBilling = async function (req, res) {
 exports.getSettleReview = async function (req, res) {
     let cIdx = req.user.cIdx,
         startMonth = req.query.startMonth,
-        endMonth = req.query.endMonth,
-        sIdx = req.query.sIdx;
+        endMonth = req.query.endMonth;
 
-    let result = await settleModel.getSettleReview(cIdx, startMonth, endMonth, sIdx);
+    try {
+        const settlements = await settleModel.getSettlements(cIdx, startMonth, endMonth); //정산서 정보
+        if (settlements.length === 0) return settlements;
 
-    res.json({'result': true, 'data': result});
+        const [assignments, payrolls, codes] = await Promise.all([
+            settleModel.getAssignments(startMonth, endMonth),
+            settleModel.getPayrolls(startMonth, endMonth),
+            settleModel.getCodes(cIdx)
+        ]);
+
+        // 2. 비즈니스 로직 시작 (작성하신 자바스크립트 로직 그대로)
+        const codeMap = {};
+        codes.forEach(c => {
+            codeMap[c.itemCd] = c.itemNm;
+        });
+
+        for (let row of settlements) {
+            const year = Number(row.year);
+            const month = Number(row.month);
+            const staffCount = row.staffCount;
+
+            const lastDayOfMonth = new Date(year, month, 0).getDate();
+            const monthStartStr = `${year}-${String(month).padStart(2, '0')}-01`;
+            const monthEndStr = `${year}-${String(month).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
+
+            // [1] 배치 인원 및 공제일수 계산
+            const siteAssignments = assignments.filter(a => {
+                if (a.sIdx !== row.sIdx || a.type !== row.type) return false;
+                const e = a.endDt || '9999-12-31';
+                return a.startDt <= monthEndStr && e >= monthStartStr;
+            });
+
+            const uniqueMembers = new Set(siteAssignments.map(a => a.mIdx));
+            row.workStaffCount = uniqueMembers.size;
+
+            let deductionDays = 0;
+            for (let day = 1; day <= lastDayOfMonth; day++) {
+                const currentDayStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                let dailyActiveMembers = new Set();
+
+                for (let a of siteAssignments) {
+                    const e = a.endDt || '9999-12-31';
+                    if (currentDayStr >= a.startDt && currentDayStr <= e) {
+                        dailyActiveMembers.add(a.mIdx);
+                    }
+                }
+                if (dailyActiveMembers.size < staffCount) deductionDays++;
+            }
+            row.deductionDays = deductionDays;
+
+            // [2] 급여 및 공제 내역 합산
+            const sitePayrolls = payrolls.filter(p =>
+                p.sIdx === row.sIdx && p.year === year && p.month === month && p.type === row.type
+            );
+
+            let totalGrossPay = 0, totalDeductions = 0, totalNetPay = 0, totalPayItemsSum = 0;
+            let aggregatedPayItems = {}, aggregatedDeductionItems = {};
+
+            for (let p of sitePayrolls) {
+                totalGrossPay += (p.grossPay || 0);
+                totalDeductions += (p.deductions || 0);
+                totalNetPay += (p.total || 0);
+
+                if (p.payItems) {
+                    let payObj = typeof p.payItems === 'string' ? JSON.parse(p.payItems) : p.payItems;
+                    for (let [code, amount] of Object.entries(payObj)) {
+                        const amt = Number(amount) || 0;
+                        totalPayItemsSum += amt;
+                        const codeName = codeMap[code] || code;
+                        aggregatedPayItems[codeName] = (aggregatedPayItems[codeName] || 0) + amt;
+                    }
+                }
+
+                if (p.deductionItems) {
+                    let dedObj = typeof p.deductionItems === 'string' ? JSON.parse(p.deductionItems) : p.deductionItems;
+                    for (let [code, amount] of Object.entries(dedObj)) {
+                        const amt = Number(amount) || 0;
+                        const codeName = codeMap[code] || code;
+                        aggregatedDeductionItems[codeName] = (aggregatedDeductionItems[codeName] || 0) + amt;
+                    }
+                }
+            }
+
+            row.totalGrossPay = totalGrossPay;
+            row.totalDeductions = totalDeductions;
+            row.totalNetPay = totalNetPay;
+            row.totalPayItemsSum = totalPayItemsSum;
+            row.detailPayItems = aggregatedPayItems;
+            row.detailDeductionItems = aggregatedDeductionItems;
+        }
+
+        return settlements;
+
+    } catch (err) {
+        console.error('Service Error:', err);
+        return res.status(500).json({ result: false, msg: '데이터베이스 처리 중 오류가 발생했습니다.' });
+    }
+}
+
+exports.getSettleReview_v2 = async function (req, res) {
+    //계약인원은 new_tb_site_contract의 staffCount에서 확인 (경비/미화 구분), 실제청구 인원은 new_tb_site_settlement의 payrollData length
+    //당월 청구액은 new_tb_site_settlement의 grandTotal 에서 확인 (부가세포함액),
+    // 기준금액은 new_tb_site_contract에서 월간용역비 - 퇴직적립금 총액 - 연차적립금 총액 - 4대보험 차액(그런데 meltOptions 에 따라 4대보험 차액값은 변동됨)
+    // 급여총계 new_tb_member_payroll_month의 grossPay where sIdx = ? and year = ? and month = ?
+    // 기준총계액은 new_tb_site_contract의 jsonData에서 direct(직접노무비에서 연차,퇴직제외)
+    let cIdx = req.user.cIdx,
+        startMonth = req.query.startMonth,
+        endMonth = req.query.endMonth;
+
+    try {
+        const settlements = await settleModel.getSettlements(cIdx, startMonth, endMonth); //정산서 정보
+
+        const [assignments, payrolls, codes] = await Promise.all([
+            settleModel.getAssignments(startMonth, endMonth),
+            settleModel.getPayrolls(startMonth, endMonth),
+            // settleModel.getCodes(cIdx)
+        ]);
+
+        console.log(assignments);
+        return;
+
+        for (let row of settlements) {
+            const year = Number(row.year);
+            const month = Number(row.month);
+            const staffCount = row.staffCount;
+
+            const lastDayOfMonth = new Date(year, month, 0).getDate();
+            const monthStartStr = `${year}-${String(month).padStart(2, '0')}-01`;
+            const monthEndStr = `${year}-${String(month).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
+
+            // [1] 배치 인원 및 공제일수 계산
+            const siteAssignments = assignments.filter(a => {
+                if (a.sIdx !== row.sIdx || a.type !== row.type) return false;
+                const e = a.endDt || '9999-12-31';
+                return a.startDt <= monthEndStr && e >= monthStartStr;
+            });
+
+            const uniqueMembers = new Set(siteAssignments.map(a => a.mIdx));
+            row.workStaffCount = uniqueMembers.size;
+
+            let deductionDays = 0;
+            for (let day = 1; day <= lastDayOfMonth; day++) {
+                const currentDayStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                let dailyActiveMembers = new Set();
+
+                for (let a of siteAssignments) {
+                    const e = a.endDt || '9999-12-31';
+                    if (currentDayStr >= a.startDt && currentDayStr <= e) {
+                        dailyActiveMembers.add(a.mIdx);
+                    }
+                }
+                if (dailyActiveMembers.size < staffCount) deductionDays++;
+            }
+            row.deductionDays = deductionDays;
+
+            // [2] 급여 및 공제 내역 합산
+            const sitePayrolls = payrolls.filter(p =>
+                p.sIdx === row.sIdx && p.year === year && p.month === month && p.type === row.type
+            );
+
+            let totalGrossPay = 0, totalDeductions = 0, totalNetPay = 0, totalPayItemsSum = 0;
+            let aggregatedPayItems = {}, aggregatedDeductionItems = {};
+
+            for (let p of sitePayrolls) {
+                totalGrossPay += (p.grossPay || 0);
+                totalDeductions += (p.deductions || 0);
+                totalNetPay += (p.total || 0);
+            }
+
+            row.totalGrossPay = totalGrossPay;
+            row.totalDeductions = totalDeductions;
+            row.totalNetPay = totalNetPay;
+            row.totalPayItemsSum = totalPayItemsSum;
+            row.detailPayItems = aggregatedPayItems;
+            row.detailDeductionItems = aggregatedDeductionItems;
+        }
+
+        return settlements;
+
+    } catch (err) {
+        console.error('Service Error:', err);
+        return res.status(500).json({ result: false, msg: '데이터베이스 처리 중 오류가 발생했습니다.' });
+    }
+
 }
 
 exports.setSettleData = async function (req, res) {

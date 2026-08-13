@@ -12,14 +12,17 @@ module.exports = function (app) {
 
     app.route('/v1/settle/payroll/calculate').get(service.getCalculatedPayroll)
 
-    //급여총액 리스트
+    //급여총액 리스트 및 청구현황
     app.route('/v1/settle/payroll/summary').get(service.getSettleSummary);
+
+    //급여총액 리스트 및 청구현황 데이터 수정
+    app.route('/v1/settle/payroll/summary').put(service.updateSettleSummary);
 
     //청구현황
     app.route('/v1/settle/billing/list').get(service.getSettleBilling);
 
     //총액리스트
-    app.route('/v1/settle/review/list').get(service.getSettleReview);
+    app.route('/v1/settle/review/list').get(service.getSettleReview_v2);
 
     // 용역 정산서 저장
     app.route('/v1/settle/site/data/:sIdx').post(service.setSettleData)
