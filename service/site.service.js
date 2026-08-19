@@ -434,13 +434,16 @@ exports.getSiteData = async function (req, res) {
 };
 
 exports.getSiteData_v2 = async function (req, res) {
-    const sIdx = req.params.sIdx;
+    let cIdx = req.user.cIdx,
+        sIdx = req.params.sIdx;
+
+    if(!cIdx) return res.json({ result: false, message: '회사 index 정보가 없습니다.' });
     if(!sIdx) return res.json({ result: false, message: '현장 index 정보가 없습니다.' });
 
     try {
         // 1. 모든 DB 쿼리를 병렬(Promise.all)로 실행하여 속도 극대화
         const [sites, contracts, bigos, schedules] = await Promise.all([
-            siteModel.getSiteData_v2(sIdx),
+            siteModel.getSiteData_v2(sIdx, cIdx),
             siteModel.getContractsBySite_v2(sIdx),
             siteModel.getBigosBySite_v2(sIdx),
             siteModel.getWorkContracts(sIdx) // 기존 스케줄 쿼리
@@ -528,6 +531,100 @@ exports.getSiteCoords = async function (req, res) {
     let result = await siteModel.getSiteCoords(sIdx);
     res.json({ result: true, data: result });
 }
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+exports.updateSiteCoordsData = async function (req, res) {
+    const KAKAO_API_KEY = 'ec1c7d1d60f1b51ace19292d3f524367';
+    let cIdx = req.params.cIdx;
+
+    if (!cIdx) {
+        return res.status(400).json({ success: false, message: 'cIdx가 누락되었습니다.' });
+    }
+
+    try {
+        let sites = await siteModel.getSiteList(cIdx);
+
+
+        if (sites.length == 0) {
+            return res.status(500).json({ success: false, message: '현장 목록을 불러오지 못했습니다.' });
+        }
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (let site of sites) {
+            if (!site.address) {
+                failCount++;
+                continue;
+            }
+
+            // 이미 좌표가 있다면 스킵
+            /*
+            if (site.latitude && site.longitude) {
+                continue;
+            }
+
+             */
+
+            try {
+                // 내장 fetch를 위한 URL 및 쿼리 파라미터 세팅
+                const targetUrl = new URL('https://dapi.kakao.com/v2/local/search/address.json');
+                targetUrl.searchParams.append('query', site.address);
+
+                // fetch API 호출
+                const response = await fetch(targetUrl.toString(), {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `KakaoAK ${KAKAO_API_KEY}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Kakao API HTTP error! status: ${response.status}`);
+                }
+
+                // JSON 결과 파싱
+                const result = await response.json();
+
+                if (result.documents && result.documents.length > 0) {
+                    const lng = result.documents[0].x; // 경도
+                    const lat = result.documents[0].y; // 위도
+
+                    const isUpdated = await siteModel.updateSiteCoords(site.idx, lat, lng);
+
+                    if (isUpdated) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
+                } else {
+                    failCount++;
+                }
+            } catch (apiError) {
+                console.error(`[API 에러] 현장 idx: ${site.idx}, 에러: ${apiError.message}`);
+                failCount++;
+            }
+
+            // API 호출 제한 방지 (100ms 대기)
+            await sleep(100);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: '위경도 일괄 업데이트가 완료되었습니다.',
+            data: {
+                totalSites: sites.length,
+                success: successCount,
+                fail: failCount
+            }
+        });
+
+    } catch (error) {
+        console.error('서비스단 에러:', error);
+        return res.status(500).json({ success: false, message: '서버 내부 오류가 발생했습니다.' });
+    }
+};
 
 exports.setAccountBill = async function (req, res) {
     let dno = req.body.dno, //문서번호

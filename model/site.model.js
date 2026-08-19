@@ -728,10 +728,12 @@ exports.getSiteData = async function (sIdx) {
 }
 
 // 1. 현장 기본 정보 쿼리
-exports.getSiteData_v2 = async function (sIdx) {
-    const sql = `SELECT * FROM new_tb_site WHERE idx = ?`;
+exports.getSiteData_v2 = async function (sIdx, cIdx) {
+    const sql = `SELECT * FROM new_tb_site WHERE idx = ? and cIdx = ?`;
+    let aParameter = [sIdx, cIdx];
+
     try {
-        let [res] = await pool.query(sql, [sIdx]);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     } catch (e) {
         console.error('getSiteOnly_v2 err', e);
@@ -812,6 +814,23 @@ exports.getSiteCoords = async function (sIdx) {
     try {
         let [res] = await pool.query(sql, aParameter);
         return res[0];
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.updateSiteCoords = async function (sIdx, lat, lng) {
+    let sql = `
+        UPDATE new_tb_site 
+        SET latitude = ?, longitude = ? 
+        WHERE idx = ?
+    `;
+    let aParameter = [lat, lng, sIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
     }catch (e) {
         console.log('db err', e);
         return {'data': '-9999'}
