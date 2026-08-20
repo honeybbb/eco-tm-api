@@ -43,3 +43,36 @@ exports.loginUser = async function (loginId, password) {
         return {'data': '-9999'}
     }
 }
+
+exports.setMenuSettings = async function (cIdx, mnIdx, tableId, jsonData) {
+    let sql = `
+        INSERT INTO new_tb_config_menu (cIdx, mnIdx, tableId, columnsData, regDt) 
+        VALUES (?, ?, ?, ?, NOW())
+        ON DUPLICATE KEY UPDATE 
+            columnsData = VALUES(columnsData),
+            modDt = NOW()
+    `;
+    let aParameter = [cIdx, mnIdx, tableId, jsonData];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.getMenuSettings = async function (cIdx, mnIdx, tableId) {
+    let sql = "select * from new_tb_config_menu where cIdx = ? and mnIdx = ? and tableId = ?";
+
+    let aParameter = [cIdx, mnIdx, tableId];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}

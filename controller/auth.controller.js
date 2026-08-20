@@ -10,4 +10,10 @@ module.exports = function (app) {
     app.route('/v1/auth/manager').post(service.loginManager);
 
     app.route('/v1/auth/refresh').post(service.refreshToken);
+
+    // 관리자 메뉴 컬럼 설정
+    app.route('/v1/auth/menu/setting').post(service.setMenuSettings);
+
+    // 관리자 메뉴 컬럼 가져오기
+    app.route('/v1/auth/menu/setting').get(service.getMenuSettings);
 };

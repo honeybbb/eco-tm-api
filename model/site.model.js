@@ -614,10 +614,7 @@ exports.getAssignedStaff = async function (sIdx) {
             ma.mIdx,
             ma.idx AS assignIdx,
             DATE_FORMAT(ma.regDt, '%Y-%m-%d') AS assignDate,
-            m.type,
-            m.name,
-            m.phone,
-            m.position,
+            m.*, m.status as mStatus,
             (SELECT itemNm FROM new_tb_code WHERE itemCd = m.position AND cIdx = m.cIdx LIMIT 1) AS positionName
         FROM new_tb_member_assignment ma
             LEFT JOIN new_tb_member m ON m.idx = ma.mIdx

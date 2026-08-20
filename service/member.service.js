@@ -46,7 +46,10 @@ exports.deleteManager = async function (req, res) {
 
 //직원 리스트 조회
 exports.getMemberList = async function (req, res) {
-    let cIdx = req.user.cIdx || 1;
+    let cIdx = req.user.cIdx;
+
+    if(!cIdx) return res.json({'result': false, 'msg': '회사 정보가 없습니다. 로그인을 다시 해주세요.'})
+
     try {
         let result = await memberModel.getMemberList(cIdx);
         const safeResult = result.map(member => {
