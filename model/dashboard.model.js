@@ -24,7 +24,7 @@ exports.getSiteStats = async function (cIdx) {
 };
 
 // 멤버 통계 데이터 가져오기 (전체 인원, 지난달 신규 입사자)
-exports.getMemberStats = async function (cIdx) {
+exports.getMemberStatsTemp = async function (cIdx) {
     /**
      * totalCount: 현재 등록된 전체 멤버 수
      * lastMonthIncrease: 지난달(1일~말일) 사이에 입사(inDate)한 멤버 수
@@ -35,7 +35,7 @@ exports.getMemberStats = async function (cIdx) {
             COUNT(CASE WHEN inDate >= LAST_DAY(NOW() - INTERVAL 2 MONTH) + INTERVAL 1 DAY 
                   AND inDate <= LAST_DAY(NOW() - INTERVAL 1 MONTH) THEN 1 END) AS lastMonthIncrease
         FROM new_tb_member 
-        WHERE cIdx = ?
+        WHERE cIdx = ? and status = 0 /* 재직중(status=0) */
     `;
     let aParameter = [cIdx];
     try {
@@ -45,6 +45,49 @@ exports.getMemberStats = async function (cIdx) {
     } catch (e) {
         console.log('db err', e);
         return { totalCount: 0, lastMonthNewcomers: 0 };
+    }
+};
+
+// 통계 데이터 가져오기 (전체 인원, 지난달 신규 입사자, 총 계약 인원)
+exports.getMemberStats = async function (cIdx) {
+    let sql = `
+        SELECT
+            -- 1. 재직 인원 (status = 0)
+            (SELECT COUNT(*) FROM new_tb_member WHERE cIdx = ? AND status = 0) AS totalCount,
+
+            -- 2. 지난달 신규 입사자
+            (SELECT COUNT(*) FROM new_tb_member
+             WHERE cIdx = ? AND status = 0
+               AND inDate >= LAST_DAY(NOW() - INTERVAL 2 MONTH) + INTERVAL 1 DAY
+            AND inDate <= LAST_DAY(NOW() - INTERVAL 1 MONTH)) AS lastMonthIncrease,
+
+            -- 3. 총 계약 인원 (현재 유효한 계약 기간 기준)
+            IFNULL(
+            (
+            SELECT SUM(sc.staffCount)
+            FROM new_tb_site_contract sc
+            INNER JOIN (
+            -- 핵심 수정 부분: 오늘 날짜가 계약 기간(startDt ~ endDt)에 포함되는 계약만 필터링
+            SELECT sIdx, type, MAX(idx) AS max_idx
+            FROM new_tb_site_contract
+            WHERE CURDATE() >= DATE(startDt) AND CURDATE() <= DATE(endDt)
+            GROUP BY sIdx, type
+            ) active_latest ON sc.idx = active_latest.max_idx
+            INNER JOIN new_tb_site s ON s.idx = sc.sIdx
+            WHERE s.cIdx = ?
+            ), 0
+            ) AS contractCount
+    `;
+
+    // cIdx가 3번 사용되므로 배열에 3개 삽입
+    let aParameter = [cIdx, cIdx, cIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res[0] || { totalCount: 0, lastMonthIncrease: 0, contractCount: 0 };
+    } catch (e) {
+        console.log('db err', e);
+        return { totalCount: 0, lastMonthIncrease: 0, contractCount: 0 };
     }
 };
 

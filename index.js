@@ -48,11 +48,6 @@ siteRoutes(app);
 var memberRoutes = require("./controller/member.controller");
 memberRoutes(app);
 
-/*
-var contractRoutes = require("./controller/contract.controller");
-contractRoutes(app);
- */
-
 var noticeRoutes = require("./controller/notice.controller");
 noticeRoutes(app);
 
