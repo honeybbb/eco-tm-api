@@ -19,8 +19,9 @@ const getMemberStats = async (cIdx) => {
         dashboardModel.getMemberStats(cIdx)
     ]);
     return {
-        totalCount: stats.totalCount,
-        increaseCount: stats.lastMonthIncrease
+        totalCount: stats.totalCount,           // 재직 인원
+        increaseCount: stats.lastMonthIncrease, // 신규 입사자
+        contractCount: stats.contractCount      // 총 계약 인원
     };
 };
 
