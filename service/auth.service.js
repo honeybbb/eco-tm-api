@@ -74,3 +74,24 @@ exports.refreshToken = async function (req, res) {
         res.status(401).json({ result: false, msg: '재로그인 필요' });
     }
 };
+
+exports.setMenuSettings = async function (req, res) {
+    let cIdx = req.user.cIdx,
+        mnIdx = req.body.mnIdx,
+        tableId = req.body.tableId,
+        jsonData = req.body.columnsData;
+
+    console.log(jsonData);
+
+    let result = await authModel.setMenuSettings(cIdx, mnIdx, tableId, jsonData);
+    res.json({'result': true, 'data': result})
+}
+
+exports.getMenuSettings = async function (req, res) {
+    let cIdx = req.user.cIdx,
+        mnIdx = req.query.mnIdx,
+        tableId = req.query.tableId;
+
+    let result = await authModel.getMenuSettings(cIdx, mnIdx, tableId);
+    res.json({'result': true, 'data': result})
+}
