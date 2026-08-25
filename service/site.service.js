@@ -1,4 +1,5 @@
 const siteModel = require("../model/site.model");
+const memberModel = require("../model/member.model");
 const { decodeLatin1ToUtf8 } = require("../utils/password");
 
 exports.getSiteList = async function (req, res) {
@@ -7,6 +8,119 @@ exports.getSiteList = async function (req, res) {
     let result = await siteModel.getSiteList(cIdx);
 
     res.json({'result': true, 'data': result})
+}
+
+exports.getSiteList_v2 = async function (req, res) {
+    let cIdx = req.user.cIdx;
+
+    // 1. 모델단에서 순수 DB 쿼리 결과를 가져옵니다.
+    let result = await siteModel.getSiteList(cIdx);
+    let members = await memberModel.getMemberAvailable(cIdx)
+
+    // DB 에러 방어 코드
+    if (result && result.data === '-9999') {
+        return res.json({'result': false, 'msg': '데이터베이스 오류가 발생했습니다.'});
+    }
+
+    // 2. 서비스단 비즈니스 로직 (금액 및 횟수 가공)
+    result = result.map(site => {
+        if (site.contracts) {
+            // DB에서 넘어온 contracts가 문자열이면 배열로 파싱
+            let contractsArr = typeof site.contracts === 'string' ? JSON.parse(site.contracts) : site.contracts;
+
+            contractsArr = contractsArr.map(c => {
+                let cleaningExpense = 0;
+                let otherExpense = 0;
+                let managementFee = 0;
+                let profit = 0;
+                let cleaningCount = 0;
+
+                // 1. 인원수 데이터 준비
+                let staffArr = c.staffDetail || [];
+                if (typeof staffArr === 'string') {
+                    try { staffArr = JSON.parse(staffArr); } catch(e) { staffArr = []; }
+                }
+
+                // 2. 단가 데이터 준비
+                let jsonData = c.jsonData || {};
+                if (typeof jsonData === 'string') {
+                    try { jsonData = JSON.parse(jsonData); } catch(e) { jsonData = {}; }
+                }
+
+                // 3. 대청소비 & 기타제경비 계산 (단가 * 인원수)
+                if (jsonData.expenses && Array.isArray(jsonData.expenses)) {
+                    jsonData.expenses.forEach(exp => {
+                        if (exp.code && String(exp.code).startsWith('04003001')) { // 대청소비
+                            if (exp.values) {
+                                Object.entries(exp.values).forEach(([staffCode, val]) => {
+                                    const amount = Number(val) || 0;
+                                    const staff = staffArr.find(s => s.code === staffCode);
+                                    const count = staff ? (Number(staff.count) || 0) : 0;
+                                    cleaningExpense += (amount * count);
+                                });
+                            }
+                        } else if (exp.code && String(exp.code).startsWith('04003004')) { // 기타제경비
+                            if (exp.values) {
+                                Object.entries(exp.values).forEach(([staffCode, val]) => {
+                                    const amount = Number(val) || 0;
+                                    const staff = staffArr.find(s => s.code === staffCode);
+                                    const count = staff ? (Number(staff.count) || 0) : 0;
+                                    otherExpense += (amount * count);
+                                });
+                            }
+                        }
+                    });
+                }
+
+                // 4. 일반관리비 계산 (단가 * 인원수)
+                if (jsonData.managementFee) {
+                    Object.entries(jsonData.managementFee).forEach(([staffCode, val]) => {
+                        const amount = Number(val) || 0;
+                        const staff = staffArr.find(s => s.code === staffCode);
+                        const count = staff ? (Number(staff.count) || 0) : 0;
+                        managementFee += (amount * count);
+                    });
+                }
+
+                // 5. 기업이윤 계산 (단가 * 인원수)
+                if (jsonData.profit) {
+                    Object.entries(jsonData.profit).forEach(([staffCode, val]) => {
+                        const amount = Number(val) || 0;
+                        const staff = staffArr.find(s => s.code === staffCode);
+                        const count = staff ? (Number(staff.count) || 0) : 0;
+                        profit += (amount * count);
+                    });
+                }
+
+                // 6. 대청소 횟수 계산
+                const processItems = (items) => {
+                    let cnt = 0;
+                    items.forEach(item => { if (item.name && item.count) cnt += (Number(item.count) || 0); });
+                    return cnt;
+                };
+                if (c.cleaningConfig && Array.isArray(c.cleaningConfig)) {
+                    cleaningCount = processItems(c.cleaningConfig);
+                } else if (jsonData.cleaningConfig && Array.isArray(jsonData.cleaningConfig)) {
+                    cleaningCount = processItems(jsonData.cleaningConfig);
+                }
+
+                return {
+                    ...c,
+                    cleaningExpense,
+                    otherExpense,
+                    managementFee,
+                    profit,
+                    cleaningCount
+                };
+            });
+
+            site.contracts = contractsArr;
+        }
+        return site;
+    });
+
+    // 3. 가공 완료된 데이터를 프론트엔드로 응답합니다.
+    res.json({'result': true, 'data': result});
 }
 
 exports.setSiteBigo = async function (req, res) {
@@ -32,6 +146,31 @@ exports.DeleteSiteBigo = async function (req, res) {
 
     let result = await siteModel.DeleteSiteBigo(bgIdx);
     res.json({'result': true, 'data': result})
+}
+
+exports.setSiteMemo = async function (req, res) {
+    let sIdx = req.params.sIdx,
+        colName = req.body.colName,
+        type = req.body.type,
+        text = req.body.text;
+
+    console.log(sIdx, colName, type, text);
+    // return;
+
+    let result = await siteModel.setSiteMemo(sIdx, colName, type, text);
+
+    res.json({'result': true, 'data': result})
+}
+
+exports.deleteSiteMemo = async function (req, res) {
+    let sIdx = req.params.sIdx;
+    let colName = req.body.colName;
+
+    console.log(sIdx, req.body)
+    // Model 함수 호출
+    let result = await siteModel.deleteSiteMemo(sIdx, colName);
+
+    return res.json({ result: true, data: result });
 }
 
 exports.setSiteOrderBudgets = async function (req, res) {
