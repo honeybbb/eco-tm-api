@@ -6,6 +6,8 @@ module.exports = function (app) {
     // 현장 리스트 조회
     app.route('/v1/site/list').get(service.getSiteList);
 
+    app.route('/v2/site/list').get(service.getSiteList_v2);
+
     //현장 비고 저장
     app.route('/v1/site/bigo/register').post(service.setSiteBigo);
 
@@ -14,6 +16,12 @@ module.exports = function (app) {
 
     //현장 비고 삭제
     app.route('/v1/site/bigo/:bgIdx').delete(service.DeleteSiteBigo);
+
+    //현장 메모 추가
+    app.route('/v1/site/memo/:sIdx').post(service.setSiteMemo);
+
+    //현장 메모 삭제
+    app.route('/v1/site/memo/:sIdx').put(service.deleteSiteMemo);
 
     //현장 비품 예산 설정
     app.route('/v1/site/order/budgets').post(service.setSiteOrderBudgets);
@@ -26,6 +34,9 @@ module.exports = function (app) {
 
     // 현장 위도,경도 조회
     app.route('/v1/site/coords/:sIdx').get(service.getSiteCoords);
+
+    // 현장 위,경도 업데이트
+    app.route('/v1/site/coords/bulk/:cIdx').put(service.updateSiteCoordsData);
 
     // 현장 배치 조회
     app.route('/v1/site/staff/:sIdx').get(service.getAssignedStaff)

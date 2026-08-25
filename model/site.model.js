@@ -115,6 +115,72 @@ exports.DeleteSiteBigo = async function (idx) {
     }
 }
 
+exports.setSiteMemo = async function (sIdx, colName, type, text) {
+    let selectSql = "SELECT memo FROM new_tb_site WHERE idx = ?";
+    let updateSql = "UPDATE new_tb_site SET memo = ? WHERE idx = ?";
+
+    try {
+        // 1. 기존 직원의 메모 데이터(JSON) 조회
+        let [rows] = await pool.query(selectSql, [sIdx]);
+
+        // 2. 파싱 (DB에 null이거나 값이 없으면 빈 객체로 초기화)
+        let memoObj = {};
+        if (rows.length > 0 && rows[0].memo) {
+            memoObj = typeof rows[0].memo === 'string' ? JSON.parse(rows[0].memo) : rows[0].memo;
+        }
+
+        // 3. 넘어온 컬럼명(colName)에 해당하는 데이터만 갱신
+        memoObj[colName] = {
+            type: type || '02004002',
+            content: text,
+            regDt: new Date().toISOString().slice(0, 16).replace('T', ' ') // '2026-07-24 10:11' 형태
+        };
+
+        // 4. 수정한 JSON 객체를 문자열로 변환하여 DB에 업데이트
+        let aParameter = [JSON.stringify(memoObj), sIdx];
+        await pool.query(updateSql, aParameter);
+
+        // 5. 프론트엔드로 전달할 수 있도록 업데이트된 전체 메모 객체 반환
+        return memoObj;
+
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}; // 기존 에러 처리 방식과 동일하게 맞춤
+    }
+}
+
+exports.deleteSiteMemo = async function (sIdx, colName) {
+    let selectSql = "SELECT memo FROM new_tb_site WHERE idx = ?";
+    let updateSql = "UPDATE new_tb_site SET memo = ? WHERE idx = ?";
+
+    try {
+        // 1. 기존 직원의 메모 데이터(JSON) 통째로 조회
+        let [rows] = await pool.query(selectSql, [sIdx]);
+
+        let memoObj = {};
+        if (rows.length > 0 && rows[0].memo) {
+            memoObj = typeof rows[0].memo === 'string' ? JSON.parse(rows[0].memo) : rows[0].memo;
+        }
+
+        // 2. JavaScript의 delete 연산자를 사용해 해당 컬럼(키)의 데이터만 쏙 삭제
+        // 예: colName이 'name'이면 memoObj 안의 "name" 데이터만 날아감
+        if (memoObj[colName]) {
+            delete memoObj[colName];
+        }
+
+        // 3. 해당 컬럼이 지워진 나머지 JSON 객체를 다시 문자열로 변환하여 UPDATE (덮어쓰기)
+        let aParameter = [JSON.stringify(memoObj), sIdx];
+        await pool.query(updateSql, aParameter);
+
+        // 4. 프론트 화면을 즉시 갱신할 수 있도록 남은 메모 객체 반환
+        return memoObj;
+
+    } catch (e) {
+        console.log('db err', e);
+        return { 'data': '-9999' };
+    }
+}
+
 exports.setSiteOrderBudgets = async function (sIdx, value, admin) {
     let sql = "insert into new_tb_site_budget (sIdx, value, admin, regDt) values (?, ?, ?, NOW())";
     sql += " ON DUPLICATE KEY UPDATE value = ?, managerId = ?, modDt = NOW()";
@@ -512,7 +578,10 @@ exports.getSiteCleaningSchedule = async function (cIdx) {
             scs.sIdx,
             ss.name AS siteName,
             scs.itemCd,
-            scs.cleaningDt,
+            (select itemNm from new_tb_code where scs.itemCd = itemCd and cIdx = ?) as itemName,
+            scs.startDt,
+            scs.endDt,
+            scs.memo as requestNote,
             scs.regDt
             -- sc.status -- 만약 상태 컬럼을 추가하셨다면 주석을 해제하세요.
         FROM new_tb_site_cleaning_schedule scs
@@ -520,7 +589,7 @@ exports.getSiteCleaningSchedule = async function (cIdx) {
         WHERE s.cIdx = ?
         ORDER BY sc.cleaningDt ASC
     `;
-    let aParameter = [cIdx];
+    let aParameter = [cIdx, cIdx];
     try {
         const [res] = await pool.query(query, aParameter);
         return res;
