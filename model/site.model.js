@@ -575,7 +575,7 @@ exports.getCleaningSchedule = async function (cIdx) {
     let query = `
         SELECT 
             cs.*, cs.tIdx as teamIdx,
-            s.director,
+            s.manager,
             s.name AS siteName,
             (select itemNm from new_tb_code where cs.itemCd = itemCd and cIdx = ?) as itemName
         FROM new_tb_cleaning_schedule cs
