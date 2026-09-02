@@ -425,7 +425,6 @@ exports.registerFullMember = async function (req, res) {
         // 2. 모델에 넘길 데이터 구조화
         // (1) Member 데이터
         const memberData = {
-            mType: body.member_type,
             cIdx: body.cIdx,
             type: body.type,
             name: body.name,
