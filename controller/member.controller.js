@@ -77,4 +77,12 @@ module.exports = function (app) {
     //직원 배치 해제
     app.route('/v1/member/staffing/:idx').put(service.updateMemberStaffing);
 
+    //대청소 가능 인원 전체 조회(본사직원)
+    app.route('/v1/member/cleaning').get(service.getCleaningMembers);
+
+    //대청소 팀 배정
+    app.route('/v1/member/cleaning/team').post(service.setCleaningMembers);
+
+    //대청소 팀 수정
+    app.route('/v1/member/cleaning/team/:tIdx').put(service.updateCleaningMembers);
 }

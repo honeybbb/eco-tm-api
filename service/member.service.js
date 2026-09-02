@@ -425,6 +425,7 @@ exports.registerFullMember = async function (req, res) {
         // 2. 모델에 넘길 데이터 구조화
         // (1) Member 데이터
         const memberData = {
+            mType: body.member_type,
             cIdx: body.cIdx,
             type: body.type,
             name: body.name,
@@ -521,7 +522,7 @@ exports.registerFullMember = async function (req, res) {
             monthWorkTime: body.monthWorkTime,
             payItems: JSON.stringify(payItems),         // 지급 항목 분리
             deductionItems: JSON.stringify(deductionItems), // 공제 항목 분리
-            workSchedule: JSON.stringify(body.contractData.workSchedule || {}), //근무 스케줄 JSON화
+            workSchedule: JSON.stringify(body.contractData?.workSchedule || {}), //근무 스케줄 JSON화
             startDt: body.contractData?.contractStartDt || null,
             endDt: body.contractData?.contractEndDt || null,
             bigo: body.bigo
@@ -931,6 +932,7 @@ exports.updateMemberData = async function (req, res) {
                     // 시작일과 종료일이 모두 있는 유효한 데이터만 필터링
                     if (p.startDate && p.endDate) {
                         periodsData.push({
+                            idx: p.idx || null,
                             status: body.status,
                             startDate: p.startDate,
                             endDate: p.endDate,
@@ -942,6 +944,7 @@ exports.updateMemberData = async function (req, res) {
         } else if (body.status === '4') {
             // 휴직(4): startDate, endDate 매핑
             periodsData.push({
+                idx: body.historyIdx || null, // 단일 상태 PK
                 status: body.status,
                 startDate: body.startDate || body.joinDate || null,
                 endDate: body.endDate || body.outDate || null,
@@ -950,6 +953,7 @@ exports.updateMemberData = async function (req, res) {
         } else {
             // 재직(0), 퇴사(1): joinDate, outDate 매핑
             periodsData.push({
+                idx: body.historyIdx || null, // 단일 상태 PK
                 status: body.status,
                 startDate: body.joinDate || null,
                 endDate: body.status === '1' ? (body.endDate || body.outDate || null) : null,
@@ -1110,3 +1114,94 @@ exports.deleteMember = async function (req, res) {
     let result = await memberModel.deleteMember(mId);
     res.json({'result': true, 'data': result});
 }
+
+exports.getCleaningMembers = async function (req, res) {
+    let cIdx = req.user.cIdx;
+
+    let result = await memberModel.getCleaningMembers(cIdx);
+
+    res.json({'result': true, 'data': result});
+}
+
+// 1. 신규 팀 + 팀원 등록 (POST)
+exports.setCleaningMembers = async function (req, res) {
+    let cIdx = req.user.cIdx,
+        name = req.body.name,       // 프론트에서 보낸 팀 이름
+        members = req.body.members; // 프론트에서 보낸 팀원 배열
+
+    // 1) DB에 팀을 먼저 생성하고 진짜 PK(insertId)를 받아옴
+    let newTeamIdx = await siteModel.setCleaningTeam(cIdx, name);
+
+    if (newTeamIdx === '-9999' || !newTeamIdx) {
+        return res.json({ 'result': false, 'data': '팀 등록 중 오류가 발생했습니다.' });
+    }
+
+    // 2) 새로 생성된 팀의 진짜 ID(newTeamIdx)를 사용해 팀원 일괄 등록
+    if (members && members.length > 0) {
+        let memberValues = members.map(m => [
+            newTeamIdx,  // ★ 프론트에서 온 가짜 값이 아닌 DB가 방금 만든 진짜 idx
+            m.mIdx,
+            m.leaderFl,
+            new Date()
+        ]);
+
+        let result = await memberModel.setCleaningMembers(memberValues);
+
+        if (result.data === '-9999') {
+            return res.json({ 'result': false, 'data': '팀원 등록 중 오류가 발생했습니다.' });
+        }
+    }
+
+    res.json({ 'result': true, 'data': '팀과 팀원이 성공적으로 등록되었습니다.' });
+}
+
+// 2. 기존 팀 + 팀원 수정 (PUT)
+exports.updateCleaningMembers = async function (req, res) {
+    let teamIdx = req.params.tIdx, // URL에서 넘어온 기존 팀 idx
+        cIdx = req.user.cIdx,
+        name = req.body.name,
+        members = req.body.members;
+
+    // 1) 팀 이름 수정
+    let updateTeam = await siteModel.updateCleaningTeam(teamIdx, cIdx, name);
+    if (updateTeam.data === '-9999') {
+        return res.json({ 'result': false, 'data': '팀 이름 수정 중 오류가 발생했습니다.' });
+    }
+
+    // 2) 기존 팀원 일괄 삭제
+    let delResult = await memberModel.deleteCleaningMembers(teamIdx);
+    if (delResult.data === '-9999') {
+        return res.json({ 'result': false, 'data': '기존 팀원 삭제 중 오류가 발생했습니다.' });
+    }
+
+    // 3) 새로운 팀원 배열 일괄 등록
+    if (members && members.length > 0) {
+        let memberValues = members.map(m => [
+            teamIdx,
+            m.mIdx,
+            m.leaderFl,
+            new Date()
+        ]);
+
+        let insertResult = await memberModel.setCleaningMembers(memberValues);
+        if (insertResult.data === '-9999') {
+            return res.json({ 'result': false, 'data': '새 팀원 등록 중 오류가 발생했습니다.' });
+        }
+    }
+
+    res.json({ 'result': true, 'data': '수정 완료' });
+}
+
+/*
+exports.saveCleaningTeam = async function (req, res) {
+    let cIdx = req.user.cIdx;         // 토큰 등에서 가져온 회사 idx
+    let teamIdx = req.params.idx;     // PUT 요청일 경우 존재 (없으면 undefined)
+    let { name, members } = req.body;
+
+    // 서비스 함수 호출
+    const result = await memberModel.saveCleaningTeamService(cIdx, teamIdx, name, members);
+
+    res.json({'result': true, 'data': result});
+};
+
+ */
