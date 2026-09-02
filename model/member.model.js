@@ -79,7 +79,10 @@ exports.getMemberList = async function (cIdx) {
     let sql = "select m.*, c2.sort,"
     // sql += " case when status = 0 then '재직' when status = 1 then '퇴사' else '-' end as `status`,"
     // sql += " mc.jsonData as wage,"
-    sql += " ms.sIdx, ms.name as `siteName`, ms.payment_day, mc.contractEndDt as `contract`,"
+    //sql += " ms.sIdx, ms.name as `siteName`,"
+    sql += " IF(m.hq = 'Y', 0, ms.sIdx) as sIdx,"
+    sql += " IF(m.hq = 'Y', '본사', IFNULL(ms.name, '미배정(대기)')) as `siteName`,"
+    sql += " ms.payment_day, mc.contractEndDt as `contract`,"
     sql += " c.itemNm as `type`, c2.itemNm as `position`, c3.option as `badgeColor`, c3.itemNm as `disability_grade`"
     sql += " from new_tb_member m"
 
@@ -411,7 +414,7 @@ exports.getMemberAvailable = async function(sIdx, cIdx) {
     sql += " FROM new_tb_member m";
 
     // 2. 전체 직원이 아닌 '내 회사(cIdx)' 소속이면서 '재직 중(status=0)'인 사람만 필터링
-    sql += " WHERE m.cIdx = ?"// AND m.status = 0";
+    sql += " WHERE m.cIdx = ? AND m.status = 0";
 
     // 3. 해당 현장(sIdx)에 이미 배치된 직원은 제외 (NOT IN)
     sql += " AND m.idx NOT IN (";
@@ -830,7 +833,7 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
         // -----------------------------------------------------
         let sqlMember = `
             INSERT INTO new_tb_member 
-            (cIdx, type, name, billingName, id, password, 
+            (cIdx, hq, type, name, billingName, id, password, 
              birthDt, rrn, phone, position, gender, email,
              disability, disability_date, disability_grade, defector, patriot, intern, beneficiary,
              foreigner, nationality, visa_code, visa_date,
@@ -839,7 +842,7 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
              inDate, outDate, outReason, 
              transferDate, 
              status, address)
-            VALUES (?, ?, ?, ?, ?, ?, 
+            VALUES (?, ?, ?, ?, ?, ?, ?, 
                     ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?,
@@ -851,7 +854,7 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
         `;
 
         let paramMember = [
-            member.cIdx, member.type, member.name, member.billingName, member.id, member.password,
+            member.cIdx, member.mType == 'HQ'?'Y':'N', member.type, member.name, member.billingName, member.id, member.password,
             member.birthDt, member.rrn,
             member.phone, member.position, member.gender, member.email,
             member.disability, member.disability_date, member.disability_grade, member.defector, member.patriot, member.intern,
@@ -1082,33 +1085,53 @@ exports.updateMemberWithContractAndStaffing = async function (mIdx, member, cont
         await connection.query(sqlStaffing, [mIdx, staffing.sIdx]);
 
         // -----------------------------------------------------------------
-        // 4. 이력(History) 테이블 업데이트 처리 (Soft Delete 방식)
+        // 4. 이력(History) 테이블 업데이트 처리 (Upsert 방식)
         // -----------------------------------------------------------------
-        // 과거 데이터를 지우지 않고, 사용 여부(useFl)를 'N'으로 변경하여 히스토리 보존
-        const sqlDeactivateHistory = `
+        if (periodsData && periodsData.length > 0) {
+            const currentStatus = periodsData[0].status;
+            const keepIdxList = periodsData.filter(p => p.idx).map(p => p.idx);
+
+            // 사용자가 '일용직' 기간 중 특정 기간을 프론트에서 '-' 버튼으로 지웠을 때를 대비한 로직
+            // '현재 저장하려는 상태(currentStatus)'에 해당하는 과거 이력 중, 넘어온 idx 목록에 없는 것은 N 처리
+            if (keepIdxList.length > 0) {
+                const placeholders = keepIdxList.map(() => '?').join(',');
+                const sqlDeleteRemoved = `
             UPDATE new_tb_member_history 
             SET useFl = 'N' 
-            WHERE mIdx = ?
+            WHERE mIdx = ? AND historyStatus = ? AND idx NOT IN (${placeholders})
         `;
-        await connection.query(sqlDeactivateHistory, [mIdx]);
+                await connection.query(sqlDeleteRemoved, [mIdx, currentStatus, ...keepIdxList]);
+            } else {
+                // 넘어온 기존 idx가 하나도 없다면, 해당 상태의 기존 내역을 모두 N 처리 (사용자가 다 지운 경우)
+                const sqlDeleteAllForStatus = `
+            UPDATE new_tb_member_history 
+            SET useFl = 'N' 
+            WHERE mIdx = ? AND historyStatus = ?
+        `;
+                await connection.query(sqlDeleteAllForStatus, [mIdx, currentStatus]);
+            }
 
-        if (periodsData && periodsData.length > 0) {
-            // 새롭게 들어온 데이터는 useFl = 'Y'로 저장 (최신 데이터 표시)
-            const sqlInsertHistory = `
+            // 넘어온 데이터 Insert 또는 Update 처리
+            for (const p of periodsData) {
+                if (p.idx) {
+                    // ① PK(idx)가 있으면 기존 이력이므로 UPDATE 처리 (regDt는 유지됨)
+                    const sqlUpdateHistory = `
+                UPDATE new_tb_member_history 
+                SET sIdx = ?, startDate = ?, endDate = ?, outReason = ?, useFl = 'Y'
+                WHERE idx = ?
+            `;
+                    await connection.query(sqlUpdateHistory, [
+                        staffing.sIdx, p.startDate, p.endDate, p.outReason, p.idx
+                    ]);
+                } else if (p.startDate || p.endDate) {
+                    // ② PK(idx)가 없으면 새로 추가된 이력(혹은 새로운 상태 전환)이므로 INSERT 처리
+                    const sqlInsertHistory = `
                 INSERT INTO new_tb_member_history 
                 (mIdx, sIdx, historyStatus, startDate, endDate, outReason, useFl, regDt) 
                 VALUES (?, ?, ?, ?, ?, ?, 'Y', NOW())
             `;
-
-            for (const p of periodsData) {
-                if (p.startDate || p.endDate) {
                     await connection.query(sqlInsertHistory, [
-                        mIdx,
-                        staffing.sIdx,
-                        p.status,
-                        p.startDate,
-                        p.endDate,
-                        p.outReason
+                        mIdx, staffing.sIdx, p.status, p.startDate, p.endDate, p.outReason
                     ]);
                 }
             }
@@ -1244,3 +1267,56 @@ exports.deleteMember = async function (mId) {
         return {'data': '-9999'}
     }
 }
+
+exports.getCleaningMembers = async function (cIdx) {
+    let sql = "select * from new_tb_member where hq = 'Y' and cIdx in (?)";
+    let aParameter = [cIdx];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.setCleaningMembers = async function (memberValues) {
+    let sql = "INSERT INTO new_tb_cleaning_team_member (tIdx, mIdx, leaderFl, regDt) VALUES ?";
+    let aParameter = [memberValues];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'};
+    }
+}
+
+// 특정 팀의 팀원 전체 삭제
+exports.deleteCleaningMembers = async function (teamIdx) {
+    let sql = "DELETE FROM new_tb_cleaning_team_member WHERE tIdx = ?";
+    let aParameter = [teamIdx];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'};
+    }
+}
+
+// 팀원 일괄 등록 (Bulk Insert)
+exports.insertTeamMembers = async (tIdx, mIdx, leaderFl, regDt) => {
+    let sql = `
+        INSERT INTO new_tb_cleaning_team_member (tIdx, mIdx, leaderFl, regDt) 
+        VALUES ?
+    `;
+    let aParameter = [tIdx, mIdx, leaderFl, regDt];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res.insertId;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
