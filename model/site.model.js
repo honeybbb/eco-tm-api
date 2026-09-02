@@ -571,23 +571,16 @@ exports.getSiteBudget = async function (sIdx, type) {
 
 // siteModel.js
 
-exports.getSiteCleaningSchedule = async function (cIdx) {
+exports.getCleaningSchedule = async function (cIdx) {
     let query = `
         SELECT 
-            scs.idx,
-            scs.sIdx,
-            ss.name AS siteName,
-            scs.itemCd,
-            (select itemNm from new_tb_code where scs.itemCd = itemCd and cIdx = ?) as itemName,
-            scs.startDt,
-            scs.endDt,
-            scs.memo as requestNote,
-            scs.regDt
-            -- sc.status -- 만약 상태 컬럼을 추가하셨다면 주석을 해제하세요.
-        FROM new_tb_site_cleaning_schedule scs
-        JOIN new_tb_site s ON scs.sIdx = s.idx
+            cs.*, cs.tIdx as teamIdx,
+            s.direct,
+            s.name AS siteName,
+            (select itemNm from new_tb_code where cs.itemCd = itemCd and cIdx = ?) as itemName
+        FROM new_tb_cleaning_schedule cs
+        JOIN new_tb_site s ON cs.sIdx = s.idx
         WHERE s.cIdx = ?
-        ORDER BY sc.cleaningDt ASC
     `;
     let aParameter = [cIdx, cIdx];
     try {
@@ -596,6 +589,37 @@ exports.getSiteCleaningSchedule = async function (cIdx) {
     } catch (err) {
         console.error("대청소 일정 조회 에러:", err);
         throw err;
+    }
+}
+
+exports.setCleaningSchedule = async function (cIdx, sIdx, itemCd, tIdx, mnIdx, startDt, endDt, durationDays, memo, status) {
+    let sql = "insert into new_tb_cleaning_schedule"
+    sql += " (cIdx, sIdx, itemCd, tIdx, mnIdx, startDt, endDt, durationDays, memo, status, regDt)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
+
+    let aParameter = [cIdx, sIdx, itemCd, tIdx, mnIdx, startDt, endDt, durationDays, memo, status];
+    let query = mysql.format(sql, aParameter);
+    try {
+        let res = await pool.query(query);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.updateCleaningSchedule = async function (idx, itemCd, startDt, endDt, durationDays, memo, status) {
+    let sql = "update new_tb_cleaning_schedule"
+    sql += " set itemCd=?, startDt=?, endDt=?, durationDays=?, memo=?, status = ? where idx = ?"
+    let aParameter = [itemCd, startDt, endDt, durationDays, memo, status, idx];
+
+    let query = mysql.format(sql, aParameter);
+    try {
+        let res = await pool.query(query);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
     }
 }
 
@@ -612,6 +636,93 @@ exports.updateSiteData = async function (sIdx, name, address, phone, bigo, build
         return {'data': '-9999'}
     }
 }
+
+exports.getCleaningTeam = async function (cIdx) {
+    let sql = `
+        SELECT 
+            t.idx, 
+            t.name AS teamName,
+            GROUP_CONCAT(tm.mIdx) AS memberIds,
+            MAX(CASE WHEN tm.leaderFl = 'Y' THEN tm.mIdx ELSE NULL END) AS leaderId
+        FROM new_tb_cleaning_team t
+        LEFT JOIN new_tb_cleaning_team_member tm ON t.idx = tm.tIdx
+        WHERE t.cIdx = ?
+        GROUP BY t.idx, t.name
+        ORDER BY t.idx ASC
+    `;
+    let aParameter = [cIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res; // 배열 형태로 반환됨
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'};
+    }
+}
+
+// 신규 팀 등록
+exports.setCleaningTeam = async (cIdx, name) => {
+    let sql = `
+        INSERT INTO new_tb_cleaning_team (cIdx, name, regDt) 
+        VALUES (?, ?, NOW())
+    `;
+    let aParameter = [cIdx, name];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res.insertId;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
+
+exports.updateCleaningTeam = async (teamIdx, cIdx, name) => {
+    let sql = `
+        UPDATE new_tb_cleaning_team 
+        SET name = ?, modDt = NOW() 
+        WHERE idx = ? AND cIdx = ?
+    `;
+
+    let aParameter = [name, teamIdx, cIdx];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
+
+exports.deleteCleaningTeamMembers = async (teamIdx) => {
+    let sql = `DELETE FROM new_tb_cleaning_team_member WHERE tIdx = ?`;
+
+    let aParameter = [teamIdx];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
+
+// 4. (추가) 팀원 일괄 등록 (Bulk Insert)
+exports.insertCleaningTeamMembers = async (memberValues) => {
+    let sql = `
+        INSERT INTO new_tb_cleaning_team_member (tIdx, mIdx, leaderFl, regDt) 
+        VALUES ?
+    `;
+
+    let aParameter = [memberValues];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+};
 
 exports.DeleteSite = async function (cIdx, sIdx) {
     let sql = "delete from new_tb_site where cIdx = ? and idx = ?"
