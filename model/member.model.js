@@ -80,8 +80,8 @@ exports.getMemberList = async function (cIdx) {
     // sql += " case when status = 0 then '재직' when status = 1 then '퇴사' else '-' end as `status`,"
     // sql += " mc.jsonData as wage,"
     //sql += " ms.sIdx, ms.name as `siteName`,"
-    sql += " IF(m.hq = 'Y', 0, ms.sIdx) as sIdx,"
-    sql += " IF(m.hq = 'Y', '본사', IFNULL(ms.name, '미배정(대기)')) as `siteName`,"
+    sql += " IF(m.type = '01001004', 0, ms.sIdx) as sIdx,"
+    sql += " IF(m.type = 'Y', '대청소', IFNULL(ms.name, '미배정(대기)')) as `siteName`,"
     sql += " ms.payment_day, mc.contractEndDt as `contract`,"
     sql += " c.itemNm as `type`, c2.itemNm as `position`, c3.option as `badgeColor`, c3.itemNm as `disability_grade`"
     sql += " from new_tb_member m"
@@ -833,7 +833,7 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
         // -----------------------------------------------------
         let sqlMember = `
             INSERT INTO new_tb_member 
-            (cIdx, hq, type, name, billingName, id, password, 
+            (cIdx, type, name, billingName, id, password, 
              birthDt, rrn, phone, position, gender, email,
              disability, disability_date, disability_grade, defector, patriot, intern, beneficiary,
              foreigner, nationality, visa_code, visa_date,
@@ -842,7 +842,7 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
              inDate, outDate, outReason, 
              transferDate, 
              status, address)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 
+            VALUES (?, ?, ?, ?, ?, ?, 
                     ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?,
@@ -854,7 +854,7 @@ exports.registerMemberWithContractAndStaffing = async function (member, contract
         `;
 
         let paramMember = [
-            member.cIdx, member.mType == 'HQ'?'Y':'N', member.type, member.name, member.billingName, member.id, member.password,
+            member.cIdx, member.type, member.name, member.billingName, member.id, member.password,
             member.birthDt, member.rrn,
             member.phone, member.position, member.gender, member.email,
             member.disability, member.disability_date, member.disability_grade, member.defector, member.patriot, member.intern,
@@ -1269,7 +1269,7 @@ exports.deleteMember = async function (mId) {
 }
 
 exports.getCleaningMembers = async function (cIdx) {
-    let sql = "select * from new_tb_member where hq = 'Y' and cIdx in (?)";
+    let sql = "select * from new_tb_member where type = '01001004' and cIdx in (?)";
     let aParameter = [cIdx];
     try {
         let [res] = await pool.query(sql, aParameter);
