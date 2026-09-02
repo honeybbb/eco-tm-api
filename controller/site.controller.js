@@ -57,7 +57,22 @@ module.exports = function (app) {
     app.route('/v1/site/contract/budget').get(service.getSiteBudget);
 
     //대청소 스케줄 조회
-    app.route('/v1/site/cleaning/schedule').get(service.getSiteCleaningSchedule);
+    app.route('/v1/site/cleaning/schedule').get(service.getCleaningSchedule);
+
+    //대청소 스케줄 등록
+    app.route('/v1/site/cleaning/schedule').post(service.setCleaningSchedule);
+
+    //대청소 스케줄 수정
+    app.route('/v1/site/cleaning/schedule/:idx').put(service.updateCleaningSchedule);
+
+    //대청소 팀 불러오기
+    app.route('/v1/site/cleaning/team').get(service.getCleaningTeam);
+
+    //대청소 팀 등록
+    app.route('/v1/site/cleaning/team').post(service.setCleaningTeam);
+
+    //대청소 팀 수정
+    app.route('/v1/site/cleaning/team/:idx').put(service.updateCleaningTeam);
 
     app.route('/v1/site/modify').post(service.updateSiteData);
 
