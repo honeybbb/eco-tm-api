@@ -608,10 +608,24 @@ exports.setCleaningSchedule = async function (cIdx, sIdx, itemCd, tIdx, mnIdx, s
     }
 }
 
-exports.updateCleaningSchedule = async function (idx, itemCd, startDt, endDt, durationDays, memo, status) {
+exports.updateCleaningSchedule = async function (idx, itemCd, startDt, endDt, durationDays, tIdx, mnIdx, memo, status) {
     let sql = "update new_tb_cleaning_schedule"
-    sql += " set itemCd=?, startDt=?, endDt=?, durationDays=?, memo=?, status = ? where idx = ?"
-    let aParameter = [itemCd, startDt, endDt, durationDays, memo, status, idx];
+    sql += " set itemCd=?, startDt=?, endDt=?, durationDays=?, tIdx=?, mnIdx=?, memo=?, status = ? where idx = ?"
+    let aParameter = [itemCd, startDt, endDt, durationDays, tIdx, mnIdx, memo, status, idx];
+
+    let query = mysql.format(sql, aParameter);
+    try {
+        let res = await pool.query(query);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.DeleteCleaningSchedule = async function (idx) {
+    let sql = "delete from new_tb_cleaning_schedule where idx = ?"
+    let aParameter = [idx];
 
     let query = mysql.format(sql, aParameter);
     try {

@@ -65,6 +65,9 @@ module.exports = function (app) {
     //대청소 스케줄 수정
     app.route('/v1/site/cleaning/schedule/:idx').put(service.updateCleaningSchedule);
 
+    //대청소 스케줄 삭제
+    app.route('/v1/site/cleaning/schedule/:idx').delete(service.DeleteCleaningSchedule);
+
     //대청소 팀 불러오기
     app.route('/v1/site/cleaning/team').get(service.getCleaningTeam);
 
