@@ -30,6 +30,7 @@ exports.getSiteList_v2 = async function (req, res) {
 
             contractsArr = contractsArr.map(c => {
                 let cleaningExpense = 0;
+                let cleaningSupplies = 0;
                 let otherExpense = 0;
                 let managementFee = 0;
                 let profit = 0;
@@ -57,6 +58,15 @@ exports.getSiteList_v2 = async function (req, res) {
                                     const staff = staffArr.find(s => s.code === staffCode);
                                     const count = staff ? (Number(staff.count) || 0) : 0;
                                     cleaningExpense += (amount * count);
+                                });
+                            }
+                        } else if (exp.code && String(exp.code).startsWith('04003002')) { // 기타제경비
+                            if (exp.values) {
+                                Object.entries(exp.values).forEach(([staffCode, val]) => {
+                                    const amount = Number(val) || 0;
+                                    const staff = staffArr.find(s => s.code === staffCode);
+                                    const count = staff ? (Number(staff.count) || 0) : 0;
+                                    cleaningSupplies += (amount * count);
                                 });
                             }
                         } else if (exp.code && String(exp.code).startsWith('04003004')) { // 기타제경비
@@ -107,6 +117,7 @@ exports.getSiteList_v2 = async function (req, res) {
                 return {
                     ...c,
                     cleaningExpense,
+                    cleaningSupplies,
                     otherExpense,
                     managementFee,
                     profit,
