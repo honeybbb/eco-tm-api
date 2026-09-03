@@ -384,7 +384,7 @@ exports.setCleaningSchedule = async function (req, res) {
     let cIdx = req.user.cIdx,
         sIdx = req.body.sIdx,
         itemCd = req.body.itemCd,
-        tIdx = req.body.tIdx, //팀idx
+        tIdx = req.body.teamIdx, //팀idx
         mnIdx = req.body.mnIdx,
         startDt = req.body.startDt,
         endDt = req.body.endDt,
@@ -403,12 +403,22 @@ exports.updateCleaningSchedule = async function (req, res) {
         startDt = req.body.startDt,
         endDt = req.body.endDt,
         durationDays = req.body.durationDays,
-        tIdx = req.body.tIdx,
+        tIdx = req.body.teamIdx,
         mnIdx = req.body.mnIdx,
         memo = req.body.memo,
         status = req.body.status;
 
+    console.log(idx, itemCd, startDt, endDt, durationDays, tIdx, mnIdx, memo, status)
+
     let result = await siteModel.updateCleaningSchedule(idx, itemCd, startDt, endDt, durationDays, tIdx, mnIdx, memo, status);
+
+    res.json({ 'result': true, 'data': result });
+}
+
+exports.DeleteCleaningSchedule = async function (req, res) {
+    let idx = req.params.idx;
+
+    let result = await siteModel.DeleteCleaningSchedule(idx);
 
     res.json({ 'result': true, 'data': result });
 }
