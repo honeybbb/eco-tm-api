@@ -1,11 +1,12 @@
 const mysql = require("mysql");
 const pool = require("../config/mysql");
+const eqModel = require("./equipment.model");
 
 
-exports.setEquipment = async function (cIdx, name, type, model, qty, serialNo, purchaseDt, status, bigo) {
-    let sql = "insert into new_tb_equipment (cIdx, name, type, model, qty, serialNo, purchaseDt, status, bigo)"
-    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    let aParameter = [cIdx, name, type, model, qty, serialNo, purchaseDt, status, bigo];
+exports.setEquipment = async function (cIdx, name, type, model, serialNo, totalQty, purchaseDt, mfgDt, price, imgPath, status, bigo) {
+    let sql = "insert into new_tb_equipment (cIdx, name, type, model, serialNo, qty, purchaseDt, mfgDt, price, imgPath, status, bigo, regDt)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
+    let aParameter = [cIdx, name, type, model, serialNo, totalQty, purchaseDt, mfgDt, price, imgPath, status, bigo];
 
     try {
         let [res] = await pool.query(sql, aParameter);
@@ -17,8 +18,24 @@ exports.setEquipment = async function (cIdx, name, type, model, qty, serialNo, p
 }
 
 exports.getEquipmentList = async function (cIdx) {
-    let sql = "select * from new_tb_equipment where cIdx = ?"
+    let sql = "select eq.*, eqa.* from new_tb_equipment eq"
+    sql += " left join new_tb_equipment_assignment eqa";
+    sql += " where eq.cIdx = ?";
     let aParameter = [cIdx];
+
+    let query = mysql.format(sql, aParameter);
+    try {
+        let res = await pool.query(query);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.moveEquipment = async function (eqIdx, fromSite, toSite, qty, date) {
+    let sql = "update new_tb_equipment_assignment set eqIdx = ?, from = ?, sIdx = ?, assignQty =?, assignDt = ?, regDt = NOW()";
+    let aParameter = [eqIdx, fromSite, toSite, qty, date];
 
     let query = mysql.format(sql, aParameter);
     try {
@@ -76,7 +93,22 @@ exports.updateEquipmentSite = async function (assignIdx, qty, status, nextCheckD
 
         let aParameter = [qty, status, nextCheckDt, bigo, assignIdx];
         let [res] = await pool.query(sql, aParameter);
-        return res
+        return res;
+    } catch (e) {
+        console.error('updateEquipmentSite err', e)
+        return { data: '-9999' }
+    }
+}
+
+exports.repairEquipment = async function (eqIdx, sIdx, repairType, content, cost) {
+    let sql = "update new_tb_equipment_repair set sIdx = ?, repairType=?, content=?, cost=?, regDt=NOW()"
+    sql += " where eqIdx = ?"
+
+    let aParameter = [sIdx, repairType, content, cost, eqIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
     } catch (e) {
         console.error('updateEquipmentSite err', e)
         return { data: '-9999' }
