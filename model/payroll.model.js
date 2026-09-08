@@ -358,6 +358,7 @@ exports.getPayrollMonth = async function (year, month, cIdx) {
             m.name AS staff,
             m.birthDt AS birthDt,
             m.rrn as personalNo,
+            m.status as mStatus,
             s.idx AS sIdx,
             s.name AS siteName,
             s.payment_day,
