@@ -152,7 +152,7 @@ exports.getBaseSalary = async function (cIdx, sIdx) { // 1. 파라미터에 sIdx
     sql += " left join new_tb_code c on c.itemCd = m.position and c.cIdx = m.cIdx";
 
     // 기본 WHERE 조건
-    sql += " WHERE m.cIdx = ?";
+    sql += " WHERE m.cIdx = ? and m.deleteFl = 'N'";
     let aParameter = [cIdx];
 
     // 2. sIdx가 넘어왔을 경우에만 AND 조건 동적 추가
@@ -426,7 +426,7 @@ exports.getPayrollMonth = async function (year, month, cIdx) {
             ) bs2 ON bs1.idx = bs2.max_idx
         ) bs ON bs.mIdx = m.idx
 
-        WHERE m.cIdx = ?
+        WHERE m.cIdx = ? and m.deleteFl = 'N'
           AND m.inDate <= LAST_DAY(STR_TO_DATE(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'), '%Y-%m-%d'))
           AND (m.outDate IS NULL OR m.outDate >= STR_TO_DATE(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'), '%Y-%m-%d'))
         ORDER BY s.idx, c.sort, m.idx
@@ -637,7 +637,7 @@ exports.getPayrollCalculate = async function (year, month, cIdx, sIdx) {
     )
     LEFT JOIN new_tb_member_assignment ma ON ma.mIdx = m.idx
     LEFT JOIN new_tb_site s ON s.idx = ma.sIdx
-    WHERE m.cIdx = ?
+    WHERE m.cIdx = ? and m.deleteFl = 'N'
   `;
 
     // 파라미터 순서대로
