@@ -89,7 +89,7 @@ exports.getSettlePayroll = async function (cIdx, year, month, sIdx){
     sql += " left join new_tb_code c on c.itemCd = LEFT(m.position, 8) and c.cIdx = m.cIdx";
 
     // 기본 WHERE 조건
-    sql += " WHERE m.cIdx = ?";
+    sql += " WHERE m.cIdx = ? and m.deleteFl = 'N'";
     let aParameter = [cIdx];
 
     if (year && month) {
