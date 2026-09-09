@@ -19,7 +19,7 @@ exports.findByLoginId = async function (loginId) {
 }
 
 exports.findByAdminId = async function (loginId) {
-    let sql = "select * from new_tb_manager where managerId = ? and status = 0";
+    let sql = "select *, (select c.companyNm from new_tb_config c where c.idx = cIdx) as companyNm from new_tb_manager where managerId = ? and status = 0";
     let aParameter = [loginId];
 
     try {
