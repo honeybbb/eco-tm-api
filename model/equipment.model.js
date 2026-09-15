@@ -19,7 +19,7 @@ exports.setEquipment = async function (cIdx, name, type, model, serialNo, totalQ
 
 exports.getEquipmentList = async function (cIdx) {
     let sql = "select eq.*, eqa.* from new_tb_equipment eq"
-    sql += " left join new_tb_equipment_assignment eqa";
+    sql += " left join new_tb_equipment_assignment eqa on eq.idx = eqa.eqIdx";
     sql += " where eq.cIdx = ?";
     let aParameter = [cIdx];
 
