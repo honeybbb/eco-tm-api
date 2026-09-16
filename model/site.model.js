@@ -224,7 +224,7 @@ exports.saveSite = async function (site) {
                     director=?, director_phone=?, billingManager = ?, payrollManager = ?,
                     bankName=?, accountNumber=?, accountName=?, payment_day=?, billing_day=?,
                     businessNumber=?, businessName =?, representative=?, businessType=?, businessItem=?, 
-                    email=?
+                    email=?, status =?
                 WHERE idx = ?
             `;
             let params = [
@@ -233,7 +233,7 @@ exports.saveSite = async function (site) {
                 site.director, site.director_phone, site.billingManager, site.payrollManager,
                 site.bankName, site.accountNumber, site.accountName, site.payment_day, site.billing_day,
                 site.businessNumber, site.businessName, site.representative, site.businessType, site.businessItem,
-                site.email,
+                site.email, site.status,
                 new_sIdx
             ];
             await connection.query(sql, params);
@@ -246,14 +246,14 @@ exports.saveSite = async function (site) {
                  director, director_phone, billingManager, payrollManager, 
                  bankName, accountNumber, accountName, payment_day, billing_day,
                  businessNumber,businessName, representative, businessType, businessItem,
-                 email)
+                 email, status)
                 VALUES (
                         ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, 
                         ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?,
-                        ?
+                        ?, ?
                        )
             `;
             let params = [
@@ -263,7 +263,7 @@ exports.saveSite = async function (site) {
                 site.director, site.director_phone, site.billingManager, site.payrollManager,
                 site.bankName, site.accountNumber, site.accountName, site.payment_day, site.billing_day,
                 site.businessNumber, site.businessName, site.representative, site.businessType, site.businessItem,
-                site.email
+                site.email, site.status
             ];
             let result = await connection.query(sql, params);
             new_sIdx = result[0].insertId;
@@ -608,10 +608,20 @@ exports.setCleaningSchedule = async function (cIdx, sIdx, itemCd, tIdx, mnIdx, s
     }
 }
 
-exports.updateCleaningSchedule = async function (idx, itemCd, startDt, endDt, durationDays, tIdx, mnIdx, memo, status) {
+exports.updateCleaningSchedule = async function (
+    idx, itemCd, startDt, endDt, startTm, endTm, durationDays,
+    tIdx, mnIdx, memo, status, includeSat, includeSun, includeHoliday, dailyTasksJson
+) {
     let sql = "update new_tb_cleaning_schedule"
-    sql += " set itemCd=?, startDt=?, endDt=?, durationDays=?, tIdx=?, mnIdx=?, memo=?, status = ? where idx = ?"
-    let aParameter = [itemCd, startDt, endDt, durationDays, tIdx, mnIdx, memo, status, idx];
+    sql += " set itemCd=?, startDt=?, endDt=?, startTm=?, endTm=?,"
+    sql += " durationDays=?, tIdx=?, mnIdx=?, memo=?, status = ?,"
+    sql += " includeSat=?, includeSun=?, includeHoliday=?, dailyTasksJson=?"
+    sql += " where idx = ?"
+    let aParameter = [
+        itemCd, startDt, endDt, startTm, endTm, durationDays,
+        tIdx, mnIdx, memo, status,
+        includeSat, includeSun, includeHoliday, dailyTasksJson,
+        idx];
 
     let query = mysql.format(sql, aParameter);
     try {

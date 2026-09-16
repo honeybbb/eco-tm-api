@@ -413,15 +413,25 @@ exports.updateCleaningSchedule = async function (req, res) {
         itemCd = req.body.itemCd,
         startDt = req.body.startDt,
         endDt = req.body.endDt,
+        startTm = req.body.startTm,
+        endTm = req.body.endTm,
         durationDays = req.body.durationDays,
         tIdx = req.body.teamIdx,
         mnIdx = req.body.mnIdx,
         memo = req.body.memo,
-        status = req.body.status;
+        status = req.body.status,
+        includeSat = req.body.includeSat,
+        includeSun = req.body.includeSun,
+        includeHoliday = req.body.includeHoliday,
+        dailyTasksJson = req.body.dailyTasksJson;
 
     console.log(idx, itemCd, startDt, endDt, durationDays, tIdx, mnIdx, memo, status)
 
-    let result = await siteModel.updateCleaningSchedule(idx, itemCd, startDt, endDt, durationDays, tIdx, mnIdx, memo, status);
+    let result = await siteModel.updateCleaningSchedule(
+        idx, itemCd, startDt, endDt, startTm, endTm, durationDays,
+        tIdx, mnIdx, memo, status,
+        includeSat, includeSun, includeHoliday, dailyTasksJson
+    );
 
     res.json({ 'result': true, 'data': result });
 }
