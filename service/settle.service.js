@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+const XlsxTemplate = require('xlsx-template');
 const settleModel = require("../model/settle.model");
 const payrollModel = require("../model/payroll.model");
 const siteModel = require("../model/site.model");
@@ -95,6 +98,68 @@ exports.getSettlePayroll = async function (req, res) {
 }
 
  */
+
+exports.getCalculatedPayroll_v2 = async function (req, res) {
+    try {
+        const { cIdx, sIdx, year, month, type } = req.query;
+
+        const targetMonth = String(month).padStart(2, '0');
+        const startDt = `${year}-${targetMonth}-01`;
+        const endDt = new Date(year, month, 0).toISOString().split('T')[0];
+
+        const siteData = await siteModel.getSiteData(sIdx);
+        let budgetMap = {};
+
+        if (siteData && siteData.length > 0 && siteData[0].contractList) {
+            const contracts = JSON.parse(siteData[0].contractList);
+            const targetContract = contracts.find(c => c.type === type);
+
+            if (targetContract && targetContract.budget) {
+                const parsedBudget = typeof targetContract.budget === 'string' ? JSON.parse(targetContract.budget) : targetContract.budget;
+                if (parsedBudget.directLabor) {
+                    parsedBudget.directLabor.forEach(labor => {
+                        budgetMap[labor.label] = labor.values;
+                    });
+                }
+            }
+        }
+
+        let members = await settleModel.getAssignedMembers(cIdx, sIdx, endDt, startDt);
+
+        if (!Array.isArray(members)) {
+            return res.status(500).json({ result: false, message: '직원 데이터를 불러오지 못했습니다.' });
+        }
+
+        // ── 근태 데이터 일괄 조회 (N+1 제거) ─────────────
+        const memberIdxList = members.map(m => m.idx);
+        const allWorkData = await workModel.getWorkSheetsBatch(memberIdxList, startDt, endDt);
+
+        // mIdx 기준으로 그룹핑
+        const workMap = {};
+        for (const row of allWorkData) {
+            if (!workMap[row.mIdx]) workMap[row.mIdx] = [];
+            workMap[row.mIdx].push(row);
+        }
+
+        // 4. 직원별 실제 근태 데이터 집계 (DB 호출 없이 메모리에서 처리)
+        for (let member of members) {
+            const workData = workMap[member.idx] || [];
+
+            const uniqueDays = new Set(workData.map(w => w.date));
+            member.actualWorkDays = uniqueDays.size;
+            member.actualWorkHours = workData.reduce((sum, row) => sum + Number(row.duration), 0);
+
+            member.budgetData = budgetMap[member.position] || null;
+        }
+
+        res.json({ result: true, data: members });
+
+    } catch (e) {
+        console.error('getCalculatedPayroll 에러:', e);
+        res.status(500).json({ result: false, message: '서버 에러' });
+    }
+}
+
 exports.getSettlePayroll = async function (req, res) {
     let cIdx = req.user.cIdx,
         year  = req.query.year,
@@ -576,4 +641,168 @@ exports.setSettleMember = async function (req, res) {
         console.error("정산서 저장 에러:", err);
         return res.status(500).json({ result: false, msg: '데이터베이스 처리 중 오류가 발생했습니다.' });
     }
+}
+
+exports.uploadSettleTemplate = async function (req, res) {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: '파일이 첨부되지 않았습니다.' });
+        }
+
+        // 1. 세션(토큰) 및 프론트엔드(FormData)에서 넘어온 데이터 추출
+        // 인증 미들웨어를 사용 중이라면 req.user.cIdx 등에 값이 들어있음
+        const cIdx = req.user ? req.user.cIdx : null;
+        const docType = req.body.type; // Vue에서 formData.append('type', form.value.type)으로 보낸 값
+        // const templateName = req.body.name; // Vue에서 보낸 템플릿명
+
+        // 2. DB에 저장할 파일 경로 및 원본 이름 맵핑
+        const fileUrl = `/uploads/${req.file.filename}`;
+        const originalName = req.file.originalname;
+
+        // 3. DB 저장 서비스 호출 (settle.service나 settle.model 연결)
+        await settleModel.uploadSettleModal(cIdx, docType, fileUrl, originalName);
+
+        // 4. 프론트엔드 응답
+        return res.json({
+            success: true,
+            message: '템플릿이 성공적으로 등록되었습니다.',
+            data: {
+                fileUrl: fileUrl,
+                originalName: originalName
+            }
+        });
+
+    } catch (error) {
+        console.error('정산서 템플릿 업로드 에러:', error);
+        return res.status(500).json({ success: false, message: '서버 오류가 발생했습니다.' });
+    }
+}
+
+exports.downloadSettleTemplate = async function (req, res) {
+    try {
+        const data = req.body;
+        const format = data.format || 'excel';
+
+        // 1. 템플릿 파일 경로
+        // (현재는 테스트용 파일로 연결. 추후 DB에서 현장에 맞는 file_url을 조회하도록 변경하시면 됩니다)
+        const templatePath = path.join(__dirname, '../uploads/1789365197581_467163209.xlsx');
+
+        if (!fs.existsSync(templatePath)) {
+            return res.status(404).json({ success: false, message: '서버에 엑셀 템플릿 파일이 없습니다.' });
+        }
+
+        // 2. 단일 데이터 매핑 (가이드에 안내된 키워드와 동일하게 맞춤)
+        const values = {
+            yyyy: data.year,
+            mm: String(data.month).padStart(2, '0'),
+            문서번호: data.docNo || '',
+            시행일자: data.billingDt || '',
+            현장명: data.billingData?.siteName || data.siteName || '',
+            총청구금액: Number(data.grandTotal) || 0,
+            합계금액: Number(data.grandTotal) || 0,
+            공급가액: Number(data.subTotal) || 0,
+            부가세: Number(data.vatAmount) || 0,
+            인사말: data.billingData?.headerMessage || '',
+            계좌정보: data.billingData?.bankInfo || '',
+
+            // HTML로 작성된 메모를 엑셀용 일반 텍스트로 치환 (정규식 사용)
+            메모: data.billingData?.memo
+                ? data.billingData.memo.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>?/gm, '')
+                : ''
+        };
+
+        // 2-1. 항목별 산출금액 동적 매핑 (예: {{경비용역비}}, {{청소용역비}})
+        if (data.billingData && Array.isArray(data.billingData.items)) {
+            data.billingData.items.forEach(item => {
+                if (item.detail) {
+                    // 공백 제거 (예: "경비 용역비" -> "경비용역비")
+                    values[item.detail.replace(/\s/g, '')] = Number(item.amount) || 0;
+                }
+            });
+        }
+
+        // 2-2. 하단 요약 데이터 매핑 (예: {{월간용역비}}, {{4대보험차액}}, {{연차적립금}})
+        if (Array.isArray(data.totalSummary)) {
+            data.totalSummary.forEach(item => {
+                if (item.label) {
+                    const amount = Number(item.value) * (item.sign || 1);
+                    // 괄호 및 줄바꿈 기호 제거 (예: "당월 청구금액 \n(원 단위 절사)" -> "당월청구금액")
+                    const cleanLabel = item.label.replace(/\s|\n|\(.*?\)/g, '');
+                    values[cleanLabel] = amount;
+                }
+            });
+        }
+
+        // 2-3. 배열 데이터(급여 대장) 매핑 : {{#empList}} ... {{/empList}}
+        values.empList = Array.isArray(data.payrollData) ? data.payrollData.map((emp, idx) => {
+            return {
+                no: idx + 1,
+                empName: emp.empName || '',
+                position: emp.position || '',
+                personalNo: emp.personalNo || '',
+                inDate: emp.inDate || '',
+                outDate: emp.outDate || '',
+
+                // 총액 및 실수령액
+                grossPay: Number(emp.grossPay) || 0,
+                netPay: Number(emp.netPay) || 0,
+                totalDeduct: Number(emp.totalDeduct) || 0,
+
+                // 각종 수당 및 충당금
+                연차: Number(emp.reserves?.annualLeave) || 0,
+                퇴직: Number(emp.reserves?.severance) || 0,
+                산재: Number(emp.reserves?.sanjae) || 0,
+                사업주고용: Number(emp.reserves?.empInsEmployer) || 0,
+
+                // 4대보험 공제 (프론트엔드 코드 체계 04002... 호환)
+                국민연금: Number(emp.deductionItems?.['04002001']) || Number(emp.deductionItems?.['04002001001']) || 0,
+                건강보험: Number(emp.deductionItems?.['04002002']) || Number(emp.deductionItems?.['04002001002']) || 0,
+                장기요양: Number(emp.deductionItems?.['04002004']) || Number(emp.deductionItems?.['04002001004']) || 0,
+                고용보험: Number(emp.deductionItems?.['04002003']) || Number(emp.deductionItems?.['04002001003']) || 0,
+            };
+        }) : [];
+
+        // 3. 템플릿 로드 및 데이터 치환 (Substitute)
+        const templateFile = fs.readFileSync(templatePath);
+        const template = new XlsxTemplate(templateFile);
+
+        // 엑셀의 1번째 시트, 2번째 시트 모두에 값을 치환합니다.
+        template.substitute(1, values);
+        try { template.substitute(2, values); } catch(e) {} // 2번 시트가 없으면 무시
+
+        // 최종 완성된 바이너리 데이터 생성
+        const resultBuffer = Buffer.from(template.generate({ type: 'nodebuffer' }));
+
+        // 4. 프론트엔드로 파일 전송 (응답)
+        const fileName = encodeURI(`정산서_${values.현장명}_${values.yyyy}년${values.mm}월`);
+
+        if (format === 'pdf') {
+            return res.status(501).send('PDF 변환은 서버에 LibreOffice 설치가 필요합니다.');
+        } else {
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${fileName}.xlsx`);
+            return res.send(resultBuffer);
+        }
+
+    } catch (error) {
+        console.error('엑셀 템플릿 다운로드 중 에러 발생:', error);
+        res.status(500).json({ success: false, message: '문서 생성 중 오류가 발생했습니다.' });
+    }
+};
+
+exports.getSettleTemplate = async function (req, res) {
+    let cIdx = req.user.cIdx;
+
+    let result = await settleModel.getSettleTemplate(cIdx);
+
+    res.json({"result": true, "data": result});
+}
+
+exports.deleteSettleTemplate = async function (req, res) {
+    let cIdx = req.user.cIdx,
+        idx = req.params.idx;
+
+    let result = await settleModel.deleteSettleTemplate(cIdx, idx);
+
+    res.json({"result": true, "data": result});
 }
