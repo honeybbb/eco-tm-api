@@ -27,7 +27,10 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 // const upload = multer({ storage: multer.memoryStorage() });
-const uploadMemory = multer({ storage: multer.memoryStorage() });
+const uploadMemory = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 20 * 1024 * 1024 }, // 20MB 제한
+});
 
 module.exports = function (app) {
     //직원 등록 - 엑셀 업로드
