@@ -12,6 +12,9 @@ module.exports = function (app) {
 
     app.route('/v1/settle/payroll/calculate').get(service.getCalculatedPayroll)
 
+    //정산 데이터 복사
+    // app.route('/v1/settle/payroll/copy').put(service.copySettlePayroll);
+
     //급여총액 리스트 및 청구현황
     app.route('/v1/settle/payroll/summary').get(service.getSettleSummary);
 
@@ -35,4 +38,10 @@ module.exports = function (app) {
 
     // 연차퇴직금 정산서 저장
     app.route('/v1/settle/member').post(service.setSettleMember)
+
+    //정산서 양식 조회
+    app.route('/v1/settle/template/list').get(service.getSettleTemplate);
+
+    //정산서 양식 삭제
+    app.route('/v1/settle/template/:idx').delete(service.deleteSettleTemplate);
 };

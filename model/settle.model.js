@@ -1093,3 +1093,47 @@ exports.updateSettleMember = async function (
         return {'data': '-9999'}
     }
 }
+
+exports.uploadSettleModal = async function (cIdx, docType, fileUrl, originalName){
+    let sql = `
+        INSERT INTO new_tb_site_settlement_format 
+        (cIdx, docType, filePath, originalName, regDt)
+        VALUES (?, ?, ?, ?, NOW())
+    `;
+
+    let aParameter = [cIdx, docType, fileUrl, originalName];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.getSettleTemplate = async function (cIdx) {
+    let sql = "select * from new_tb_site_settlement_format where cIdx in (?)"
+    let aParameter = [cIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.deleteSettleTemplate = async function (cIdx, idx) {
+    let sql = "delete from new_tb_site_settlement_format where cIdx in (?) and idx in (?)"
+    let aParameter = [cIdx, idx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
