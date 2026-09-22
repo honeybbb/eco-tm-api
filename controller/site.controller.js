@@ -69,13 +69,13 @@ module.exports = function (app) {
     app.route('/v1/site/cleaning/schedule/:idx').delete(service.DeleteCleaningSchedule);
 
     //대청소 팀 불러오기
-    app.route('/v1/site/cleaning/team').get(service.getCleaningTeam);
+    // app.route('/v1/site/cleaning/team').get(service.getCleaningTeam);
 
     //대청소 팀 등록
-    app.route('/v1/site/cleaning/team').post(service.setCleaningTeam);
+    // app.route('/v1/site/cleaning/team').post(service.setCleaningTeam);
 
     //대청소 팀 수정
-    app.route('/v1/site/cleaning/team/:idx').put(service.updateCleaningTeam);
+    // app.route('/v1/site/cleaning/team/:idx').put(service.updateCleaningTeam);
 
     app.route('/v1/site/modify').post(service.updateSiteData);
 
