@@ -569,17 +569,20 @@ exports.getSiteBudget = async function (sIdx, type) {
     }
 }
 
-// siteModel.js
-
 exports.getCleaningSchedule = async function (cIdx) {
     let query = `
-        SELECT 
-            cs.*, cs.tIdx as teamIdx,
-            s.manager, s.mnIdx,
+        SELECT
+            cs.*,
+            s.manager,
             s.name AS siteName,
-            (select itemNm from new_tb_code where cs.itemCd = itemCd and cIdx = ?) as itemName
+            (select itemNm from new_tb_code where cs.itemCd = itemCd and cIdx = ?) as itemName,
+            (
+                select group_concat(css.mIdx order by css.mIdx)
+                from new_tb_cleaning_schedule_staff css
+                where css.scheduleIdx = cs.idx
+            ) as staffIds
         FROM new_tb_cleaning_schedule cs
-        JOIN new_tb_site s ON cs.sIdx = s.idx
+                 JOIN new_tb_site s ON cs.sIdx = s.idx
         WHERE s.cIdx = ?
     `;
     let aParameter = [cIdx, cIdx];
@@ -592,44 +595,100 @@ exports.getCleaningSchedule = async function (cIdx) {
     }
 }
 
-exports.setCleaningSchedule = async function (cIdx, sIdx, itemCd, tIdx, mnIdx, startDt, endDt, durationDays, memo, status) {
-    let sql = "insert into new_tb_cleaning_schedule"
-    sql += " (cIdx, sIdx, itemCd, tIdx, mnIdx, startDt, endDt, durationDays, memo, status, regDt)"
-    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
+function parseStaffIds(staffIds) {
+    if (!staffIds) return [];
+    return String(staffIds)
+        .split(',')
+        .map((v) => Number(v.trim()))
+        .filter((n) => Number.isInteger(n) && n > 0);
+}
 
-    let aParameter = [cIdx, sIdx, itemCd, tIdx, mnIdx, startDt, endDt, durationDays, memo, status];
-    let query = mysql.format(sql, aParameter);
+// ----------------------------------------------------------------------------
+// 등록 (수정: startTm/endTm/includeSat/includeSun/includeHoliday/dailyTasksJson 추가)
+// ----------------------------------------------------------------------------
+exports.setCleaningSchedule = async function (
+    cIdx, sIdx, itemCd, staffIds, mnIdx, startDt, endDt, startTm, endTm, durationDays,
+    memo, status, includeSat, includeSun, includeHoliday, dailyTasksJson
+) {
+    const conn = await pool.getConnection();
     try {
-        let res = await pool.query(query);
-        return res;
-    }catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
+        await conn.beginTransaction();
+
+        let sql = "insert into new_tb_cleaning_schedule";
+        sql += " (cIdx, sIdx, itemCd, mnIdx, startDt, endDt, startTm, endTm, durationDays,";
+        sql += "  memo, status, includeSat, includeSun, includeHoliday, dailyTasksJson, regDt)";
+        sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+        let aParameter = [
+            cIdx, sIdx, itemCd, mnIdx, startDt, endDt, startTm, endTm, durationDays,
+            memo, status, includeSat, includeSun, includeHoliday, dailyTasksJson
+        ];
+        let [res] = await conn.query(sql, aParameter);
+        const scheduleIdx = res.insertId;
+
+        const ids = parseStaffIds(staffIds);
+        if (ids.length) {
+            const values = ids.map((mIdx) => [scheduleIdx, mIdx]);
+            await conn.query(
+                "insert into new_tb_cleaning_schedule_staff (scheduleIdx, mIdx) values ?",
+                [values]
+            );
+        }
+
+        await conn.commit();
+        return { result: true, insertId: scheduleIdx };
+    } catch (e) {
+        await conn.rollback();
+        console.error('대청소 일정 등록 db err:', e);
+        return { result: false, error: e.message };
+    } finally {
+        conn.release();
     }
 }
 
+// ----------------------------------------------------------------------------
+// 수정 — 기존과 동일 (이미 dailyTasksJson 처리하고 있었음), 실패 응답만 표준화
+// ----------------------------------------------------------------------------
 exports.updateCleaningSchedule = async function (
     idx, itemCd, startDt, endDt, startTm, endTm, durationDays,
-    tIdx, mnIdx, memo, status, includeSat, includeSun, includeHoliday, dailyTasksJson
+    staffIds, mnIdx, memo, status, includeSat, includeSun, includeHoliday, dailyTasksJson
 ) {
-    let sql = "update new_tb_cleaning_schedule"
-    sql += " set itemCd=?, startDt=?, endDt=?, startTm=?, endTm=?,"
-    sql += " durationDays=?, tIdx=?, mnIdx=?, memo=?, status = ?,"
-    sql += " includeSat=?, includeSun=?, includeHoliday=?, dailyTasksJson=?"
-    sql += " where idx = ?"
-    let aParameter = [
-        itemCd, startDt, endDt, startTm, endTm, durationDays,
-        tIdx, mnIdx, memo, status,
-        includeSat, includeSun, includeHoliday, dailyTasksJson,
-        idx];
-
-    let query = mysql.format(sql, aParameter);
+    const conn = await pool.getConnection();
     try {
-        let res = await pool.query(query);
-        return res;
-    }catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
+        await conn.beginTransaction();
+
+        let sql = "update new_tb_cleaning_schedule";
+        sql += " set itemCd=?, startDt=?, endDt=?, startTm=?, endTm=?,";
+        sql += " durationDays=?, mnIdx=?, memo=?, status=?,";
+        sql += " includeSat=?, includeSun=?, includeHoliday=?, dailyTasksJson=?";
+        sql += " where idx=?";
+        let aParameter = [
+            itemCd, startDt, endDt, startTm, endTm, durationDays,
+            mnIdx, memo, status,
+            includeSat, includeSun, includeHoliday, dailyTasksJson,
+            idx
+        ];
+        await conn.query(sql, aParameter);
+
+        // 기존 배정 전부 삭제 후 다시 insert
+        await conn.query("delete from new_tb_cleaning_schedule_staff where scheduleIdx = ?", [idx]);
+
+        const ids = parseStaffIds(staffIds);
+        if (ids.length) {
+            const values = ids.map((mIdx) => [idx, mIdx]);
+            await conn.query(
+                "insert into new_tb_cleaning_schedule_staff (scheduleIdx, mIdx) values ?",
+                [values]
+            );
+        }
+
+        await conn.commit();
+        return { result: true };
+    } catch (e) {
+        await conn.rollback();
+        console.error('대청소 일정 수정 db err:', e);
+        return { result: false, error: e.message };
+    } finally {
+        conn.release();
     }
 }
 
@@ -639,7 +698,7 @@ exports.DeleteCleaningSchedule = async function (idx) {
 
     let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(query);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -653,7 +712,7 @@ exports.updateSiteData = async function (sIdx, name, address, phone, bigo, build
 
     let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(query);
         return res;
     }catch (e) {
         console.log('db err', e);

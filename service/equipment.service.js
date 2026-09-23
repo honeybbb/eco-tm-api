@@ -3,14 +3,15 @@ const eqModel = require("../model/equipment.model")
 //장비 등록
 exports.setEquipment = async function (req, res) {
     let cIdx = req.user ? req.user.cIdx : 1, // (인증 미들웨어가 없다면 에러 방지용)
-        type = req.body.type,
+        type = req.body.type, //itemCd
         name = req.body.name,
         model = req.body.model,
         serialNo = req.body.serialNo,
         totalQty = req.body.totalQty,
         purchaseDt = req.body.purchaseDt,
-        mfgDt = req.body.mfgDt,
-        price = req.body.price,
+        supplyPrice = req.body.supplyPrice, //공급가
+        vat = req.body.vat,//부가세
+        totalPrice = req.body.totalPrice,//판매가
         status = req.body.status,
         bigo = req.body.bigo;
 
@@ -21,9 +22,15 @@ exports.setEquipment = async function (req, res) {
         imgPath = req.files.map(file => `/uploads/${file.filename}`).join(',');
     }
 
+    let filePath = '';
+
 
     try {
-        let result = await eqModel.setEquipment(cIdx, name, type, model, serialNo, totalQty, purchaseDt, mfgDt, price, imgPath, status, bigo);
+        let result = await eqModel.setEquipment(
+            cIdx, name, type, model, serialNo, totalQty, purchaseDt,
+            supplyPrice, vat, totalPrice,
+            imgPath, filePath, status, bigo
+        );
         res.json({'result': true, 'data': result});
     } catch (error) {
         console.error('장비 등록 DB 에러:', error);
@@ -38,6 +45,37 @@ exports.getEquipmentList = async function (req, res) {
     let result = await eqModel.getEquipmentList(cIdx);
 
     res.json({'result': true, 'data':result})
+}
+
+//장비 리스트 v2
+exports.getEquipmentList_v2 = async function (req, res) {
+    let cIdx = req.user.cIdx;
+
+    //장비 마스터 데이터
+    let result = await eqModel.getEquipmentList_v2(cIdx);
+    // 장비가 아예 없으면 빈 배열 바로 반환
+    if (!result || result.length === 0) {
+        res.json({'result': true, 'data':result});
+    }
+
+    let eqIdxs = result.map(eq => eq.idx);
+
+    // 3. Model 호출: 하위 이력 테이블 3개 병렬 조회 (Promise.all 활용)
+    let [assignments, repairs, transactions] = await Promise.all([
+        eqModel.getEquipmentAssignment(eqIdxs),
+        eqModel.getEquipmentRepair(eqIdxs),
+        eqModel.getEquipmentTransaction(eqIdxs)
+    ]);
+
+    // 4. 비즈니스 로직: 프론트엔드에서 쓰기 좋게 각각의 장비 객체 안에 이력 배열을 매핑 (조립)
+    result.forEach(eq => {
+        eq.assignments = assignments.filter(a => a.eqIdx === eq.idx);
+        eq.repairs = repairs.filter(r => r.eqIdx === eq.idx);
+        eq.transactions = transactions.filter(t => t.eqIdx === eq.idx);
+    });
+
+    // 5. 최종 완성된 데이터 반환
+    res.json({'result': true, 'data':result});
 }
 
 
@@ -87,6 +125,15 @@ exports.repairEquipment = async function (req, res) {
         cost = req.body.cost;
 
     let result = await eqModel.repairEquipment(eqIdx, sIdx, repairType, content, cost);
+
+    res.json({'result': true, 'data':result})
+}
+
+//장비 폐기
+exports.disposeEquipment = async function (req, res) {
+    let eqIdx = req.params.idx;
+
+    let result = await eqModel.disposeEquipment(eqIdx);
 
     res.json({'result': true, 'data':result})
 }

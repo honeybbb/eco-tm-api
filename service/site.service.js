@@ -395,17 +395,28 @@ exports.setCleaningSchedule = async function (req, res) {
     let cIdx = req.user.cIdx,
         sIdx = req.body.sIdx,
         itemCd = req.body.itemCd,
-        tIdx = req.body.teamIdx, //팀idx
+        staffIds = req.body.staffIds, // 투입 작업자 idx들 ("3,7,12" 콤마 문자열)
         mnIdx = req.body.mnIdx,
         startDt = req.body.startDt,
         endDt = req.body.endDt,
+        startTm = req.body.startTm,
+        endTm = req.body.endTm,
         durationDays = req.body.durationDays,
         memo = req.body.memo,
-        status = req.body.status;
+        status = req.body.status,
+        includeSat = req.body.includeSat,
+        includeSun = req.body.includeSun,
+        includeHoliday = req.body.includeHoliday,
+        dailyTasksJson = req.body.dailyTasksJson;
 
-    let result = await siteModel.setCleaningSchedule(cIdx, sIdx, itemCd, tIdx, mnIdx, startDt, endDt, durationDays, memo, status);
+    let result = await siteModel.setCleaningSchedule(
+        cIdx, sIdx, itemCd, staffIds, mnIdx, startDt, endDt, startTm, endTm, durationDays,
+        memo, status, includeSat, includeSun, includeHoliday, dailyTasksJson
+    );
 
-    res.json({ 'result': true, 'data': result });
+    // 버그 수정: 모델이 실패를 반환해도 여기서 무조건 result:true 로 덮어써서
+    // 프론트가 실패를 전혀 감지하지 못하고 있었음 → 모델 결과를 그대로 전달.
+    res.json({ 'result': !!result.result, 'data': result });
 }
 
 exports.updateCleaningSchedule = async function (req, res) {
@@ -416,7 +427,7 @@ exports.updateCleaningSchedule = async function (req, res) {
         startTm = req.body.startTm,
         endTm = req.body.endTm,
         durationDays = req.body.durationDays,
-        tIdx = req.body.teamIdx,
+        staffIds = req.body.staffIds, // 투입 작업자 idx들 ("3,7,12" 콤마 문자열)
         mnIdx = req.body.mnIdx,
         memo = req.body.memo,
         status = req.body.status,
@@ -425,15 +436,14 @@ exports.updateCleaningSchedule = async function (req, res) {
         includeHoliday = req.body.includeHoliday,
         dailyTasksJson = req.body.dailyTasksJson;
 
-    console.log(idx, itemCd, startDt, endDt, durationDays, tIdx, mnIdx, memo, status)
-
     let result = await siteModel.updateCleaningSchedule(
         idx, itemCd, startDt, endDt, startTm, endTm, durationDays,
-        tIdx, mnIdx, memo, status,
+        staffIds, mnIdx, memo, status,
         includeSat, includeSun, includeHoliday, dailyTasksJson
     );
 
-    res.json({ 'result': true, 'data': result });
+    // 버그 수정: 위와 동일 — 모델 실패를 그대로 전달
+    res.json({ 'result': !!result.result, 'data': result });
 }
 
 exports.DeleteCleaningSchedule = async function (req, res) {
