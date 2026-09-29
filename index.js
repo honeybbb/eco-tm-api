@@ -69,6 +69,9 @@ etcRoutes(app);
 var equipmentRoutes = require("./controller/equipment.controller");
 equipmentRoutes(app);
 
+var favoriteRoutes = require("./controller/favorite.controller");
+favoriteRoutes(app);
+
 app.listen(port, () => {
     console.log(`Example app listening on port ${port}`)
 })
