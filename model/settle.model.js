@@ -345,25 +345,29 @@ exports.getSettleSummary = async function (cIdx, year, month) {
 
             /* 3. 급여지급액 합계 (서브쿼리 mpm) */
             IFNULL(mpm.netPayTotal, 0) AS netPay,
-            IFNULL(mpm.payrollCnt, 0) AS payrollCnt
+            IFNULL(mpm.payrollCnt, 0) AS payrollCnt,
+
+            /* 4. 당월 입/퇴사자 상세 리스트 (서브쿼리 mio) */
+            IFNULL(mio.payrollData, JSON_ARRAY()) AS payrollData
 
         FROM new_tb_site_settlement ss
 
-                 /* [청구 데이터] 최신 청구 데이터만 추출 */
+                 /* [청구 데이터] 최신 청구 데이터만 추출 (회사 스코프) */
                  INNER JOIN (SELECT MAX(idx) AS max_idx
                              FROM new_tb_site_settlement
-                             WHERE year = ? AND month = ?
+                             WHERE year = ? AND month = ? AND cIdx = ?
                              GROUP BY sIdx) latest ON ss.idx = latest.max_idx
 
-                 INNER JOIN new_tb_site s ON s.idx = ss.sIdx
+                 INNER JOIN new_tb_site s ON s.idx = ss.sIdx AND s.cIdx = ?
 
-            /* [계약 인원] 현장 및 타입별 최신 계약 인원 가져오기 */
-                 LEFT JOIN (SELECT sc1.sIdx, sc1.type, sc1.staffCount
+            /* [계약 인원] 현장별로 type(경비/미화 등)별 최신 계약 인원을 합산 */
+                 LEFT JOIN (SELECT sc1.sIdx, SUM(sc1.staffCount) AS staffCount
                             FROM new_tb_site_contract sc1
                                      INNER JOIN (SELECT sIdx, type, MAX(idx) AS max_idx
                                                  FROM new_tb_site_contract
-                                                 GROUP BY sIdx, type) sc2 ON sc1.idx = sc2.max_idx) sc
-                           ON sc.sIdx = ss.sIdx AND sc.type = ss.type
+                                                 GROUP BY sIdx, type) sc2 ON sc1.idx = sc2.max_idx
+                            GROUP BY sc1.sIdx) sc
+                           ON sc.sIdx = ss.sIdx
 
             /* [인원 통계] new_tb_member_assignment를 통해 직원의 최신 현장 매핑 */
                  LEFT JOIN (SELECT ma.sIdx, /* 배정 테이블의 현장 idx 기준 */
@@ -380,6 +384,7 @@ exports.getSettleSummary = async function (cIdx, year, month) {
                                                                       FROM new_tb_member_assignment
                                                                       GROUP BY mIdx) a2 ON a1.idx = a2.max_idx) ma
                                                 ON m.idx = ma.mIdx
+                            WHERE m.cIdx = ?
                             GROUP BY ma.sIdx) ma ON ma.sIdx = ss.sIdx
 
             /* [급여 합계] 해당 연/월 실수령액 총합 및 재직자 기준 급여인원 */
@@ -391,19 +396,49 @@ exports.getSettleSummary = async function (cIdx, year, month) {
                 SUM(CASE WHEN m.status = 0 THEN 1 ELSE 0 END) AS \`payrollCnt\`
             FROM new_tb_member_payroll_month pm
                      LEFT JOIN new_tb_member m ON pm.mIdx = m.idx
-            WHERE pm.year = ? AND pm.month = ?
+            WHERE pm.year = ? AND pm.month = ? AND m.cIdx = ?
             GROUP BY pm.sIdx
         ) mpm ON mpm.sIdx = ss.sIdx
+
+            /* [입/퇴사자 상세] 당월 입/퇴사한 직원 목록을 사이트별로 JSON 배열로 반환 */
+                 LEFT JOIN (
+            SELECT ma.sIdx,
+                   JSON_ARRAYAGG(
+                       JSON_OBJECT(
+                           'empName', m.name,
+                           'position', IFNULL(pc.itemNm, ''),
+                           'inDate',  DATE_FORMAT(m.inDate,  '%Y-%m-%d'),
+                           'outDate', DATE_FORMAT(m.outDate, '%Y-%m-%d')
+                       )
+                   ) AS payrollData
+            FROM new_tb_member m
+                     INNER JOIN (SELECT a1.mIdx, a1.sIdx
+                                 FROM new_tb_member_assignment a1
+                                          INNER JOIN (SELECT mIdx, MAX(idx) AS max_idx
+                                                      FROM new_tb_member_assignment
+                                                      GROUP BY mIdx) a2 ON a1.idx = a2.max_idx) ma
+                                ON m.idx = ma.mIdx
+                     LEFT JOIN new_tb_code pc ON pc.itemCd = m.position AND pc.cIdx = m.cIdx
+            WHERE m.cIdx = ?
+              AND ( (YEAR(m.inDate)  = ? AND MONTH(m.inDate)  = ?)
+                 OR (YEAR(m.outDate) = ? AND MONTH(m.outDate) = ?) )
+            GROUP BY ma.sIdx
+        ) mio ON mio.sIdx = ss.sIdx
 
         ORDER BY s.name ASC
     `;
 
         // 파라미터 순서 매핑
     let aParameter = [
-        year, month,           // latest 청구 데이터 서브쿼리용
+        year, month, cIdx,     // latest 청구 데이터 서브쿼리용 (year, month, cIdx)
+        cIdx,                  // new_tb_site 조인 스코프 (s.cIdx)
         year, month,           // ma 입사자 카운트용
         year, month,           // ma 퇴사자 카운트용
-        year, month            // mpm 급여 합계용
+        cIdx,                  // ma 서브쿼리 회사 스코프 (m.cIdx)
+        year, month, cIdx,     // mpm 급여 합계용 (year, month, m.cIdx)
+        cIdx,                  // mio 서브쿼리 회사 스코프 (m.cIdx)
+        year, month,           // mio 입사자 상세용
+        year, month            // mio 퇴사자 상세용
     ];
 
     try {
