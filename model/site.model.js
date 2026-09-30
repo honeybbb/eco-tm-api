@@ -572,9 +572,10 @@ exports.getSiteBudget = async function (sIdx, type) {
 // siteModel.js
 
 exports.getCleaningSchedule = async function (cIdx) {
+    // tIdx(팀 idx) 컬럼은 아직 DB에 존재하지 않으므로 SELECT에서 제외
     let query = `
-        SELECT 
-            cs.*, cs.tIdx as teamIdx,
+        SELECT
+            cs.*,
             s.manager, s.mnIdx,
             s.name AS siteName,
             (select itemNm from new_tb_code where cs.itemCd = itemCd and cIdx = ?) as itemName
@@ -593,11 +594,12 @@ exports.getCleaningSchedule = async function (cIdx) {
 }
 
 exports.setCleaningSchedule = async function (cIdx, sIdx, itemCd, tIdx, mnIdx, startDt, endDt, durationDays, memo, status) {
+    // tIdx(팀 idx) 컬럼은 아직 DB에 존재하지 않으므로 INSERT에서 제외
     let sql = "insert into new_tb_cleaning_schedule"
-    sql += " (cIdx, sIdx, itemCd, tIdx, mnIdx, startDt, endDt, durationDays, memo, status, regDt)"
-    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
+    sql += " (cIdx, sIdx, itemCd, mnIdx, startDt, endDt, durationDays, memo, status, regDt)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
 
-    let aParameter = [cIdx, sIdx, itemCd, tIdx, mnIdx, startDt, endDt, durationDays, memo, status];
+    let aParameter = [cIdx, sIdx, itemCd, mnIdx, startDt, endDt, durationDays, memo, status];
     let query = mysql.format(sql, aParameter);
     try {
         let res = await pool.query(query);
@@ -612,14 +614,15 @@ exports.updateCleaningSchedule = async function (
     idx, itemCd, startDt, endDt, startTm, endTm, durationDays,
     tIdx, mnIdx, memo, status, includeSat, includeSun, includeHoliday, dailyTasksJson
 ) {
+    // tIdx(팀 idx) 컬럼은 아직 DB에 존재하지 않으므로 UPDATE에서 제외
     let sql = "update new_tb_cleaning_schedule"
     sql += " set itemCd=?, startDt=?, endDt=?, startTm=?, endTm=?,"
-    sql += " durationDays=?, tIdx=?, mnIdx=?, memo=?, status = ?,"
+    sql += " durationDays=?, mnIdx=?, memo=?, status = ?,"
     sql += " includeSat=?, includeSun=?, includeHoliday=?, dailyTasksJson=?"
     sql += " where idx = ?"
     let aParameter = [
         itemCd, startDt, endDt, startTm, endTm, durationDays,
-        tIdx, mnIdx, memo, status,
+        mnIdx, memo, status,
         includeSat, includeSun, includeHoliday, dailyTasksJson,
         idx];
 
