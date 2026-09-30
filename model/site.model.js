@@ -572,7 +572,6 @@ exports.getSiteBudget = async function (sIdx, type) {
 // siteModel.js
 
 exports.getCleaningSchedule = async function (cIdx) {
-    // tIdx(팀 idx) 컬럼은 아직 DB에 존재하지 않으므로 SELECT에서 제외
     let query = `
         SELECT
             cs.*,
@@ -593,8 +592,7 @@ exports.getCleaningSchedule = async function (cIdx) {
     }
 }
 
-exports.setCleaningSchedule = async function (cIdx, sIdx, itemCd, tIdx, mnIdx, startDt, endDt, durationDays, memo, status) {
-    // tIdx(팀 idx) 컬럼은 아직 DB에 존재하지 않으므로 INSERT에서 제외
+exports.setCleaningSchedule = async function (cIdx, sIdx, itemCd, mnIdx, startDt, endDt, durationDays, memo, status) {
     let sql = "insert into new_tb_cleaning_schedule"
     sql += " (cIdx, sIdx, itemCd, mnIdx, startDt, endDt, durationDays, memo, status, regDt)"
     sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
@@ -612,9 +610,8 @@ exports.setCleaningSchedule = async function (cIdx, sIdx, itemCd, tIdx, mnIdx, s
 
 exports.updateCleaningSchedule = async function (
     idx, itemCd, startDt, endDt, startTm, endTm, durationDays,
-    tIdx, mnIdx, memo, status, includeSat, includeSun, includeHoliday, dailyTasksJson
+    mnIdx, memo, status, includeSat, includeSun, includeHoliday, dailyTasksJson
 ) {
-    // tIdx(팀 idx) 컬럼은 아직 DB에 존재하지 않으므로 UPDATE에서 제외
     let sql = "update new_tb_cleaning_schedule"
     sql += " set itemCd=?, startDt=?, endDt=?, startTm=?, endTm=?,"
     sql += " durationDays=?, mnIdx=?, memo=?, status = ?,"
@@ -663,93 +660,6 @@ exports.updateSiteData = async function (sIdx, name, address, phone, bigo, build
         return {'data': '-9999'}
     }
 }
-
-exports.getCleaningTeam = async function (cIdx) {
-    let sql = `
-        SELECT 
-            t.idx, 
-            t.name AS teamName,
-            GROUP_CONCAT(tm.mIdx) AS memberIds,
-            MAX(CASE WHEN tm.leaderFl = 'Y' THEN tm.mIdx ELSE NULL END) AS leaderId
-        FROM new_tb_cleaning_team t
-        LEFT JOIN new_tb_cleaning_team_member tm ON t.idx = tm.tIdx
-        WHERE t.cIdx = ?
-        GROUP BY t.idx, t.name
-        ORDER BY t.idx ASC
-    `;
-    let aParameter = [cIdx];
-
-    try {
-        let [res] = await pool.query(sql, aParameter);
-        return res; // 배열 형태로 반환됨
-    } catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'};
-    }
-}
-
-// 신규 팀 등록
-exports.setCleaningTeam = async (cIdx, name) => {
-    let sql = `
-        INSERT INTO new_tb_cleaning_team (cIdx, name, regDt) 
-        VALUES (?, ?, NOW())
-    `;
-    let aParameter = [cIdx, name];
-    try {
-        let [res] = await pool.query(sql, aParameter);
-        return res.insertId;
-    }catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
-    }
-};
-
-exports.updateCleaningTeam = async (teamIdx, cIdx, name) => {
-    let sql = `
-        UPDATE new_tb_cleaning_team 
-        SET name = ?, modDt = NOW() 
-        WHERE idx = ? AND cIdx = ?
-    `;
-
-    let aParameter = [name, teamIdx, cIdx];
-    try {
-        let [res] = await pool.query(sql, aParameter);
-        return res;
-    }catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
-    }
-};
-
-exports.deleteCleaningTeamMembers = async (teamIdx) => {
-    let sql = `DELETE FROM new_tb_cleaning_team_member WHERE tIdx = ?`;
-
-    let aParameter = [teamIdx];
-    try {
-        let [res] = await pool.query(sql, aParameter);
-        return res;
-    }catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
-    }
-};
-
-// 4. (추가) 팀원 일괄 등록 (Bulk Insert)
-exports.insertCleaningTeamMembers = async (memberValues) => {
-    let sql = `
-        INSERT INTO new_tb_cleaning_team_member (tIdx, mIdx, leaderFl, regDt) 
-        VALUES ?
-    `;
-
-    let aParameter = [memberValues];
-    try {
-        let [res] = await pool.query(sql, aParameter);
-        return res;
-    }catch (e) {
-        console.log('db err', e);
-        return {'data': '-9999'}
-    }
-};
 
 exports.DeleteSite = async function (cIdx, sIdx) {
     let sql = "delete from new_tb_site where cIdx = ? and idx = ?"

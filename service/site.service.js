@@ -395,7 +395,6 @@ exports.setCleaningSchedule = async function (req, res) {
     let cIdx = req.user.cIdx,
         sIdx = req.body.sIdx,
         itemCd = req.body.itemCd,
-        tIdx = req.body.teamIdx, //팀idx
         mnIdx = req.body.mnIdx,
         startDt = req.body.startDt,
         endDt = req.body.endDt,
@@ -403,7 +402,7 @@ exports.setCleaningSchedule = async function (req, res) {
         memo = req.body.memo,
         status = req.body.status;
 
-    let result = await siteModel.setCleaningSchedule(cIdx, sIdx, itemCd, tIdx, mnIdx, startDt, endDt, durationDays, memo, status);
+    let result = await siteModel.setCleaningSchedule(cIdx, sIdx, itemCd, mnIdx, startDt, endDt, durationDays, memo, status);
 
     res.json({ 'result': true, 'data': result });
 }
@@ -416,7 +415,6 @@ exports.updateCleaningSchedule = async function (req, res) {
         startTm = req.body.startTm,
         endTm = req.body.endTm,
         durationDays = req.body.durationDays,
-        tIdx = req.body.teamIdx,
         mnIdx = req.body.mnIdx,
         memo = req.body.memo,
         status = req.body.status,
@@ -425,11 +423,9 @@ exports.updateCleaningSchedule = async function (req, res) {
         includeHoliday = req.body.includeHoliday,
         dailyTasksJson = req.body.dailyTasksJson;
 
-    console.log(idx, itemCd, startDt, endDt, durationDays, tIdx, mnIdx, memo, status)
-
     let result = await siteModel.updateCleaningSchedule(
         idx, itemCd, startDt, endDt, startTm, endTm, durationDays,
-        tIdx, mnIdx, memo, status,
+        mnIdx, memo, status,
         includeSat, includeSun, includeHoliday, dailyTasksJson
     );
 
@@ -440,33 +436,6 @@ exports.DeleteCleaningSchedule = async function (req, res) {
     let idx = req.params.idx;
 
     let result = await siteModel.DeleteCleaningSchedule(idx);
-
-    res.json({ 'result': true, 'data': result });
-}
-
-exports.getCleaningTeam = async function (req, res) {
-    let cIdx = req.user.cIdx;
-
-    let result = await siteModel.getCleaningTeam(cIdx);
-
-    res.json({ 'result': true, 'data': result });
-}
-
-exports.setCleaningTeam = async function (req, res) {
-    let cIdx = req.user.cIdx,
-        name = req.body.name; //팀이름
-
-    let result = await siteModel.setCleaningTeam(cIdx, name);
-
-    res.json({ 'result': true, 'data': result });
-}
-
-exports.updateCleaningTeam = async function (req, res) {
-    let teamIdx = req.params.idx,
-        cIdx = req.user.cIdx,
-        name = req.body.name;
-
-    let result = await siteModel.updateCleaningTeam(teamIdx, cIdx, name);
 
     res.json({ 'result': true, 'data': result });
 }
