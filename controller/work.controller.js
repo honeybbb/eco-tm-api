@@ -29,6 +29,8 @@ module.exports = function (app) {
     //직원 출근일괄 등록
     app.route('/v1/work/bulk').post(service.bulkRegisterWork);
 
+    app.route('/v1/work/bulk/all').post(service.bulkRegisterWorkAll);
+
     // 수동 등록/수정
     app.route('/v1/work/upsert').post(service.upsertWork);
 

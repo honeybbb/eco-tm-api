@@ -35,6 +35,25 @@ exports.getWorkByDate = async function(mIdx, sIdx, date) {
     }
 };
 
+// workModel.js
+exports.getWorkSheetsBatch = async function (memberIdxList, startDt, endDt) {
+    if (!memberIdxList.length) return [];
+    const sql = `
+    SELECT mIdx, date, duration
+    FROM new_tb_work
+    WHERE mIdx IN (?) AND date BETWEEN ? AND ?
+  `;
+    let aParameter = [memberIdxList, startDt, endDt];
+    try {
+        const [rows] = await pool.query(sql, aParameter);
+        return rows;
+    } catch (e) {
+        console.error('DB Error [getWorkSheetsBatch]:', e);
+        throw e;
+    }
+
+};
+
 // workModel.js 또는 siteModel.js
 exports.getSiteContractDetail = async function(sIdx, type) {
     let sql = `

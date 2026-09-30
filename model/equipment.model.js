@@ -3,10 +3,17 @@ const pool = require("../config/mysql");
 const eqModel = require("./equipment.model");
 
 
-exports.setEquipment = async function (cIdx, name, type, model, serialNo, totalQty, purchaseDt, mfgDt, price, imgPath, status, bigo) {
-    let sql = "insert into new_tb_equipment (cIdx, name, type, model, serialNo, qty, purchaseDt, mfgDt, price, imgPath, status, bigo, regDt)"
+exports.setEquipment = async function (
+    cIdx, name, type, model, serialNo, totalQty, purchaseDt,
+    supplyPrice, vat, totalPrice, imgPath, filePath, status, bigo
+) {
+    let sql = "insert into new_tb_equipment"
+    sql += " (cIdx, name, type, model, serialNo, qty, purchaseDt, supplyPrice, vat, totalPrice, imgPath, filePath, status, bigo, regDt)"
     sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
-    let aParameter = [cIdx, name, type, model, serialNo, totalQty, purchaseDt, mfgDt, price, imgPath, status, bigo];
+    let aParameter = [
+        cIdx, name, type, model, serialNo, totalQty, purchaseDt,
+        supplyPrice, vat, totalPrice, imgPath, filePath, status, bigo
+    ];
 
     try {
         let [res] = await pool.query(sql, aParameter);
@@ -26,6 +33,65 @@ exports.getEquipmentList = async function (cIdx) {
     let query = mysql.format(sql, aParameter);
     try {
         let res = await pool.query(query);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+//장비 리스트 (마스터)
+exports.getEquipmentList_v2 = async function (cIdx) {
+    let sql = "select * from new_tb_equipment where cIdx in (?)"
+    let aParameter = [cIdx];
+
+    let query = mysql.format(sql, aParameter);
+    try {
+        let [res] = await pool.query(query);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+//장비 배치 내역
+exports.getEquipmentAssignment = async function (eqIdx) {
+    let sql = "select * from new_tb_equipment_assignment where eqIdx in (?)";
+    let aParameter = [eqIdx];
+
+    let query = mysql.format(sql, aParameter);
+    try {
+        let [res] = await pool.query(query);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+//장비 수리 내역
+exports.getEquipmentRepair = async function (eqIdx) {
+    let sql = "select * from new_tb_equipment_repair where eqIdx in (?)";
+    let aParameter = [eqIdx];
+
+    let query = mysql.format(sql, aParameter);
+    try {
+        let [res] = await pool.query(query);
+        return res;
+    }catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.getEquipmentTransaction = async function (eqIdx) {
+    let sql = "select * from new_tb_equipment_transaction where eqIdx in (?)";
+    let aParameter = [eqIdx];
+
+    let query = mysql.format(sql, aParameter);
+    try {
+        let [res] = await pool.query(query);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -105,6 +171,20 @@ exports.repairEquipment = async function (eqIdx, sIdx, repairType, content, cost
     sql += " where eqIdx = ?"
 
     let aParameter = [sIdx, repairType, content, cost, eqIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.error('updateEquipmentSite err', e)
+        return { data: '-9999' }
+    }
+}
+
+//장비 폐기
+exports.disposeEquipment = async function (eqIdx) {
+    let sql = "update new_tb_equipment set status = 2 where idx in (?)";
+    let aParameter = [eqIdx];
 
     try {
         let [res] = await pool.query(sql, aParameter);

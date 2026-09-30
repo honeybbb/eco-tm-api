@@ -64,4 +64,6 @@ module.exports = function (app) {
     app.route('/v1/code/item/order').get(service.getOrders);
 
     app.route('/v1/code/item/order/status').put(service.updateOrderStatus);
+
+    app.route('/v1/config/holiday').get(service.getRestDeInfo);
 }

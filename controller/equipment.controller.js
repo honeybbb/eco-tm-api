@@ -26,7 +26,7 @@ module.exports = function (app) {
     app.route('/v1/equipment/register').post(upload.array('imgPath', 10), service.setEquipment);
 
     //장비 리스트
-    app.route('/v1/equipment/list').get(service.getEquipmentList);
+    app.route('/v2/equipment/list').get(service.getEquipmentList_v2);
 
     //장비 이동
     app.route('/v1/equipment/move').put(service.moveEquipment);
@@ -36,4 +36,7 @@ module.exports = function (app) {
 
     //장비 수리등록
     app.route('/v1/equipment/repair').put(service.repairEquipment);
+
+    //장비 폐기
+    app.route('/v1/equipment/dispose/:idx').put(service.disposeEquipment);
 }

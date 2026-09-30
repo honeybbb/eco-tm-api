@@ -1,5 +1,6 @@
 const workModel = require("../model/work.model")
 const memberModel = require("../model/member.model");
+const siteModel = require("../model/site.model");
 const xlsx = require("xlsx");
 const path = require('path');
 const ExcelJS = require('exceljs');
@@ -949,7 +950,7 @@ exports.bulkRegisterWork = async function (req, res) {
                 // 스케줄상 근무일(isActive)이 아니면 패스
                 if (!daySchedule || !daySchedule.isActive) continue;
 
-                // 🌟 이미 등록된 휴가(연차, 반차, 휴무)가 있는지 확인
+                // 이미 등록된 휴가(연차, 반차, 휴무)가 있는지 확인
                 const existing = await workModel.getWorkByDate(staff.idx, sIdx, date);
                 const hasLeave = existing.some(r => ['annual', 'half', 'leave'].includes(r.workType));
 
@@ -958,7 +959,7 @@ exports.bulkRegisterWork = async function (req, res) {
                     continue;
                 }
 
-                // 🌟 계약서에 명시된 시간으로 등록
+                // 계약서에 명시된 시간으로 등록
                 // workStartDt는 'YYYY-MM-DD HH:mm' 형식으로 조합 (필요시 모델 수정)
                 const startTime = `${date} ${daySchedule.startTime || '09:00'}:00`;
                 const endTime = `${date} ${daySchedule.endTime || '18:00'}:00`;
@@ -986,6 +987,138 @@ exports.bulkRegisterWork = async function (req, res) {
 
     } catch (error) {
         console.error('❌ 일괄 등록 오류:', error);
+        res.status(500).json({ result: false, message: '서버 오류가 발생했습니다.' });
+    }
+};
+
+// ────────────────────────────────────────────────────────
+// 1. 단일 현장/월에 대한 근태 생성 핵심 로직 (응답 반환 없이 데이터 처리만 수행)
+// ────────────────────────────────────────────────────────
+const processBulkRegisterCore = async (cIdx, sIdx, month, type) => {
+    try {
+        const toYMD = (val) => {
+            if (!val) return null;
+            const d = new Date(val);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
+
+        // 1. 현장 직원 목록 조회 및 필터링
+        const allStaff = await memberModel.getStaffBySite(sIdx, cIdx);
+        const staffList = allStaff.filter(m => m.type === type);
+
+        // 직원이 없으면 조용히 0건 리턴 (루프를 멈추지 않음)
+        if (staffList.length === 0) return { success: 0, skipped: 0 };
+
+        // 2. 최신 계약 스케줄 로드
+        const rawStaffDetail = await workModel.getSiteContractDetail(sIdx, type);
+        if (!rawStaffDetail) return { success: 0, skipped: 0 };
+
+        const staffDetail = typeof rawStaffDetail === 'string' ? JSON.parse(rawStaffDetail) : rawStaffDetail;
+        const scheduleMap = {};
+        staffDetail.forEach(item => {
+            scheduleMap[item.code] = item.schedule;
+        });
+
+        // 3. 기존 일반 근무 데이터 삭제
+        const mIdxList = staffList.map(s => s.idx);
+        await workModel.deleteWorkByStaffList(sIdx, month, mIdxList);
+
+        // 4. 날짜 생성 및 등록 루프
+        const allDates = getAllDatesOfMonth(month); // (기존 글로벌 함수 사용)
+        const currentTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+        let successCount = 0;
+        let skipLeaveCount = 0;
+
+        for (const staff of staffList) {
+            const positionKey = staff.position ? String(staff.position).substring(0, 8) : '';
+            const schedule = scheduleMap[positionKey];
+            if (!schedule) continue;
+
+            const inDate = toYMD(staff.inDate);
+            const outDate = (staff.status === 1 || staff.outDate) ? toYMD(staff.outDate) : null;
+
+            for (const date of allDates) {
+                if (inDate && date < inDate) continue;
+                if (outDate && date > outDate) continue;
+
+                const dayOfWeek = new Date(date).getDay();
+                const daySchedule = schedule[dayOfWeek];
+                if (!daySchedule || !daySchedule.isActive) continue;
+
+                const existing = await workModel.getWorkByDate(staff.idx, sIdx, date);
+                const hasLeave = existing.some(r => ['annual', 'half', 'leave'].includes(r.workType));
+
+                if (hasLeave) {
+                    skipLeaveCount++;
+                    continue;
+                }
+
+                const startTime = `${date} ${daySchedule.startTime || '09:00'}:00`;
+                const endTime = `${date} ${daySchedule.endTime || '18:00'}:00`;
+
+                const result = await workModel.workStart(
+                    staff.idx, Number(sIdx), startTime, 'work', '', currentTime, endTime
+                );
+
+                if (result && result.data !== '-9999') successCount++;
+            }
+        }
+
+        return { success: successCount, skipped: skipLeaveCount };
+    } catch (error) {
+        console.error(`❌ [현장: ${sIdx}, 월: ${month}] 처리 중 오류:`, error);
+        return { success: 0, skipped: 0 }; // 에러가 나도 다른 현장/월 처리를 위해 기본값 반환
+    }
+};
+
+// ────────────────────────────────────────────────────────
+// 2. 전체 현장 & 1~7월 루프 컨트롤러 (API 엔드포인트)
+// ────────────────────────────────────────────────────────
+exports.bulkRegisterWorkAll = async function (req, res) {
+    try {
+        const cIdx = 4; // 요청하신 고정값 적용
+        const { year, type } = req.body; // 특정 연도(예: 2024)와 직종만 입력받음
+
+        if (!year || !type) {
+            return res.status(400).json({ result: false, message: '연도(year)와 직종(type) 파라미터가 누락되었습니다.' });
+        }
+
+        // 전체 현장 목록 조회
+        const sites = await siteModel.getSiteList(cIdx);
+        const sIdxs = sites.map(s => s.idx);
+
+        if (sIdxs.length === 0) {
+            return res.status(400).json({ result: false, message: '등록된 현장이 없습니다.' });
+        }
+
+        // 1월 ~ 7월 배열 생성 (예: ['2024-01', '2024-02', ... '2024-07'])
+        const months = ['01', '02', '03', '04', '05', '06', '07'].map(m => `${year}-${m}`);
+
+        let totalSuccess = 0;
+        let totalSkipped = 0;
+
+        // 🌟 이중 루프: 모든 현장에 대해 1~7월을 순차적으로 처리
+        for (const sIdx of sIdxs) {
+            for (const month of months) {
+                // 핵심 로직 호출
+                const result = await processBulkRegisterCore(cIdx, sIdx, month, type);
+
+                totalSuccess += result.success;
+                totalSkipped += result.skipped;
+            }
+        }
+
+        // 모든 루프가 끝난 뒤 클라이언트에 딱 한 번만 응답
+        res.status(200).json({
+            result: true,
+            success: totalSuccess,
+            skippedByLeave: totalSkipped,
+            message: `전체 일괄 등록 완료: ${totalSuccess}건 생성 (연차/반차 ${totalSkipped}건 보존)`
+        });
+
+    } catch (error) {
+        console.error('❌ 전체 일괄 등록 오류:', error);
         res.status(500).json({ result: false, message: '서버 오류가 발생했습니다.' });
     }
 };
