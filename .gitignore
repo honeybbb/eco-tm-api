@@ -11,6 +11,9 @@ uploads/
 # Logs
 *.log
 
+# Local DB backups (실제 데이터 포함 — 저장소에 올리지 않음)
+_backup_*.sql
+
 # IDE / OS
 .idea/
 .vscode/

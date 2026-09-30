@@ -454,33 +454,6 @@ exports.DeleteCleaningSchedule = async function (req, res) {
     res.json({ 'result': true, 'data': result });
 }
 
-exports.getCleaningTeam = async function (req, res) {
-    let cIdx = req.user.cIdx;
-
-    let result = await siteModel.getCleaningTeam(cIdx);
-
-    res.json({ 'result': true, 'data': result });
-}
-
-exports.setCleaningTeam = async function (req, res) {
-    let cIdx = req.user.cIdx,
-        name = req.body.name; //팀이름
-
-    let result = await siteModel.setCleaningTeam(cIdx, name);
-
-    res.json({ 'result': true, 'data': result });
-}
-
-exports.updateCleaningTeam = async function (req, res) {
-    let teamIdx = req.params.idx,
-        cIdx = req.user.cIdx,
-        name = req.body.name;
-
-    let result = await siteModel.updateCleaningTeam(teamIdx, cIdx, name);
-
-    res.json({ 'result': true, 'data': result });
-}
-
 exports.updateSiteData = async function (req, res) {
     let sIdx = req.body.sIdx,
         name = req.body.name,
