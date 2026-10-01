@@ -34,9 +34,15 @@ module.exports = function (app) {
     //장비 조회
     app.route('/v1/equipment/data/:idx').get(service.getEquipmentData);
 
-    //장비 수리등록
-    app.route('/v1/equipment/repair').put(service.repairEquipment);
+    //장비 수리등록 (before 사진 포함)
+    app.route('/v1/equipment/repair').post(upload.array('beforeImgPath', 10), service.repairEquipment);
+
+    //장비 수리 완료 처리 (after 사진 포함)
+    app.route('/v1/equipment/repair/:repairIdx/complete').post(upload.array('afterImgPath', 10), service.completeRepair);
 
     //장비 폐기
     app.route('/v1/equipment/dispose/:idx').put(service.disposeEquipment);
+
+    //장비 부분 폐기 처리 (현장/수량 지정)
+    app.route('/v1/equipment/discard').post(service.discardEquipment);
 }

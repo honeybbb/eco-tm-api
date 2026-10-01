@@ -8,8 +8,8 @@ exports.setEquipment = async function (
     supplyPrice, vat, totalPrice, imgPath, filePath, status, bigo
 ) {
     let sql = "insert into new_tb_equipment"
-    sql += " (cIdx, name, type, model, serialNo, qty, purchaseDt, supplyPrice, vat, totalPrice, imgPath, filePath, status, bigo, regDt)"
-    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
+    sql += " (cIdx, name, type, model, serialNo, totalQty, purchaseDt, supplyPrice, vat, totalPrice, imgPath, filePath, status, bigo, regDt)"
+    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
     let aParameter = [
         cIdx, name, type, model, serialNo, totalQty, purchaseDt,
         supplyPrice, vat, totalPrice, imgPath, filePath, status, bigo
@@ -148,6 +148,21 @@ exports.setEquipmentSite = async function (eqIdx, sIdx, qty, assignDt, nextCheck
     }
 }
 
+// 신규 장비 등록 시 최초 배치 insert (fromSidx = 0 = 본사)
+exports.setEquipmentAssignment = async function (eqIdx, fromSidx, sIdx, qty, assignDt, bigo, status) {
+    let sql = "insert into new_tb_equipment_assignment (eqIdx, fromSidx, sIdx, assignQty, assignDt, bigo, status, regDt)";
+    sql += " values (?, ?, ?, ?, ?, ?, ?, NOW())";
+    let aParameter = [eqIdx, fromSidx, sIdx, qty, assignDt, bigo, status];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('setEquipmentAssignment db err', e);
+        return { 'data': '-9999' };
+    }
+}
+
 exports.updateEquipmentSite = async function (assignIdx, qty, status, nextCheckDt, bigo) {
     try {
         let sql = "UPDATE new_tb_equipment_assignment"
@@ -181,7 +196,54 @@ exports.repairEquipment = async function (eqIdx, sIdx, repairType, content, cost
     }
 }
 
-//장비 폐기
+// 수리/점검 이력 INSERT (before 사진 포함)
+exports.setEquipmentRepair = async function (
+    eqIdx, sIdx, repairDt, repairType, startDt, endDt,
+    content, repairCenter, beforeImgPath, cost, expense, managerId
+) {
+    let sql = "insert into new_tb_equipment_repair";
+    sql += " (eqIdx, sIdx, repairDt, repairType, startDt, endDt, content, repairCenter, beforeImgPath, cost, expense, managerId, regDt)";
+    sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+    let aParameter = [
+        eqIdx, sIdx, repairDt, repairType, startDt, endDt,
+        content, repairCenter, beforeImgPath, cost, expense, managerId
+    ];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.error('setEquipmentRepair err', e);
+        return { data: '-9999' };
+    }
+}
+
+// 수리 완료 처리 (afterImgPath, completedDt 업데이트)
+exports.completeEquipmentRepair = async function (repairIdx, completedDt, afterImgPath) {
+    let sql = "update new_tb_equipment_repair";
+    sql += " set completedDt = ?, afterImgPath = COALESCE(?, afterImgPath), modDt = NOW()";
+    sql += " where idx = ?";
+    try {
+        let [res] = await pool.query(sql, [completedDt, afterImgPath, repairIdx]);
+        return res;
+    } catch (e) {
+        console.error('completeEquipmentRepair err', e);
+        return { data: '-9999' };
+    }
+}
+
+// 장비 마스터 status 변경 (수리/점검중 등으로 전환)
+exports.updateEquipmentStatus = async function (eqIdx, status) {
+    let sql = "update new_tb_equipment set status = ?, modDt = NOW() where idx = ?";
+    try {
+        let [res] = await pool.query(sql, [status, eqIdx]);
+        return res;
+    } catch (e) {
+        console.error('updateEquipmentStatus err', e);
+        return { data: '-9999' };
+    }
+}
+
+//장비 폐기 (장비 마스터 상태 변경)
 exports.disposeEquipment = async function (eqIdx) {
     let sql = "update new_tb_equipment set status = 2 where idx in (?)";
     let aParameter = [eqIdx];
@@ -190,7 +252,34 @@ exports.disposeEquipment = async function (eqIdx) {
         let [res] = await pool.query(sql, aParameter);
         return res;
     } catch (e) {
-        console.error('updateEquipmentSite err', e)
+        console.error('disposeEquipment err', e)
         return { data: '-9999' }
+    }
+}
+
+// 폐기 이력 INSERT (부분 폐기 지원)
+exports.setEquipmentDiscard = async function (eqIdx, sIdx, qty, discardDt, reason, managerId) {
+    let sql = "insert into new_tb_equipment_discard (eqIdx, sIdx, qty, discardDt, reason, managerId, regDt)";
+    sql += " values (?, ?, ?, ?, ?, ?, NOW())";
+    let aParameter = [eqIdx, sIdx, qty, discardDt, reason, managerId];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.error('setEquipmentDiscard err', e);
+        return { data: '-9999' };
+    }
+}
+
+// 특정 장비의 폐기 이력 조회
+exports.getEquipmentDiscard = async function (eqIdx) {
+    let sql = "select * from new_tb_equipment_discard where eqIdx in (?) order by regDt desc";
+    let aParameter = [eqIdx];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.error('getEquipmentDiscard err', e);
+        return { data: '-9999' };
     }
 }
