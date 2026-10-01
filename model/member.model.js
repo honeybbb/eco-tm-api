@@ -441,7 +441,7 @@ exports.setMemberData = async function(type, name, id, password, birthDt, phone,
     sql += " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     sql += " ON DUPLICATE KEY UPDATE name=?, birthDt=?, phone=?, position=?, gender=?,email=?,"
     sql += " disability=?, disability_date=?, disability_grade=?, defector=?, patriot=?, intern=?, beneficiary=?, foreigner=?, nationality=?, visa_code=?, visa_date=?,"
-    sql += " bank=?,accountNumber=?,inDate=?,outDate=?,outReason=?,addr=?,bigo=?"
+    sql += " bank=?,accountNumber=?,inDate=?,outDate=?,outReason=?,address=?,bigo=?"
     let aParameter = [type, name, id, password, birthDt, phone, position, contract, gender, email,
         disability, disability_date, disability_grade, defector, patriot, intern, beneficiary, foreigner, nationality, visa_code, visa_date,
         bank, accountNumber, inDate, outDate, outReason, address, bigo,
@@ -621,7 +621,7 @@ exports.setMemberLeave = async function (mIdx, sIdx, type, year, middleDt, count
 }
 
 exports.updateMemberLeave = async function (mIdx, year, totalCount, overCount, usedCount, bigo, modDt){
-    let sql = "update new_tb_member_annual_leave set totalCount=?,overCount=?,usedCount=?,bigo=?,modDt=? where mIdx in (?) and year (?)"
+    let sql = "update new_tb_member_annual_leave set totalCount=?,overCount=?,usedCount=?,bigo=?,modDt=? where mIdx in (?) and year = ?"
     let aParameter = [totalCount, overCount, usedCount, bigo, modDt, mIdx, year];
 
     try {
@@ -1246,6 +1246,18 @@ exports.updateMemberFourInsStatus = async function (cIdx, mIdx, colName, status)
     let sql = `UPDATE new_tb_member SET ${colName} = ? WHERE cIdx = ? AND idx = ?`;
     let aParameter = [status, cIdx, mIdx];
 
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'};
+    }
+}
+
+exports.updateMemberMngYn = async function (cIdx, mIdx, mngYn) {
+    let sql = "UPDATE new_tb_member SET mngYn = ? WHERE cIdx = ? AND idx = ?";
+    let aParameter = [mngYn, cIdx, mIdx];
     try {
         let [res] = await pool.query(sql, aParameter);
         return res;

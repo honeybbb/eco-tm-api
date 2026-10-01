@@ -1001,6 +1001,20 @@ exports.updateMemberFourInsStatus = async function (req, res) {
     }
 }
 
+exports.updateMemberMngYn = async function (req, res) {
+    let cIdx = req.user.cIdx,
+        mIdx = req.params.idx,
+        mngYn = req.body.mngYn === 'Y' ? 'Y' : 'N';
+
+    let result = await memberModel.updateMemberMngYn(cIdx, mIdx, mngYn);
+
+    if (result && result.data !== '-9999') {
+        res.json({'result': true, 'data': result});
+    } else {
+        res.json({'result': false, 'message': 'DB 업데이트 실패'});
+    }
+}
+
 exports.uploadExcel = async function (req, res) {
     try {
         const cIdx = req.user.cIdx;

@@ -44,6 +44,9 @@ module.exports = function (app) {
 
     app.route('/v1/member/status/four/ins/:idx').put(service.updateMemberFourInsStatus);
 
+    //직원 관리 권한 토글 (mngYn)
+    app.route('/v1/member/mngyn/:idx').put(service.updateMemberMngYn);
+
     //직원 삭제
     app.route('/v1/member/:id').put(service.deleteMember);
 
