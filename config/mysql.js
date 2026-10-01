@@ -2,7 +2,7 @@ var mysql = require("mysql2/promise");
 var util = require("util");
 var pool = mysql.createPool({
     host: 'renewwave.co.kr',
-    post: '3306',
+    port: 3306,
     user: 'root',
     password: 'Renew0701!',
     database: 'eco_erp_system',

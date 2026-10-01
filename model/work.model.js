@@ -171,7 +171,7 @@ exports.workEnd = async function (mIdx, sIdx, workEndDt, today) {
 exports.getDayOff = async function (mIdx, today) {
     let sql = "select * from new_tb_member_off"
     sql += " where mIdx in (?)" //직원idx
-    sql += " and AND (?) BETWEEN startDt AND endDt" //날짜
+    sql += " and (?) BETWEEN startDt AND endDt" //날짜
     sql += " and status = 1"; //연차 승인 상태
     let aParameter = [mIdx, today];
 
