@@ -140,9 +140,9 @@ exports.setWageCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl
 exports.setBaseCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl, option, regDt) {
     // ON DUPLICATE KEY UPDATE 구문 추가
     let sql = `
-        INSERT INTO new_tb_code (cIdx, groupCd, itemCd, itemNm, sort, useFl, \`option\`, regDt) 
+        INSERT INTO new_tb_code (cIdx, groupCd, itemCd, itemNm, sort, useFl, \`option\`, regDt)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE 
+        ON DUPLICATE KEY UPDATE
             itemNm = VALUES(itemNm),
             sort = VALUES(sort),
             useFl = VALUES(useFl),
@@ -271,7 +271,7 @@ exports.getWageCode2 = async function (cIdx) {
                useFl, deleteFl, editFl, sort
         FROM   new_tb_code
         WHERE
---             groupCd LIKE '04%' and 
+--             groupCd LIKE '04%' and
             cIdx in (?)
         ORDER  BY itemCd, sort
     `;

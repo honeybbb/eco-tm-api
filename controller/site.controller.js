@@ -68,6 +68,15 @@ module.exports = function (app) {
     //대청소 스케줄 삭제
     app.route('/v1/site/cleaning/schedule/:idx').delete(service.DeleteCleaningSchedule);
 
+    //대청소 사진 제출 시 스케줄 상태를 확정대기(5)로 변경 (user 앱에서 호출)
+    app.route('/v1/site/cleaning/schedule/status/pending').put(service.setCleaningSchedulePending);
+
+    //대청소 공문 목록 조회
+    app.route('/v1/site/cleaning/doc').get(service.getCleaningDocList);
+
+    //대청소 공문 발송(생성)
+    app.route('/v1/site/cleaning/doc').post(service.setCleaningDoc);
+
     //대청소 팀 불러오기
     // app.route('/v1/site/cleaning/team').get(service.getCleaningTeam);
 

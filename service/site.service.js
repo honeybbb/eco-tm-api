@@ -391,6 +391,24 @@ exports.getCleaningSchedule = async function (req, res) {
     res.json({ 'result': true, 'data': result });
 }
 
+// user 앱 대청소 보고서 제출 시 스케줄 상태를 5(확정대기)로 변경
+exports.setCleaningSchedulePending = async function (req, res) {
+    try {
+        const cIdx = req.user.cIdx;
+        const sIdx = req.body.sIdx;
+        const workDate = req.body.workDate;
+
+        if (!sIdx || !workDate) {
+            return res.json({ result: false, msg: 'sIdx와 workDate가 필요합니다.' });
+        }
+
+        const result = await siteModel.setCleaningSchedulePending(cIdx, sIdx, workDate);
+        res.json({ result: true, data: result });
+    } catch (err) {
+        res.json({ result: false, msg: '스케줄 상태 변경 실패' });
+    }
+}
+
 exports.setCleaningSchedule = async function (req, res) {
     let cIdx = req.user.cIdx,
         sIdx = req.body.sIdx,
@@ -452,6 +470,30 @@ exports.DeleteCleaningSchedule = async function (req, res) {
     let result = await siteModel.DeleteCleaningSchedule(idx);
 
     res.json({ 'result': true, 'data': result });
+}
+
+exports.getCleaningDocList = async function (req, res) {
+    let cIdx = req.user.cIdx;
+
+    let result = await siteModel.getCleaningDocList(cIdx);
+
+    res.json({ 'result': true, 'data': result });
+}
+
+exports.setCleaningDoc = async function (req, res) {
+    let cIdx = req.user.cIdx,
+        scheduleIdx = req.body.scheduleIdx,
+        docType = req.body.docType,
+        title = req.body.title,
+        snapshotJson = req.body.snapshotJson;
+
+    if (!scheduleIdx || !title) {
+        return res.json({ 'result': false, 'message': 'scheduleIdx, title은 필수입니다.' });
+    }
+
+    let result = await siteModel.setCleaningDoc(cIdx, scheduleIdx, docType, title, snapshotJson);
+
+    res.json({ 'result': !!result.result, 'data': result });
 }
 
 exports.updateSiteData = async function (req, res) {
