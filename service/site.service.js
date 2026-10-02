@@ -11,128 +11,110 @@ exports.getSiteList = async function (req, res) {
 }
 
 exports.getSiteList_v2 = async function (req, res) {
-    let cIdx = req.user.cIdx;
+    const cIdx = req.user.cIdx;
 
     // 1. 모델단에서 순수 DB 쿼리 결과를 가져옵니다.
     let result = await siteModel.getSiteList(cIdx);
-    let members = await memberModel.getMemberAvailable(cIdx)
+    const members = await memberModel.getMemberAvailable(cIdx);
 
     // DB 에러 방어 코드
-    if (result && result.data === '-9999') {
-        return res.json({'result': false, 'msg': '데이터베이스 오류가 발생했습니다.'});
+    if (!result || result.data === '-9999') {
+        return res.json({ 'result': false, 'msg': '데이터베이스 오류가 발생했습니다.' });
     }
+
+    // 문자열이면 JSON 파싱, 실패하면 기본값 반환
+    const parseJson = (value, fallback) => {
+        if (!value) return fallback;
+        if (typeof value !== 'string') return value;
+        try { return JSON.parse(value); } catch (e) { return fallback; }
+    };
 
     // 2. 서비스단 비즈니스 로직 (금액 및 횟수 가공)
     result = result.map(site => {
-        if (site.contracts) {
-            // DB에서 넘어온 contracts가 문자열이면 배열로 파싱
-            let contractsArr = typeof site.contracts === 'string' ? JSON.parse(site.contracts) : site.contracts;
+        if (!site.contracts) return site;
 
-            contractsArr = contractsArr.map(c => {
-                let cleaningExpense = 0;
-                let cleaningSupplies = 0;
-                let otherExpense = 0;
-                let managementFee = 0;
-                let profit = 0;
-                let cleaningCount = 0;
+        const contractsArr = parseJson(site.contracts, []);
 
-                // 1. 인원수 데이터 준비
-                let staffArr = c.staffDetail || [];
-                if (typeof staffArr === 'string') {
-                    try { staffArr = JSON.parse(staffArr); } catch(e) { staffArr = []; }
-                }
+        site.contracts = contractsArr.map(c => {
+            let cleaningExpense = 0;   // 대청소비
+            let cleaningSupplies = 0;  // 청소용품비
+            let otherExpense = 0;      // 기타제경비
+            let managementFee = 0;     // 일반관리비
+            let profit = 0;            // 기업이윤
+            let cleaningCount = 0;     // 대청소 횟수
 
-                // 2. 단가 데이터 준비
-                let jsonData = c.jsonData || {};
-                if (typeof jsonData === 'string') {
-                    try { jsonData = JSON.parse(jsonData); } catch(e) { jsonData = {}; }
-                }
+            // 2-1. 인원수 / 단가 데이터 준비
+            const staffArr = parseJson(c.staffDetail, []);
+            const jsonData = parseJson(c.jsonData, {});
 
-                // 3. 대청소비 & 기타제경비 계산 (단가 * 인원수)
-                if (jsonData.expenses && Array.isArray(jsonData.expenses)) {
-                    jsonData.expenses.forEach(exp => {
-                        if (exp.code && String(exp.code).startsWith('04003001')) { // 대청소비
-                            if (exp.values) {
-                                Object.entries(exp.values).forEach(([staffCode, val]) => {
-                                    const amount = Number(val) || 0;
-                                    const staff = staffArr.find(s => s.code === staffCode);
-                                    const count = staff ? (Number(staff.count) || 0) : 0;
-                                    cleaningExpense += (amount * count);
-                                });
-                            }
-                        } else if (exp.code && String(exp.code).startsWith('04003002')) { // 기타제경비
-                            if (exp.values) {
-                                Object.entries(exp.values).forEach(([staffCode, val]) => {
-                                    const amount = Number(val) || 0;
-                                    const staff = staffArr.find(s => s.code === staffCode);
-                                    const count = staff ? (Number(staff.count) || 0) : 0;
-                                    cleaningSupplies += (amount * count);
-                                });
-                            }
-                        } else if (exp.code && String(exp.code).startsWith('04003004')) { // 기타제경비
-                            if (exp.values) {
-                                Object.entries(exp.values).forEach(([staffCode, val]) => {
-                                    const amount = Number(val) || 0;
-                                    const staff = staffArr.find(s => s.code === staffCode);
-                                    const count = staff ? (Number(staff.count) || 0) : 0;
-                                    otherExpense += (amount * count);
-                                });
-                            }
-                        }
-                    });
-                }
+            // 단가 * 인원수 합계
+            const sumByStaff = (values) => {
+                if (!values) return 0;
+                return Object.entries(values).reduce((sum, [staffCode, val]) => {
+                    const amount = Number(val) || 0;
+                    const staff = staffArr.find(s => s.code === staffCode);
+                    const count = staff ? (Number(staff.count) || 0) : 0;
+                    return sum + (amount * count);
+                }, 0);
+            };
 
-                // 4. 일반관리비 계산 (단가 * 인원수)
-                if (jsonData.managementFee) {
-                    Object.entries(jsonData.managementFee).forEach(([staffCode, val]) => {
-                        const amount = Number(val) || 0;
-                        const staff = staffArr.find(s => s.code === staffCode);
-                        const count = staff ? (Number(staff.count) || 0) : 0;
-                        managementFee += (amount * count);
-                    });
-                }
+            // 2-2. 대청소비 / 청소용품비 / 기타제경비 (expenses 배열)
+            if (Array.isArray(jsonData.expenses)) {
+                jsonData.expenses.forEach(exp => {
+                    if (!exp.code) return;
+                    const code = String(exp.code);
 
-                // 5. 기업이윤 계산 (단가 * 인원수)
-                if (jsonData.profit) {
-                    Object.entries(jsonData.profit).forEach(([staffCode, val]) => {
-                        const amount = Number(val) || 0;
-                        const staff = staffArr.find(s => s.code === staffCode);
-                        const count = staff ? (Number(staff.count) || 0) : 0;
-                        profit += (amount * count);
-                    });
-                }
+                    if (code.startsWith('04003001')) {
+                        cleaningExpense += sumByStaff(exp.values);
+                    } else if (code.startsWith('04003002')) {
+                        cleaningSupplies += sumByStaff(exp.values);
+                    } else if (code.startsWith('04003004')) {
+                        otherExpense += sumByStaff(exp.values);
+                    }
+                });
+            }
 
-                // 6. 대청소 횟수 계산
-                const processItems = (items) => {
-                    let cnt = 0;
-                    items.forEach(item => { if (item.name && item.count) cnt += (Number(item.count) || 0); });
-                    return cnt;
-                };
-                if (c.cleaningConfig && Array.isArray(c.cleaningConfig)) {
-                    cleaningCount = processItems(c.cleaningConfig);
-                } else if (jsonData.cleaningConfig && Array.isArray(jsonData.cleaningConfig)) {
-                    cleaningCount = processItems(jsonData.cleaningConfig);
-                }
+            // 2-3. 일반관리비 (최상위 managementFee 객체, 코드 04004001)
+            const mf = jsonData.managementFee;
+            if (mf && String(mf.code).startsWith('04004001')) {
+                managementFee = sumByStaff(mf.values);
+            }
 
-                return {
-                    ...c,
-                    cleaningExpense,
-                    cleaningSupplies,
-                    otherExpense,
-                    managementFee,
-                    profit,
-                    cleaningCount
-                };
-            });
+            // 2-4. 기업이윤 (최상위 profit 객체, 코드 04004002)
+            const pf = jsonData.profit;
+            if (pf && String(pf.code).startsWith('04004002')) {
+                profit = sumByStaff(pf.values);
+            }
 
-            site.contracts = contractsArr;
-        }
+            // 2-5. 대청소 횟수 계산
+            const countItems = (items) => items.reduce((cnt, item) => {
+                if (item.name && item.count) cnt += (Number(item.count) || 0);
+                return cnt;
+            }, 0);
+
+            if (Array.isArray(c.cleaningConfig)) {
+                cleaningCount = countItems(c.cleaningConfig);
+            } else if (Array.isArray(jsonData.cleaningConfig)) {
+                cleaningCount = countItems(jsonData.cleaningConfig);
+            }
+
+            return {
+                ...c,
+                cleaningExpense,
+                cleaningSupplies,
+                otherExpense,
+                managementFee,
+                profit,
+                cleaningCount
+            };
+        });
+
         return site;
     });
 
     // 3. 가공 완료된 데이터를 프론트엔드로 응답합니다.
-    res.json({'result': true, 'data': result});
-}
+    res.json({ 'result': true, 'data': result });
+};
 
 exports.setSiteBigo = async function (req, res) {
     let sIdx = req.body.sIdx,
