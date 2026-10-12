@@ -83,14 +83,15 @@ exports.setBaseCode = async function (req, res) {
 }
 
 exports.updateBaseCode = async function (req, res) {
-    let itemCd = req.params.itemCd,
+    let cIdx = req.user.cIdx,
+        itemCd = req.params.itemCd,
         itemNm = req.body.itemNm,
         useFl = req.body.useFl,
         option = req.body.option,
         sort = req.body.sort,
         modDt = new Date();
 
-    let result = await etcModel.updateBaseCode(itemCd, itemNm, useFl, option, sort, modDt);
+    let result = await etcModel.updateBaseCode(cIdx, itemCd, itemNm, useFl, option, sort, modDt);
 
     res.json({'result': true, 'data': result})
 }
@@ -173,9 +174,10 @@ exports.deleteWageCode = async function (req, res) {
 }
 
 exports.deleteBaseCode = async function (req, res) {
-    let itemCd = req.params.itemCd;
+    let cIdx = req.user.cIdx,
+        itemCd = req.params.itemCd;
 
-    let result = await etcModel.deleteBaseCode(itemCd);
+    let result = await etcModel.deleteBaseCode(cIdx, itemCd);
 
     res.json({'result': true, 'data': result})
 }
@@ -288,19 +290,31 @@ exports.setOrders = async function (req, res) {
 
 //품목신청 리스트
 exports.getOrders = async function (req, res) {
-    let result = await etcModel.getOrders();
+    let cIdx = req.user.cIdx;
+    if (!cIdx) return res.json({'result': false, 'msg': '회사 정보가 없습니다.'});
+
+    let result = await etcModel.getOrders(cIdx);
 
     res.json({'result': true, 'data': result})
 }
 
 exports.updateOrderStatus = async function (req, res) {
-    let sIdx = req.body.sIdx,
-        oIdx = req.body.oIdx,
-        status = req.body.status,
-        managerId = req.body.managerId;
+    try {
+        let sIdx = req.body.sIdx,
+            items = req.body.items || [],
+            status = req.body.status,
+            managerId = req.body.managerId;
 
-    let result = await etcModel.updateOrderStatus(sIdx, oIdx, status, managerId);
-    res.json({'result': true, 'data': result})
+        if (!sIdx || !items.length || status === undefined || status === null) {
+            return res.status(400).json({ result: false, message: '필수 값 누락' });
+        }
+
+        let result = await etcModel.updateOrderStatus(sIdx, items, status, managerId);
+        res.json({ result: true, data: result });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ result: false, message: '서버 오류' });
+    }
 }
 
 /* =========================================================================

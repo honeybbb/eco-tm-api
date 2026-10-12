@@ -160,10 +160,10 @@ exports.setBaseCode = async function (cIdx, groupCd, itemCd, itemNm, sort, useFl
     }
 }
 
-exports.updateBaseCode = async function (itemCd, itemNm, useFl, option, sort, modDt) {
+exports.updateBaseCode = async function (cIdx, itemCd, itemNm, useFl, option, sort, modDt) {
     let sql = "update new_tb_code set itemNm = ?, useFl=?, `option`=?, `sort`=?, modDt=?"
-    sql += " where itemCd in (?)"
-    let aParameter = [itemNm, useFl, option, sort, modDt, itemCd];
+    sql += " where cIdx = ? and itemCd in (?)"
+    let aParameter = [itemNm, useFl, option, sort, modDt, cIdx, itemCd];
 
     try {
         let [res] = await pool.query(sql, aParameter);
@@ -298,13 +298,12 @@ exports.deleteWageCode = async function (itemCd) {
     }
 }
 
-exports.deleteBaseCode = async function (itemCd) {
-    let sql = "delete from new_tb_code where itemCd = ?"
-    let aParameter = [itemCd];
+exports.deleteBaseCode = async function (cIdx, itemCd) {
+    let sql = "delete from new_tb_code where cIdx = ? and itemCd = ?"
+    let aParameter = [cIdx, itemCd];
 
-    let query = mysql.format(sql, aParameter);
     try {
-        let res = await pool.query(query);
+        let [res] = await pool.query(sql, aParameter);
         return res;
     }catch (e) {
         console.log('db err', e);
@@ -518,7 +517,7 @@ exports.setOrders = async function (sIdx, orderList, mIdx) {
     }
 };
 
-exports.getOrders = async function () {
+exports.getOrders = async function (cIdx) {
     let sql = `
         SELECT
             o.regDt,
@@ -546,7 +545,7 @@ exports.getOrders = async function () {
                     IF(COUNT(o.idx) > 1, CONCAT(' 외 ', COUNT(o.idx) - 1, '건'), '')
             ) AS summary
         FROM new_tb_orders o
-                 LEFT JOIN new_tb_site s ON o.sIdx = s.idx
+                 INNER JOIN new_tb_site s ON o.sIdx = s.idx AND s.cIdx = ?
                  LEFT JOIN new_tb_member m ON o.mIdx = m.idx
                  LEFT JOIN new_tb_code c ON o.itemCd = c.itemCd
             -- 상위 카테고리명을 가져오기 위한 Self Join
@@ -555,7 +554,7 @@ exports.getOrders = async function () {
         GROUP BY o.regDt, o.mIdx, o.sIdx, o.status
         ORDER BY o.regDt DESC
     `;
-    let aParameter = [];
+    let aParameter = [cIdx];
 
     try {
         let [res] = await pool.query(sql, aParameter);
@@ -566,15 +565,21 @@ exports.getOrders = async function () {
     }
 };
 
-exports.updateOrderStatus = async function (sIdx, oIdx, status, managerId) {
-    let sql = "update new_tb_orders set status = ?, modDt = NOW() WHERE sIdx = ? and idx = ? and managerId = ?";
-    let aParameter = [status, sIdx, oIdx, managerId];
-
+exports.updateOrderStatus = async function (sIdx, items, status, managerId) {
+    const conn = await pool.getConnection();
     try {
-        let [res] = await pool.query(sql, aParameter);
-        return res;
+        await conn.beginTransaction();
+        const sql = "UPDATE new_tb_orders SET qty = ?, status = ?, modDt = NOW(), managerId = ? WHERE sIdx = ? AND idx = ?";
+        for (const item of items) {
+            await conn.query(sql, [item.qty, status, managerId, sIdx, item.idx]);
+        }
+        await conn.commit();
+        return { affected: items.length };
     } catch (e) {
+        await conn.rollback();
         console.log('db err', e);
         return { 'data': '-9999' };
+    } finally {
+        conn.release();
     }
 }

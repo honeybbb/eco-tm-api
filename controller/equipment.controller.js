@@ -34,6 +34,14 @@ module.exports = function (app) {
     //장비 조회
     app.route('/v1/equipment/data/:idx').get(service.getEquipmentData);
 
+    //장비 단일 조회 (수정 화면용) & 수정
+    app.route('/v1/equipment/:idx')
+        .get(service.getEquipmentDetail)
+        .put(upload.array('imgPath', 10), service.updateEquipment);
+
+    //장비 일괄 삭제 (관련 이력 포함)
+    app.route('/v1/equipment').delete(service.deleteEquipments);
+
     //장비 수리등록 (before 사진 포함)
     app.route('/v1/equipment/repair').post(upload.array('beforeImgPath', 10), service.repairEquipment);
 
