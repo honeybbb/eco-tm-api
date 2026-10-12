@@ -141,6 +141,86 @@ exports.getEquipmentData = async function (req, res) {
     res.json({'result': true, 'data':result})
 }
 
+//장비 단일 조회 (수정 화면용)
+exports.getEquipmentDetail = async function (req, res) {
+    let idx = req.params.idx;
+
+    let result = await eqModel.getEquipmentById(idx);
+
+    if (!result) {
+        return res.status(404).json({ result: false, msg: '장비를 찾을 수 없습니다.' });
+    }
+
+    res.json({ result: true, data: result });
+}
+
+//장비 일괄 삭제 (관련 이력 포함 물리 삭제)
+exports.deleteEquipments = async function (req, res) {
+    const raw = req.body?.idxList;
+    const idxList = Array.isArray(raw)
+        ? raw.map(v => Number(v)).filter(v => Number.isFinite(v))
+        : [];
+
+    if (idxList.length === 0) {
+        return res.status(400).json({ result: false, msg: '삭제할 장비를 선택해주세요.' });
+    }
+
+    try {
+        const result = await eqModel.deleteEquipments(idxList);
+        res.json({ result: true, data: { affected: result?.affectedRows ?? 0 } });
+    } catch (e) {
+        console.error('장비 삭제 에러:', e);
+        res.status(500).json({ result: false, msg: '서버 에러 발생' });
+    }
+}
+
+//장비 수정 (기본 정보 + 이미지)
+exports.updateEquipment = async function (req, res) {
+    const idx = req.params.idx;
+    const name = req.body.name;
+    const type = req.body.type;
+    const model = req.body.model || '';
+    const serialNo = req.body.serialNo || '';
+    const purchaseDt = req.body.purchaseDt || null;
+    const supplyPrice = Number(req.body.supplyPrice) || 0;
+    const vat = Number(req.body.vat) || 0;
+    const totalPrice = Number(req.body.totalPrice) || 0;
+    const bigo = req.body.bigo ?? req.body.note ?? null;
+    // 유지할 기존 이미지 경로 (CSV 문자열)
+    const keptImgPath = req.body.keptImgPath || '';
+
+    if (!idx) {
+        return res.status(400).json({ result: false, msg: '장비 idx가 없습니다.' });
+    }
+    if (!name) {
+        return res.status(400).json({ result: false, msg: '장비명이 없습니다.' });
+    }
+    if (!type) {
+        return res.status(400).json({ result: false, msg: '장비 분류가 없습니다.' });
+    }
+
+    // 새로 업로드된 이미지 경로
+    let newImgPaths = [];
+    if (req.files && req.files.length > 0) {
+        newImgPaths = req.files.map(f => `/uploads/${f.filename}`);
+    }
+
+    // 유지 이미지 + 신규 이미지 병합
+    const keptArr = keptImgPath ? String(keptImgPath).split(',').map(s => s.trim()).filter(Boolean) : [];
+    const mergedImgPath = [...keptArr, ...newImgPaths].join(',');
+
+    try {
+        let result = await eqModel.updateEquipment(
+            idx, name, type, model, serialNo, purchaseDt,
+            supplyPrice, vat, totalPrice, mergedImgPath, bigo
+        );
+        res.json({ result: true, data: result });
+    } catch (error) {
+        console.error('장비 수정 DB 에러:', error);
+        res.status(500).json({ result: false, msg: '서버 에러 발생' });
+    }
+}
+
 //장비 배치
 exports.setEquipmentSite = async function (req, res) {
     let eqIdx = req.body.eqIdx,

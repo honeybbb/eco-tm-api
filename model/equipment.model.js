@@ -231,6 +231,40 @@ exports.completeEquipmentRepair = async function (repairIdx, completedDt, afterI
     }
 }
 
+// 단일 장비 조회 (수정 화면용)
+exports.getEquipmentById = async function (idx) {
+    let sql = "select * from new_tb_equipment where idx = ?";
+    try {
+        let [res] = await pool.query(sql, [idx]);
+        return res[0] || null;
+    } catch (e) {
+        console.error('getEquipmentById err', e);
+        return null;
+    }
+}
+
+// 장비 마스터 수정 (기본 정보)
+exports.updateEquipment = async function (
+    idx, name, type, model, serialNo, purchaseDt,
+    supplyPrice, vat, totalPrice, imgPath, bigo
+) {
+    let sql = "update new_tb_equipment set";
+    sql += " name = ?, type = ?, model = ?, serialNo = ?, purchaseDt = ?,";
+    sql += " supplyPrice = ?, vat = ?, totalPrice = ?, imgPath = ?, bigo = ?, modDt = NOW()";
+    sql += " where idx = ?";
+    let aParameter = [
+        name, type, model, serialNo, purchaseDt,
+        supplyPrice, vat, totalPrice, imgPath, bigo, idx
+    ];
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.error('updateEquipment err', e);
+        return { data: '-9999' };
+    }
+}
+
 // 장비 마스터 status 변경 (수리/점검중 등으로 전환)
 exports.updateEquipmentStatus = async function (eqIdx, status) {
     let sql = "update new_tb_equipment set status = ?, modDt = NOW() where idx = ?";
@@ -281,5 +315,27 @@ exports.getEquipmentDiscard = async function (eqIdx) {
     } catch (e) {
         console.error('getEquipmentDiscard err', e);
         return { data: '-9999' };
+    }
+}
+
+// 장비 및 관련 이력 일괄 삭제 (물리 삭제, 트랜잭션)
+exports.deleteEquipments = async function (idxList) {
+    if (!Array.isArray(idxList) || idxList.length === 0) return { affectedRows: 0 };
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+        await conn.query("delete from new_tb_equipment_assignment where eqIdx in (?)", [idxList]);
+        await conn.query("delete from new_tb_equipment_repair where eqIdx in (?)", [idxList]);
+        await conn.query("delete from new_tb_equipment_discard where eqIdx in (?)", [idxList]);
+        await conn.query("delete from new_tb_equipment_transaction where eqIdx in (?)", [idxList]);
+        const [res] = await conn.query("delete from new_tb_equipment where idx in (?)", [idxList]);
+        await conn.commit();
+        return res;
+    } catch (e) {
+        await conn.rollback();
+        console.error('deleteEquipments err', e);
+        throw e;
+    } finally {
+        conn.release();
     }
 }
