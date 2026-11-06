@@ -31,6 +31,19 @@ exports.findByAdminId = async function (loginId) {
     }
 }
 
+exports.updateLastLogin = async function (managerId, clientIp) {
+    let sql = "update new_tb_manager set lastLoginDt = NOW(), lastLoginIp = ? where managerId = ?";
+    let aParameter = [clientIp, managerId];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    }catch (e) {
+        console.log('updateLastLogin db err', e);
+        return {'data': '-9999'}
+    }
+}
+
 exports.loginUser = async function (loginId, password) {
     let sql = "select * from new_tb_member where id = ? and password = ?";
     let aParameter = [loginId, password];
