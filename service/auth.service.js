@@ -49,6 +49,13 @@ exports.loginManager = async function (req, res) {
                 process.env.JWT_REFRESH_SECRET,
                 { expiresIn: '7d' }
             );
+
+            let clientIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.ip;
+            if (clientIp && clientIp.includes(',')) {
+                clientIp = clientIp.split(',')[0].trim();
+            }
+            await authModel.updateLastLogin(admin[0].managerId, clientIp);
+
             res.json({ result: true, token, refreshToken, data: admin });
         } else {
             res.json({ result: false, msg: '아이디 혹은 비밀번호를 확인해주세요.' });

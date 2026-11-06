@@ -21,6 +21,9 @@ module.exports = function (app) {
     //급여총액 리스트 및 청구현황 데이터 수정
     app.route('/v1/settle/payroll/summary').put(service.updateSettleSummary);
 
+    //급여총액 리스트 및 청구현황 수동 행 추가
+    app.route('/v1/settle/payroll/summary').post(service.createSettleSummary);
+
     //청구현황
     app.route('/v1/settle/billing/list').get(service.getSettleBilling);
 

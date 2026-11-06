@@ -3,7 +3,11 @@ const mysql = require("mysql2/promise");
 
 exports.getSettleList = async function (startMonth, endMonth, docType, cIdx) {
     let sql = "SELECT ss.*, ";
-    sql += " (SELECT itemNm FROM new_tb_code WHERE itemCd = ss.type AND cIdx = ? LIMIT 1) AS typeNm";
+    sql += " (SELECT itemNm FROM new_tb_code WHERE itemCd = ss.type AND cIdx = ? LIMIT 1) AS typeNm,";
+    // 최신 메일 발송 상태 (refType='SETTLE', refIdx=ss.idx) — 리스트에서 메일 아이콘 색상 결정용
+    sql += " (SELECT q.status FROM new_tb_mail_queue q";
+    sql += "    WHERE q.cIdx = ss.cIdx AND q.refType = 'SETTLE' AND q.refIdx = ss.idx";
+    sql += "    ORDER BY q.idx DESC LIMIT 1) AS mailStatus";
     sql += " FROM new_tb_site_settlement ss ";
     // 연도와 월을 합쳐서 'YYYYMM' 형태의 문자열로 만든 후 BETWEEN 검색
     sql += " WHERE CONCAT(ss.year, LPAD(ss.month, 2, '0')) BETWEEN ? AND ? ";
@@ -70,7 +74,61 @@ exports.getSettlePayroll = async function (cIdx, year, month, sIdx){
     // 2. 상태값(status) 처리: mbs 데이터가 없으면(NULL이면) 0, 있으면 1(또는 mbs의 기존 상태값)
     // mbs.idx가 없다는 것은 계약서에서 데이터를 끌어왔다는 의미이므로 0을 반환합니다.
     sql += " CASE WHEN mbs.idx IS NULL THEN 0 ELSE 1 END as status,";
-    sql += " mbs.grossPay, mbs.deductions AS totalDeduction, mbs.netPay";
+    sql += " mbs.grossPay, mbs.deductions AS totalDeduction, mbs.netPay,";
+
+    // ── 근무일수 계산 (getPayrollCalculate와 동일 패턴, new_tb_work 결근일 반영) ──
+    sql += " DAY(LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))) AS scheduledDays,";
+    sql += ` (
+      DATEDIFF(
+        LEAST(
+          IFNULL(
+            CASE WHEN m.outDate IS NOT NULL AND m.outDate != '0000-00-00'
+                 THEN m.outDate
+            END,
+            LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))
+          ),
+          LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))
+        ),
+        GREATEST(
+          DATE(m.inDate),
+          CONCAT(?, '-', LPAD(?, 2, '0'), '-01')
+        )
+      ) + 1
+    ) AS eligibleDays,`;
+    sql += ` (
+      SELECT COUNT(DISTINCT DATE(workStartDt))
+      FROM new_tb_work
+      WHERE mIdx = m.idx
+        AND YEAR(workStartDt) = ? AND MONTH(workStartDt) = ?
+        AND workType = 'absent'
+    ) AS absentDays,`;
+    sql += ` (
+      (
+        DATEDIFF(
+          LEAST(
+            IFNULL(
+              CASE WHEN m.outDate IS NOT NULL AND m.outDate != '0000-00-00'
+                   THEN m.outDate
+              END,
+              LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))
+            ),
+            LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))
+          ),
+          GREATEST(
+            DATE(m.inDate),
+            CONCAT(?, '-', LPAD(?, 2, '0'), '-01')
+          )
+        ) + 1
+      )
+      -
+      (
+        SELECT COUNT(DISTINCT DATE(workStartDt))
+        FROM new_tb_work
+        WHERE mIdx = m.idx
+          AND YEAR(workStartDt) = ? AND MONTH(workStartDt) = ?
+          AND workType = 'absent'
+      )
+    ) AS workedDays`;
     sql += " from new_tb_member m";
 
     // 기본급 정보 (최신 1건)
@@ -90,7 +148,18 @@ exports.getSettlePayroll = async function (cIdx, year, month, sIdx){
 
     // 기본 WHERE 조건
     sql += " WHERE m.cIdx = ? and m.deleteFl = 'N'";
-    let aParameter = [cIdx];
+    let aParameter = [
+        year, month,        // scheduledDays
+        year, month,        // eligibleDays: LEAST outDate
+        year, month,        // eligibleDays: LAST_DAY
+        year, month,        // eligibleDays: GREATEST inDate
+        year, month,        // absentDays
+        year, month,        // workedDays: LEAST outDate
+        year, month,        // workedDays: LAST_DAY
+        year, month,        // workedDays: GREATEST inDate
+        year, month,        // workedDays: absentDays 서브쿼리
+        cIdx,
+    ];
 
     if (year && month) {
         const targetMonth = String(month).padStart(2, '0'); // month가 '7'로 와도 '07'로 안전하게 변환
@@ -352,10 +421,11 @@ exports.getSettleSummary = async function (cIdx, year, month) {
 
         FROM new_tb_site_settlement ss
 
-                 /* [청구 데이터] 최신 청구 데이터만 추출 (회사 스코프) */
+                 /* [청구 데이터] 최신 청구 데이터만 추출 (회사 스코프, 수동 추가 행 제외) */
                  INNER JOIN (SELECT MAX(idx) AS max_idx
                              FROM new_tb_site_settlement
                              WHERE year = ? AND month = ? AND cIdx = ?
+                               AND IFNULL(docType, '') <> 'MANUAL'
                              GROUP BY sIdx) latest ON ss.idx = latest.max_idx
 
                  INNER JOIN new_tb_site s ON s.idx = ss.sIdx AND s.cIdx = ?
@@ -425,7 +495,32 @@ exports.getSettleSummary = async function (cIdx, year, month) {
             GROUP BY ma.sIdx
         ) mio ON mio.sIdx = ss.sIdx
 
-        ORDER BY s.name ASC
+        UNION ALL
+
+        /* [수동 추가 행] docType = 'MANUAL' 로 추가된 행은 정산서 집계 로직을 건너뛰고 그대로 노출 */
+        SELECT
+            ss.sIdx,
+            ss.idx,
+            s.name AS siteName,
+            IFNULL(ss.bankName, s.bankName) as bankName,
+            s.payment_day,
+            ss.docType,
+            ss.type,
+            ss.grandTotal AS billingAmt,
+            ss.depositDt,
+            ss.depositAmount,
+            ss.bigo,
+            ss.invoiceDt,
+            ss.invoiceAmount,
+            0 AS contractCnt,
+            0 AS currentCnt, 0 AS female, 0 AS male, 0 AS \`join\`, 0 AS resign,
+            0 AS netPay, 0 AS payrollCnt,
+            JSON_ARRAY() AS payrollData
+        FROM new_tb_site_settlement ss
+            INNER JOIN new_tb_site s ON s.idx = ss.sIdx AND s.cIdx = ?
+        WHERE ss.cIdx = ? AND ss.year = ? AND ss.month = ? AND ss.docType = 'MANUAL'
+
+        ORDER BY siteName ASC
     `;
 
         // 파라미터 순서 매핑
@@ -438,7 +533,9 @@ exports.getSettleSummary = async function (cIdx, year, month) {
         year, month, cIdx,     // mpm 급여 합계용 (year, month, m.cIdx)
         cIdx,                  // mio 서브쿼리 회사 스코프 (m.cIdx)
         year, month,           // mio 입사자 상세용
-        year, month            // mio 퇴사자 상세용
+        year, month,           // mio 퇴사자 상세용
+        cIdx,                  // [MANUAL] s.cIdx
+        cIdx, year, month      // [MANUAL] ss.cIdx, ss.year, ss.month
     ];
 
     try {
@@ -455,6 +552,38 @@ exports.updateSettleSummary = async function (cIdx, ssIdx, invoiceDt, invoiceAmo
     let sql = "update new_tb_site_settlement set invoiceDt = ?, invoiceAmount = ?, bankName = ?, bigo = ? where cIdx = ? and idx = ?"
 
     let aParameter = [invoiceDt, invoiceAmount, bankName, bigo, cIdx, ssIdx];
+
+    try {
+        let [res] = await pool.query(sql, aParameter);
+        return res;
+    } catch (e) {
+        console.log('db err', e);
+        return {'data': '-9999'}
+    }
+}
+
+exports.createSettleSummary = async function (cIdx, item) {
+    let sql = `
+        INSERT INTO new_tb_site_settlement
+            (sIdx, cIdx, year, month, docType, type, grandTotal,
+             invoiceDt, invoiceAmount, bankName, depositDt, depositAmount, bigo, regDt)
+        VALUES (?, ?, ?, ?, 'MANUAL', ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    `;
+
+    let aParameter = [
+        item.sIdx,
+        cIdx,
+        item.year,
+        item.month,
+        item.type || null,
+        Number(item.grandTotal) || 0,
+        item.invoiceDt || null,
+        item.invoiceAmount || null,
+        item.bankName || null,
+        item.depositDt || null,
+        Number(item.depositAmount) || 0,
+        item.bigo || ''
+    ];
 
     try {
         let [res] = await pool.query(sql, aParameter);

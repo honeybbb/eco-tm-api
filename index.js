@@ -72,6 +72,11 @@ equipmentRoutes(app);
 var favoriteRoutes = require("./controller/favorite.controller");
 favoriteRoutes(app);
 
+var mailRoutes = require("./controller/mail.controller");
+mailRoutes(app);
+
 app.listen(port, () => {
     console.log(`Example app listening on port ${port}`)
+    // 메일 발송 워커 기동 (MAIL_WORKER_ENABLED=Y 인 인스턴스에서만)
+    require('./utils/mailWorker').start();
 })

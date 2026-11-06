@@ -765,8 +765,8 @@ exports.DeleteSite = async function (cIdx, sIdx) {
 
 exports.updateSiteManager = async function (cIdx, siteIds, targetField, managerName) {
     // ?? 는 컬럼명(식별자), ? 는 데이터(값)로 매핑됩니다.
-    // 기존에 sIdx를 사용하셨으므로 WHERE 절은 sIdx IN (?) 으로 유지합니다.
-    let sql = "UPDATE new_tb_site SET ?? = ? WHERE sIdx IN (?) AND cIdx = ?";
+    // new_tb_site 테이블 PK 는 idx (sIdx 컬럼은 존재하지 않음)
+    let sql = "UPDATE new_tb_site SET ?? = ? WHERE idx IN (?) AND cIdx = ?";
 
     // 순서대로 targetField(컬럼명), managerName(이름), siteIds(배열), cIdx 매핑
     let aParameter = [targetField, managerName, siteIds, cIdx];

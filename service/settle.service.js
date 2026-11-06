@@ -305,6 +305,30 @@ exports.updateSettleSummary = async function (req, res) {
     }
 }
 
+exports.createSettleSummary = async function (req, res) {
+    let cIdx = req.user.cIdx,
+        data = req.body.data;
+
+    if (!data || !Array.isArray(data) || data.length === 0) {
+        return res.status(400).json({ result: false, message: '잘못된 데이터 형식입니다.' });
+    }
+
+    const invalid = data.find(row => !row.sIdx || !row.year || !row.month);
+    if (invalid) {
+        return res.status(400).json({ result: false, message: '현장/연월은 필수 입력입니다.' });
+    }
+
+    try {
+        const results = await Promise.all(data.map(item =>
+            settleModel.createSettleSummary(cIdx, item)
+        ));
+        res.json({'result': true, 'data': results});
+    } catch (error) {
+        console.error('Create Settle Summary Error:', error);
+        res.status(500).json({'result': false, 'msg': '서버 오류가 발생했습니다.'});
+    }
+}
+
 //청구현황 조회
 exports.getSettleBilling = async function (req, res) {
     let cIdx = req.user.cIdx,
